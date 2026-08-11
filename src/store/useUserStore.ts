@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { LessonAttempt, OnboardingAnswers, TradingExperience } from '../types';
 import { SKILL_TREE } from '../data/lessons';
+import { stagesForDifficulty } from '../utils/mastery';
 
 const MAX_HEARTS = 5;
 const HEART_REGEN_MINUTES = 30;
@@ -21,12 +22,14 @@ interface UserState {
   attempts: LessonAttempt[];
   virtualBalance: number;
   seenIntroNodeIds: string[];
+  nodeStageProgress: Record<string, number>;
 
   startOnboarding: () => void;
   setOnboardingAnswer: (key: keyof OnboardingAnswers, value: string) => void;
   finishOnboarding: (name: string) => void;
   loseHeart: () => void;
   refillHearts: () => void;
+  tickHeartRegen: () => void;
   addXp: (amount: number) => void;
   completeLesson: (attempt: LessonAttempt) => void;
   isNodeUnlocked: (nodeId: string) => boolean;
@@ -34,6 +37,9 @@ interface UserState {
   unlockBadge: (badgeId: string) => void;
   hasSeenIntro: (nodeId: string) => boolean;
   markIntroSeen: (nodeId: string) => void;
+  getNodeStage: (nodeId: string) => number;
+  getNodeMaxStage: (nodeId: string) => number;
+  isNodePlatinum: (nodeId: string) => boolean;
   resetProgress: () => void;
 }
 
@@ -74,6 +80,7 @@ export const useUserStore = create<UserState>()(
       attempts: [],
       virtualBalance: 10000,
       seenIntroNodeIds: [],
+      nodeStageProgress: {},
 
       startOnboarding: () => set({ onboarded: false }),
 
@@ -92,6 +99,21 @@ export const useUserStore = create<UserState>()(
 
       refillHearts: () => set({ hearts: MAX_HEARTS, lastHeartLostAt: null }),
 
+      tickHeartRegen: () => {
+        const s = get();
+        if (s.hearts >= MAX_HEARTS || !s.lastHeartLostAt) return;
+        const regenMs = HEART_REGEN_MINUTES * 60_000;
+        const elapsed = Date.now() - new Date(s.lastHeartLostAt).getTime();
+        const regensEarned = Math.floor(elapsed / regenMs);
+        if (regensEarned <= 0) return;
+        const newHearts = Math.min(MAX_HEARTS, s.hearts + regensEarned);
+        const newLastHeartLostAt =
+          newHearts >= MAX_HEARTS
+            ? null
+            : new Date(new Date(s.lastHeartLostAt).getTime() + regensEarned * regenMs).toISOString();
+        set({ hearts: newHearts, lastHeartLostAt: newLastHeartLostAt });
+      },
+
       addXp: (amount) => set((s) => ({ xp: s.xp + amount })),
 
       completeLesson: (attempt) =>
@@ -100,12 +122,22 @@ export const useUserStore = create<UserState>()(
           const completedLessonIds = s.completedLessonIds.includes(attempt.lessonId)
             ? s.completedLessonIds
             : [...s.completedLessonIds, attempt.lessonId];
+
+          const node = SKILL_TREE.find((n) => n.id === attempt.nodeId);
+          const maxStage = node ? stagesForDifficulty(node.difficulty) : 0;
+          const currentStage = s.nodeStageProgress[attempt.nodeId] ?? 0;
+          const nodeStageProgress = {
+            ...s.nodeStageProgress,
+            [attempt.nodeId]: Math.min(maxStage, currentStage + 1),
+          };
+
           return {
             xp: s.xp + attempt.xpEarned,
             attempts: [...s.attempts, attempt],
             completedLessonIds,
             streak,
             lastActiveDate,
+            nodeStageProgress,
           };
         }),
 
@@ -138,6 +170,19 @@ export const useUserStore = create<UserState>()(
           s.seenIntroNodeIds.includes(nodeId) ? s : { seenIntroNodeIds: [...s.seenIntroNodeIds, nodeId] }
         ),
 
+      getNodeStage: (nodeId) => get().nodeStageProgress[nodeId] ?? 0,
+
+      getNodeMaxStage: (nodeId) => {
+        const node = SKILL_TREE.find((n) => n.id === nodeId);
+        return node ? stagesForDifficulty(node.difficulty) : 0;
+      },
+
+      isNodePlatinum: (nodeId) => {
+        const { getNodeStage, getNodeMaxStage } = get();
+        const max = getNodeMaxStage(nodeId);
+        return max > 0 && getNodeStage(nodeId) >= max;
+      },
+
       resetProgress: () =>
         set({
           name: '',
@@ -153,6 +198,7 @@ export const useUserStore = create<UserState>()(
           attempts: [],
           virtualBalance: 10000,
           seenIntroNodeIds: [],
+          nodeStageProgress: {},
         }),
     }),
     { name: 'stonksu-storage' }

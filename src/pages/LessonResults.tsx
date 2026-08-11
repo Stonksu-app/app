@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Confetti from '../components/Confetti';
 import Icon from '../components/Icon';
@@ -12,6 +12,8 @@ interface ResultsState {
   xpEarned: number;
   nodeTitle: string;
   newBadgeIds: string[];
+  stage: number;
+  maxStage: number;
 }
 
 export default function LessonResults() {
@@ -29,12 +31,14 @@ export default function LessonResults() {
   const accuracy = totalQuestions ? Math.round((correctCount / totalQuestions) * 100) : 0;
   const animatedXp = useCountUp(xpEarned);
   const animatedAccuracy = useCountUp(accuracy);
+  const [completeLine] = useState(() => randomLine('lessonComplete'));
 
   if (!state) return null;
 
-  const { nodeTitle, newBadgeIds } = state;
+  const { nodeTitle, newBadgeIds, stage, maxStage } = state;
   const perfect = correctCount === totalQuestions;
   const earnedBadges = BADGES.filter((b) => newBadgeIds?.includes(b.id));
+  const justPlatinumed = maxStage > 0 && stage >= maxStage;
 
   return (
     <div className="min-h-screen bg-carbon-900 flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
@@ -47,7 +51,7 @@ export default function LessonResults() {
           {perfect ? '¡Lección perfecta!' : '¡Lección completada!'}
         </h1>
       </div>
-      <p className="text-carbon-300 mt-1 font-medium">{nodeTitle} — {randomLine('lessonComplete')}</p>
+      <p className="text-carbon-300 mt-1 font-medium">{nodeTitle} — {completeLine}</p>
 
       <div className="mt-8 bg-carbon-850 border border-carbon-800 rounded-3xl p-6 w-full max-w-sm">
         <div className="grid grid-cols-2 gap-4">
@@ -63,6 +67,30 @@ export default function LessonResults() {
         <p className="mt-4 text-sm font-bold text-carbon-300">
           {correctCount} de {totalQuestions} respuestas correctas
         </p>
+
+        {maxStage > 0 && (
+          <div className="mt-4 pt-4 border-t border-carbon-800">
+            {justPlatinumed ? (
+              <p className="flex items-center justify-center gap-1.5 text-sm font-black text-carbon-50 animate-pop-in">
+                <Icon name="diamond" size={16} className="text-carbon-100" /> ¡Tema PLATINADO!
+              </p>
+            ) : (
+              <>
+                <div className="flex items-center justify-center gap-1 mb-2">
+                  {Array.from({ length: maxStage }).map((_, i) => (
+                    <span
+                      key={i}
+                      className={`h-2 flex-1 rounded-full ${i < stage ? 'bg-lime-500' : 'bg-carbon-700'}`}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs font-bold text-carbon-400">
+                  Etapa {stage}/{maxStage} — te faltan {maxStage - stage} para PLATINO
+                </p>
+              </>
+            )}
+          </div>
+        )}
 
         {earnedBadges.length > 0 && (
           <div className="mt-5 pt-4 border-t border-carbon-800">

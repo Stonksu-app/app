@@ -8,6 +8,7 @@ export const SKILL_TREE: SkillNode[] = [
     description: 'Qué es el trading, mercados y brokers',
     requires: [],
     position: { x: 50, y: 0 },
+    difficulty: 'hard',
     intro: {
       flashcards: [
         { id: 'fc-broker', term: 'Bróker', definition: 'Plataforma que te da acceso a comprar y vender en los mercados.' },
@@ -228,6 +229,7 @@ export const SKILL_TREE: SkillNode[] = [
     description: 'Patrones de candlestick: martillo, doji, envolvente',
     requires: ['fundamentos'],
     position: { x: 20, y: 1 },
+    difficulty: 'medium',
     intro: {
       flashcards: [
         { id: 'fc-vela-alcista', term: 'Vela alcista', definition: 'Cierre por encima de la apertura (verde).' },
@@ -432,6 +434,7 @@ export const SKILL_TREE: SkillNode[] = [
     description: 'Niveles clave donde el precio reacciona',
     requires: ['velas-japonesas'],
     position: { x: 80, y: 2 },
+    difficulty: 'easy',
     intro: {
       flashcards: [
         { id: 'fc-soporte', term: 'Soporte', definition: 'Zona donde la caída del precio tiende a detenerse.' },
@@ -618,6 +621,7 @@ export const SKILL_TREE: SkillNode[] = [
     requires: ['soportes-resistencias'],
     position: { x: 50, y: 3 },
     lessons: [],
+    difficulty: 'medium',
   },
   {
     id: 'gestion-riesgo',
@@ -627,6 +631,7 @@ export const SKILL_TREE: SkillNode[] = [
     requires: ['indicadores'],
     position: { x: 20, y: 4 },
     lessons: [],
+    difficulty: 'medium',
   },
   {
     id: 'psicologia',
@@ -636,6 +641,7 @@ export const SKILL_TREE: SkillNode[] = [
     requires: ['gestion-riesgo'],
     position: { x: 80, y: 5 },
     lessons: [],
+    difficulty: 'medium',
   },
   {
     id: 'ordenes',
@@ -645,6 +651,7 @@ export const SKILL_TREE: SkillNode[] = [
     requires: ['psicologia'],
     position: { x: 50, y: 6 },
     lessons: [],
+    difficulty: 'medium',
   },
   {
     id: 'fundamentales',
@@ -654,6 +661,7 @@ export const SKILL_TREE: SkillNode[] = [
     requires: ['ordenes'],
     position: { x: 20, y: 7 },
     lessons: [],
+    difficulty: 'medium',
   },
 ];
 

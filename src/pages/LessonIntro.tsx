@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import FlashcardDeck from '../components/FlashcardDeck';
 import Icon from '../components/Icon';
 import Mascot from '../components/Mascot';
+import OutOfHeartsScreen from '../components/OutOfHeartsScreen';
 import { getLessonById } from '../data/lessons';
 import { useUserStore } from '../store/useUserStore';
 
@@ -14,9 +15,10 @@ const GOAL_MESSAGES: Record<string, string> = {
 };
 
 export default function LessonIntro() {
+  useUserStore.getState().tickHeartRegen();
   const { lessonId } = useParams<{ lessonId: string }>();
   const navigate = useNavigate();
-  const { onboardingAnswers, markIntroSeen, name } = useUserStore();
+  const { onboardingAnswers, markIntroSeen, name, hearts } = useUserStore();
 
   const data = useMemo(() => (lessonId ? getLessonById(lessonId) : undefined), [lessonId]);
 
@@ -27,6 +29,7 @@ export default function LessonIntro() {
   }, [data, lessonId, navigate]);
 
   if (!data) return null;
+  if (hearts <= 0) return <OutOfHeartsScreen blockedEntry />;
   const { node, lesson } = data;
   if (!node.intro) return null;
   const { intro } = node;
