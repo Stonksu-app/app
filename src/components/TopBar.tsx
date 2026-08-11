@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useUserStore } from '../store/useUserStore';
 import HeartsDisplay from './HeartsDisplay';
 import Icon from './Icon';
+import Mascot from './Mascot';
 import type { IconName } from '../types';
 
 export default function TopBar() {
@@ -26,9 +27,8 @@ export default function TopBar() {
   return (
     <header className="sticky top-0 z-30 bg-carbon-900/90 backdrop-blur border-b border-carbon-800">
       <div className="max-w-4xl mx-auto px-2 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-1 sm:gap-3">
-        <Link to="/home" className="flex items-center gap-1.5 font-black text-carbon-50 text-lg shrink-0">
-          <Icon name="bull" size={26} className="text-lime-500" />
-          <span className="hidden sm:inline">Stonksu</span>
+        <Link to="/home" className="flex items-center shrink-0" aria-label="Stonksu">
+          <Mascot size={34} mood="happy" />
         </Link>
 
         <nav className="flex items-center gap-0.5 sm:gap-1 shrink-0">

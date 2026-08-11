@@ -34,12 +34,8 @@ export default function SentenceRoundCard({
 
   const handleSelect = (id: string) => {
     if (checked) return;
+    const correct = id === 'correct';
     setSelectedId(id);
-  };
-
-  const handleCheck = () => {
-    if (!selectedId) return;
-    const correct = selectedId === 'correct';
     setChecked(true);
     onResult?.(correct);
   };
@@ -93,19 +89,18 @@ export default function SentenceRoundCard({
         <p className="text-center text-danger-400 text-sm font-bold mb-3">No es la palabra correcta, ¡inténtalo de nuevo!</p>
       )}
 
-      <button
-        onClick={checked ? handleContinue : handleCheck}
-        disabled={!selectedId}
-        className={`w-full font-black text-lg py-3.5 rounded-2xl transition active:scale-95 disabled:cursor-not-allowed ${
-          checked
-            ? isCorrect
+      {checked && (
+        <button
+          onClick={handleContinue}
+          className={`w-full font-black text-lg py-3.5 rounded-2xl transition active:scale-95 ${
+            isCorrect
               ? 'bg-lime-500 hover:bg-lime-400 text-carbon-900'
               : 'bg-danger-500 hover:bg-danger-600 text-white'
-            : 'bg-lime-500 disabled:bg-carbon-800 disabled:text-carbon-500 hover:enabled:bg-lime-400 text-carbon-900'
-        }`}
-      >
-        {checked ? (isCorrect ? 'Continuar' : 'Reintentar') : 'Comprobar'}
-      </button>
+          }`}
+        >
+          {isCorrect ? 'Continuar' : 'Reintentar'}
+        </button>
+      )}
     </div>
   );
 }

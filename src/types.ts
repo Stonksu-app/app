@@ -124,6 +124,8 @@ export interface NodeIntro {
   games: IntroGame[];
 }
 
+export type NodeDifficulty = 'easy' | 'medium' | 'hard';
+
 export interface SkillNode {
   id: string;
   title: string;
@@ -133,6 +135,7 @@ export interface SkillNode {
   requires: string[];
   position: { x: number; y: number };
   intro?: NodeIntro;
+  difficulty: NodeDifficulty;
 }
 
 export interface Badge {

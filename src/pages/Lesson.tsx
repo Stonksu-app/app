@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import CandleChart from '../components/CandleChart';
 import ComboCelebration from '../components/ComboCelebration';
@@ -29,9 +29,11 @@ const ACTIVITY_BADGE: Partial<Record<Activity['type'], { icon: IconName; label: 
 };
 
 export default function Lesson() {
+  useUserStore.getState().tickHeartRegen();
   const { lessonId } = useParams<{ lessonId: string }>();
   const navigate = useNavigate();
-  const { completeLesson, unlockBadge, attempts, streak, isLessonCompleted } = useUserStore();
+  const { completeLesson, unlockBadge, attempts, streak, isLessonCompleted, getNodeStage, getNodeMaxStage } =
+    useUserStore();
   const {
     hearts,
     combo,
@@ -56,6 +58,7 @@ export default function Lesson() {
   const [checked, setChecked] = useState(false);
   const [mascotLine, setMascotLine] = useState('');
   const [showOutOfHearts, setShowOutOfHearts] = useState(false);
+  const [enteredWithNoHearts] = useState(() => hearts <= 0);
 
   if (!data || activities.length === 0) {
     return (
@@ -66,6 +69,10 @@ export default function Lesson() {
         </button>
       </div>
     );
+  }
+
+  if (enteredWithNoHearts) {
+    return <OutOfHeartsScreen blockedEntry />;
   }
 
   const { node, lesson } = data;
@@ -112,12 +119,15 @@ export default function Lesson() {
         xpEarned: totalCorrect * XP_PER_CORRECT,
         nodeTitle: node.title,
         newBadgeIds: newBadges,
+        stage: getNodeStage(node.id),
+        maxStage: getNodeMaxStage(node.id),
       },
       replace: true,
     });
   };
 
   const advance = () => {
+    if (outOfHearts) return;
     if (index === activities.length - 1) {
       finishLesson();
       return;
@@ -128,25 +138,19 @@ export default function Lesson() {
   };
 
   const handleSelect = (optionId: string) => {
-    if (checked) return;
+    if (!isQuiz || checked) return;
+    const correct = optionId === activity.question.correctOptionId;
     setSelectedId(optionId);
-  };
-
-  const handleCheck = () => {
-    if (!isQuiz || !selectedId) return;
-    const correct = selectedId === activity.question.correctOptionId;
     setChecked(true);
     setMascotLine(randomLine(correct ? 'correct' : 'incorrect'));
     registerResult(correct);
   };
 
-  const handleContinue = () => {
-    if (outOfHearts) {
-      setShowOutOfHearts(true);
-      return;
-    }
-    advance();
-  };
+  useEffect(() => {
+    if (!outOfHearts) return;
+    const t = setTimeout(() => setShowOutOfHearts(true), 1400);
+    return () => clearTimeout(t);
+  }, [outOfHearts]);
 
   if (showOutOfHearts) return <OutOfHeartsScreen />;
 
@@ -272,45 +276,36 @@ export default function Lesson() {
         )}
       </div>
 
-      {isQuiz && (
+      {isQuiz && checked && (
         <div
           className={`w-full border-t-2 transition-colors ${
-            isCorrect
-              ? 'bg-lime-500/5 border-lime-500/20'
-              : isWrong
-              ? 'bg-danger-950 border-danger-500/20'
-              : 'border-transparent'
+            isCorrect ? 'bg-lime-500/5 border-lime-500/20' : 'bg-danger-950 border-danger-500/20'
           }`}
         >
           <div className="max-w-xl mx-auto px-4 py-4">
-            {checked && (
-              <div className="flex items-center gap-3 mb-3 animate-pop-in">
-                <div className="relative shrink-0 flex items-center justify-center">
-                  <DirectionBadge direction={isCorrect ? 'long' : 'short'} />
-                  <Mascot size={44} mood={isCorrect ? 'hype' : 'sad'} className={isWrong ? 'animate-shake' : ''} />
-                  <ParticleBurst show={isCorrect} />
-                </div>
-                <div>
-                  <p className={`font-black ${isCorrect ? 'text-lime-400' : 'text-danger-400'}`}>
-                    {isCorrect ? '¡Correcto! ' : 'Incorrecto. '}
-                    {mascotLine}
-                  </p>
-                  <p className="text-sm text-carbon-400">{activity.question.explanation}</p>
-                </div>
+            <div className="flex items-center gap-3 mb-3 animate-pop-in">
+              <div className="relative shrink-0 flex items-center justify-center">
+                <DirectionBadge direction={isCorrect ? 'long' : 'short'} />
+                <Mascot size={44} mood={isCorrect ? 'hype' : 'sad'} className={isWrong ? 'animate-shake' : ''} />
+                <ParticleBurst show={isCorrect} />
               </div>
-            )}
+              <div>
+                <p className={`font-black ${isCorrect ? 'text-lime-400' : 'text-danger-400'}`}>
+                  {isCorrect ? '¡Correcto! ' : 'Incorrecto. '}
+                  {mascotLine}
+                </p>
+                <p className="text-sm text-carbon-400">{activity.question.explanation}</p>
+              </div>
+            </div>
             <button
-              onClick={checked ? handleContinue : handleCheck}
-              disabled={!selectedId}
-              className={`w-full font-black text-lg py-4 rounded-2xl transition active:scale-95 disabled:cursor-not-allowed ${
-                checked
-                  ? isCorrect
-                    ? 'bg-lime-500 hover:bg-lime-400 text-carbon-900 animate-pulse-ring'
-                    : 'bg-danger-500 hover:bg-danger-600 text-white'
-                  : 'bg-lime-500 disabled:bg-carbon-800 disabled:text-carbon-500 hover:enabled:bg-lime-400 text-carbon-900'
+              onClick={advance}
+              className={`w-full font-black text-lg py-4 rounded-2xl transition active:scale-95 ${
+                isCorrect
+                  ? 'bg-lime-500 hover:bg-lime-400 text-carbon-900 animate-pulse-ring'
+                  : 'bg-danger-500 hover:bg-danger-600 text-white'
               }`}
             >
-              {checked ? 'Continuar' : 'Comprobar'}
+              Continuar
             </button>
           </div>
         </div>

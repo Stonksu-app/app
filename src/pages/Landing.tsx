@@ -14,9 +14,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-carbon-900">
       <header className="max-w-5xl mx-auto flex items-center justify-between px-5 py-5">
-        <div className="flex items-center gap-2 font-black text-carbon-50 text-xl">
-          <Icon name="bull" size={30} className="text-lime-500" /> Stonksu
-        </div>
+        <Mascot size={40} mood="happy" />
         <Link
           to="/onboarding"
           className="text-sm font-bold text-lime-400 hover:text-lime-300 px-4 py-2 rounded-full border-2 border-carbon-700 hover:border-lime-500/50 transition"
