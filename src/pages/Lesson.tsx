@@ -1,0 +1,320 @@
+import { useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import CandleChart from '../components/CandleChart';
+import ComboCelebration from '../components/ComboCelebration';
+import DirectionBadge from '../components/DirectionBadge';
+import Icon from '../components/Icon';
+import LessonHeader from '../components/LessonHeader';
+import Mascot, { randomLine } from '../components/Mascot';
+import MatchPairsGame from '../components/MatchPairsGame';
+import OutOfHeartsScreen from '../components/OutOfHeartsScreen';
+import ParticleBurst from '../components/ParticleBurst';
+import SentenceRoundCard from '../components/SentenceRoundCard';
+import SequenceGame from '../components/SequenceGame';
+import SortClassifyGame from '../components/SortClassifyGame';
+import StreakPill from '../components/StreakPill';
+import { getLessonById, getNodeById } from '../data/lessons';
+import { useComboFeedback } from '../hooks/useComboFeedback';
+import { useUserStore } from '../store/useUserStore';
+import { buildActivityStream } from '../utils/buildActivityStream';
+import type { Activity, IconName } from '../types';
+
+const XP_PER_CORRECT = 10;
+
+const ACTIVITY_BADGE: Partial<Record<Activity['type'], { icon: IconName; label: string }>> = {
+  match: { icon: 'shuffle', label: 'Emparejar' },
+  classify: { icon: 'target', label: 'Clasificar' },
+  sequence: { icon: 'clipboard', label: 'Ordenar' },
+  sentence: { icon: 'pencil', label: 'Completar' },
+};
+
+export default function Lesson() {
+  const { lessonId } = useParams<{ lessonId: string }>();
+  const navigate = useNavigate();
+  const { completeLesson, unlockBadge, attempts, streak, isLessonCompleted } = useUserStore();
+  const {
+    hearts,
+    combo,
+    celebration,
+    heartsLost,
+    outOfHearts,
+    registerResult,
+    shakeClass,
+    totalCorrect,
+    totalAttempts,
+    lastResult,
+  } = useComboFeedback();
+
+  const data = useMemo(() => (lessonId ? getLessonById(lessonId) : undefined), [lessonId]);
+  const activities = useMemo(
+    () => (data ? buildActivityStream(data.lesson.questions, data.node.intro?.games) : []),
+    [data]
+  );
+
+  const [index, setIndex] = useState(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState(false);
+  const [mascotLine, setMascotLine] = useState('');
+  const [showOutOfHearts, setShowOutOfHearts] = useState(false);
+
+  if (!data || activities.length === 0) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-carbon-900 p-6 text-center">
+        <p className="font-bold text-carbon-50">No encontramos esa lección.</p>
+        <button onClick={() => navigate('/home')} className="text-lime-400 font-bold">
+          Volver al mapa
+        </button>
+      </div>
+    );
+  }
+
+  const { node, lesson } = data;
+  const activity = activities[index];
+  const progressPct = Math.round((index / activities.length) * 100);
+  const badge = ACTIVITY_BADGE[activity.type];
+
+  const isQuiz = activity.type === 'quiz';
+  const isCorrect = isQuiz && checked && selectedId === activity.question.correctOptionId;
+  const isWrong = isQuiz && checked && selectedId !== null && selectedId !== activity.question.correctOptionId;
+  const zoomPulse = lastResult?.correct ? 'animate-zoom-pulse' : '';
+
+  const finishLesson = () => {
+    const wasFirstEverLesson = attempts.length === 0;
+    const alreadyCompleted = isLessonCompleted(lesson.id);
+
+    completeLesson({
+      lessonId: lesson.id,
+      nodeId: node.id,
+      completedAt: new Date().toISOString(),
+      xpEarned: totalCorrect * XP_PER_CORRECT,
+      correctCount: totalCorrect,
+      totalQuestions: totalAttempts,
+    });
+
+    const newBadges: string[] = [];
+    if (wasFirstEverLesson) newBadges.push('first-green-candle');
+    if (heartsLost > 0) newBadges.push('survived-stop-loss');
+    if (heartsLost === 0 && totalCorrect === totalAttempts) newBadges.push('perfect-lesson');
+    if (streak + 1 >= 7) newBadges.push('week-streak');
+    if (!alreadyCompleted) {
+      const node2 = getNodeById(node.id);
+      if (node2 && node2.lessons.every((l) => l.id === lesson.id || isLessonCompleted(l.id))) {
+        if (node.id === 'fundamentos') newBadges.push('fundamentals-master');
+        if (node.id === 'velas-japonesas') newBadges.push('candle-reader');
+      }
+    }
+    newBadges.forEach((b) => unlockBadge(b));
+
+    navigate(`/lesson/${lesson.id}/results`, {
+      state: {
+        correctCount: totalCorrect,
+        totalQuestions: totalAttempts,
+        xpEarned: totalCorrect * XP_PER_CORRECT,
+        nodeTitle: node.title,
+        newBadgeIds: newBadges,
+      },
+      replace: true,
+    });
+  };
+
+  const advance = () => {
+    if (index === activities.length - 1) {
+      finishLesson();
+      return;
+    }
+    setIndex((i) => i + 1);
+    setSelectedId(null);
+    setChecked(false);
+  };
+
+  const handleSelect = (optionId: string) => {
+    if (checked) return;
+    setSelectedId(optionId);
+  };
+
+  const handleCheck = () => {
+    if (!isQuiz || !selectedId) return;
+    const correct = selectedId === activity.question.correctOptionId;
+    setChecked(true);
+    setMascotLine(randomLine(correct ? 'correct' : 'incorrect'));
+    registerResult(correct);
+  };
+
+  const handleContinue = () => {
+    if (outOfHearts) {
+      setShowOutOfHearts(true);
+      return;
+    }
+    advance();
+  };
+
+  if (showOutOfHearts) return <OutOfHeartsScreen />;
+
+  return (
+    <div className={`min-h-screen bg-carbon-900 flex flex-col relative overflow-hidden ${zoomPulse} ${shakeClass}`}>
+      {celebration && <ComboCelebration tier={celebration} />}
+
+      {lastResult && (
+        <div
+          key={lastResult.nonce}
+          className={`fixed inset-0 pointer-events-none z-30 ${
+            lastResult.correct ? 'animate-flash-correct' : 'animate-flash-incorrect'
+          }`}
+        />
+      )}
+
+      <LessonHeader progressPct={progressPct} hearts={hearts} />
+
+      <div className="flex-1 max-w-xl w-full mx-auto px-4 py-6 flex flex-col relative">
+        <div className="flex items-center justify-between mb-1 gap-2">
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-black text-lime-400 uppercase tracking-wide">{node.title}</p>
+            {badge && (
+              <span className="flex items-center gap-1 text-[10px] font-black text-carbon-300 bg-carbon-800 px-2 py-0.5 rounded-full uppercase">
+                <Icon name={badge.icon} size={11} />
+                {badge.label}
+              </span>
+            )}
+            <StreakPill combo={combo} />
+          </div>
+          {isCorrect && (
+            <span key={`${activity.id}-xp`} className="text-sm font-black text-lime-400 animate-float-up">
+              +{XP_PER_CORRECT} XP
+            </span>
+          )}
+        </div>
+
+        {isQuiz && (
+          <>
+            <h1 className="text-xl sm:text-2xl font-black text-carbon-50">{activity.question.prompt}</h1>
+            {activity.question.helper && <p className="text-sm text-carbon-400 mt-1">{activity.question.helper}</p>}
+
+            {activity.question.chart && (
+              <div className="mt-4">
+                <CandleChart kind={activity.question.chart} />
+              </div>
+            )}
+
+            <div className="mt-6 grid grid-cols-1 gap-3">
+              {activity.question.options.map((opt) => {
+                const isSelected = selectedId === opt.id;
+                const showCorrect = checked && opt.id === activity.question.correctOptionId;
+                const showIncorrect = checked && isSelected && opt.id !== activity.question.correctOptionId;
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => handleSelect(opt.id)}
+                    disabled={checked}
+                    className={`text-left px-4 py-3.5 rounded-2xl border-2 font-bold transition flex items-center gap-3 ${
+                      showCorrect
+                        ? 'border-lime-500 bg-lime-500/10 text-lime-300'
+                        : showIncorrect
+                        ? 'border-danger-500 bg-danger-950 text-danger-400 animate-shake'
+                        : isSelected
+                        ? 'border-carbon-400 bg-carbon-800 text-carbon-50'
+                        : 'border-carbon-800 bg-carbon-850 text-carbon-200 hover:border-carbon-600'
+                    }`}
+                  >
+                    {showCorrect && <Icon name="check" size={18} className="text-lime-400 shrink-0 animate-bounce-in" />}
+                    {showIncorrect && <Icon name="close" size={18} className="text-danger-400 shrink-0 animate-bounce-in" />}
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {activity.type === 'match' && (
+          <div key={activity.id} className="mt-2">
+            <MatchPairsGame
+              pairs={activity.pairs}
+              instructions={activity.instructions}
+              onResult={registerResult}
+              onDone={advance}
+            />
+          </div>
+        )}
+
+        {activity.type === 'classify' && (
+          <div key={activity.id} className="mt-2">
+            <SortClassifyGame
+              items={activity.items}
+              instructions={activity.instructions}
+              bucketALabel={activity.bucketALabel}
+              bucketBLabel={activity.bucketBLabel}
+              onResult={registerResult}
+              onDone={advance}
+            />
+          </div>
+        )}
+
+        {activity.type === 'sequence' && (
+          <div key={activity.id} className="mt-2">
+            <SequenceGame
+              steps={activity.steps}
+              instructions={activity.instructions}
+              onResult={registerResult}
+              onDone={advance}
+            />
+          </div>
+        )}
+
+        {activity.type === 'sentence' && (
+          <div key={activity.id} className="mt-2">
+            <SentenceRoundCard
+              round={activity.round}
+              instructions={activity.instructions}
+              onResult={registerResult}
+              onDone={advance}
+            />
+          </div>
+        )}
+      </div>
+
+      {isQuiz && (
+        <div
+          className={`w-full border-t-2 transition-colors ${
+            isCorrect
+              ? 'bg-lime-500/5 border-lime-500/20'
+              : isWrong
+              ? 'bg-danger-950 border-danger-500/20'
+              : 'border-transparent'
+          }`}
+        >
+          <div className="max-w-xl mx-auto px-4 py-4">
+            {checked && (
+              <div className="flex items-center gap-3 mb-3 animate-pop-in">
+                <div className="relative shrink-0 flex items-center justify-center">
+                  <DirectionBadge direction={isCorrect ? 'long' : 'short'} />
+                  <Mascot size={44} mood={isCorrect ? 'hype' : 'sad'} className={isWrong ? 'animate-shake' : ''} />
+                  <ParticleBurst show={isCorrect} />
+                </div>
+                <div>
+                  <p className={`font-black ${isCorrect ? 'text-lime-400' : 'text-danger-400'}`}>
+                    {isCorrect ? '¡Correcto! ' : 'Incorrecto. '}
+                    {mascotLine}
+                  </p>
+                  <p className="text-sm text-carbon-400">{activity.question.explanation}</p>
+                </div>
+              </div>
+            )}
+            <button
+              onClick={checked ? handleContinue : handleCheck}
+              disabled={!selectedId}
+              className={`w-full font-black text-lg py-4 rounded-2xl transition active:scale-95 disabled:cursor-not-allowed ${
+                checked
+                  ? isCorrect
+                    ? 'bg-lime-500 hover:bg-lime-400 text-carbon-900 animate-pulse-ring'
+                    : 'bg-danger-500 hover:bg-danger-600 text-white'
+                  : 'bg-lime-500 disabled:bg-carbon-800 disabled:text-carbon-500 hover:enabled:bg-lime-400 text-carbon-900'
+              }`}
+            >
+              {checked ? 'Continuar' : 'Comprobar'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

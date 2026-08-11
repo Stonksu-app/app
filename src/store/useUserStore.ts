@@ -1,0 +1,168 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import type { LessonAttempt, OnboardingAnswers, TradingExperience } from '../types';
+import { SKILL_TREE } from '../data/lessons';
+
+const MAX_HEARTS = 5;
+const HEART_REGEN_MINUTES = 30;
+const XP_PER_LEVEL = 100;
+
+interface UserState {
+  name: string;
+  onboarded: boolean;
+  onboardingAnswers: OnboardingAnswers;
+  xp: number;
+  hearts: number;
+  lastHeartLostAt: string | null;
+  streak: number;
+  lastActiveDate: string | null;
+  completedLessonIds: string[];
+  unlockedBadgeIds: string[];
+  attempts: LessonAttempt[];
+  virtualBalance: number;
+  seenIntroNodeIds: string[];
+
+  startOnboarding: () => void;
+  setOnboardingAnswer: (key: keyof OnboardingAnswers, value: string) => void;
+  finishOnboarding: (name: string) => void;
+  loseHeart: () => void;
+  refillHearts: () => void;
+  addXp: (amount: number) => void;
+  completeLesson: (attempt: LessonAttempt) => void;
+  isNodeUnlocked: (nodeId: string) => boolean;
+  isLessonCompleted: (lessonId: string) => boolean;
+  unlockBadge: (badgeId: string) => void;
+  hasSeenIntro: (nodeId: string) => boolean;
+  markIntroSeen: (nodeId: string) => void;
+  resetProgress: () => void;
+}
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function computeStreakUpdate(lastActiveDate: string | null, currentStreak: number): { streak: number; lastActiveDate: string } {
+  const today = todayStr();
+  if (lastActiveDate === today) {
+    return { streak: currentStreak, lastActiveDate: today };
+  }
+  if (!lastActiveDate) {
+    return { streak: 1, lastActiveDate: today };
+  }
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yStr = yesterday.toISOString().slice(0, 10);
+  if (lastActiveDate === yStr) {
+    return { streak: currentStreak + 1, lastActiveDate: today };
+  }
+  return { streak: 1, lastActiveDate: today };
+}
+
+export const useUserStore = create<UserState>()(
+  persist(
+    (set, get) => ({
+      name: '',
+      onboarded: false,
+      onboardingAnswers: { experience: null, goal: null },
+      xp: 0,
+      hearts: MAX_HEARTS,
+      lastHeartLostAt: null,
+      streak: 0,
+      lastActiveDate: null,
+      completedLessonIds: [],
+      unlockedBadgeIds: [],
+      attempts: [],
+      virtualBalance: 10000,
+      seenIntroNodeIds: [],
+
+      startOnboarding: () => set({ onboarded: false }),
+
+      setOnboardingAnswer: (key, value) =>
+        set((s) => ({
+          onboardingAnswers: { ...s.onboardingAnswers, [key]: value as TradingExperience },
+        })),
+
+      finishOnboarding: (name) => set({ onboarded: true, name: name || 'Trader' }),
+
+      loseHeart: () =>
+        set((s) => ({
+          hearts: Math.max(0, s.hearts - 1),
+          lastHeartLostAt: s.hearts <= 0 ? s.lastHeartLostAt : new Date().toISOString(),
+        })),
+
+      refillHearts: () => set({ hearts: MAX_HEARTS, lastHeartLostAt: null }),
+
+      addXp: (amount) => set((s) => ({ xp: s.xp + amount })),
+
+      completeLesson: (attempt) =>
+        set((s) => {
+          const { streak, lastActiveDate } = computeStreakUpdate(s.lastActiveDate, s.streak);
+          const completedLessonIds = s.completedLessonIds.includes(attempt.lessonId)
+            ? s.completedLessonIds
+            : [...s.completedLessonIds, attempt.lessonId];
+          return {
+            xp: s.xp + attempt.xpEarned,
+            attempts: [...s.attempts, attempt],
+            completedLessonIds,
+            streak,
+            lastActiveDate,
+          };
+        }),
+
+      isNodeUnlocked: (nodeId) => {
+        const node = SKILL_TREE.find((n) => n.id === nodeId);
+        if (!node) return false;
+        if (node.requires.length === 0) return true;
+        const { completedLessonIds } = get();
+        return node.requires.every((reqNodeId) => {
+          const reqNode = SKILL_TREE.find((n) => n.id === reqNodeId);
+          if (!reqNode) return true;
+          if (reqNode.lessons.length === 0) return false;
+          return reqNode.lessons.every((l) => completedLessonIds.includes(l.id));
+        });
+      },
+
+      isLessonCompleted: (lessonId) => get().completedLessonIds.includes(lessonId),
+
+      unlockBadge: (badgeId) =>
+        set((s) =>
+          s.unlockedBadgeIds.includes(badgeId)
+            ? s
+            : { unlockedBadgeIds: [...s.unlockedBadgeIds, badgeId] }
+        ),
+
+      hasSeenIntro: (nodeId) => get().seenIntroNodeIds.includes(nodeId),
+
+      markIntroSeen: (nodeId) =>
+        set((s) =>
+          s.seenIntroNodeIds.includes(nodeId) ? s : { seenIntroNodeIds: [...s.seenIntroNodeIds, nodeId] }
+        ),
+
+      resetProgress: () =>
+        set({
+          name: '',
+          onboarded: false,
+          onboardingAnswers: { experience: null, goal: null },
+          xp: 0,
+          hearts: MAX_HEARTS,
+          lastHeartLostAt: null,
+          streak: 0,
+          lastActiveDate: null,
+          completedLessonIds: [],
+          unlockedBadgeIds: [],
+          attempts: [],
+          virtualBalance: 10000,
+          seenIntroNodeIds: [],
+        }),
+    }),
+    { name: 'stonksu-storage' }
+  )
+);
+
+export function xpToLevel(xp: number): { level: number; xpIntoLevel: number; xpForNext: number } {
+  const level = Math.floor(xp / XP_PER_LEVEL) + 1;
+  const xpIntoLevel = xp % XP_PER_LEVEL;
+  return { level, xpIntoLevel, xpForNext: XP_PER_LEVEL };
+}
+
+export { MAX_HEARTS, HEART_REGEN_MINUTES };
