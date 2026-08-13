@@ -12,8 +12,8 @@ const FEATURES: { icon: IconName; title: string; desc: string }[] = [
 
 export default function Landing() {
   return (
-    <div className="min-h-dvh bg-carbon-900">
-      <header className="max-w-5xl mx-auto flex items-center justify-between px-5 py-5">
+    <div className="min-h-dvh bg-carbon-900 pt-safe pb-safe">
+      <header className="max-w-5xl mx-auto flex items-center justify-between px-5 py-4">
         <Mascot size={40} mood="happy" />
         <Link
           to="/onboarding"

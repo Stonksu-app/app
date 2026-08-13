@@ -41,9 +41,10 @@ export default function LessonResults() {
   const justPlatinumed = maxStage > 0 && stage >= maxStage;
 
   return (
-    <div className="min-h-dvh bg-carbon-900 flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
+    <div className="screen-safe bg-carbon-900 flex flex-col px-6 text-center relative">
       <Confetti count={perfect ? 90 : 50} />
 
+      <div className="m-auto py-6 w-full flex flex-col items-center">
       <Mascot size={130} mood="hype" />
       <div className="flex items-center gap-2 mt-4">
         <Icon name={perfect ? 'trophy' : 'sparkles'} size={30} className="text-lime-500" />
@@ -118,6 +119,7 @@ export default function LessonResults() {
         >
           Continuar
         </button>
+      </div>
       </div>
     </div>
   );

@@ -70,8 +70,16 @@ button {
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
 }
-.min-h-dvh-safe {
-  min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+
+/* A full-height screen that keeps its content clear of the notch and the home
+   indicator. Centre the child with `m-auto` rather than `justify-center` on
+   this element: flex centring clips overflow at BOTH ends and the top of a
+   tall card becomes unreachable, whereas auto margins still allow scrolling. */
+.screen-safe {
+  min-height: 100dvh;
+  overflow-y: auto;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 @keyframes float {

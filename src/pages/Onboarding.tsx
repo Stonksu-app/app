@@ -47,8 +47,8 @@ export default function Onboarding() {
       : name.trim().length > 0;
 
   return (
-    <div className="min-h-dvh bg-carbon-900 flex flex-col">
-      <div className="max-w-xl w-full mx-auto px-5 pt-6">
+    <div className="h-dvh bg-carbon-900 flex flex-col pt-safe pb-safe">
+      <div className="shrink-0 max-w-xl w-full mx-auto px-5 pt-4">
         <div className="h-2.5 bg-carbon-800 rounded-full overflow-hidden">
           <div
             className="h-full bg-lime-500 rounded-full transition-all duration-300"
@@ -57,7 +57,7 @@ export default function Onboarding() {
         </div>
       </div>
 
-      <div className="flex-1 max-w-xl w-full mx-auto px-5 py-8 flex flex-col items-center justify-center text-center">
+      <div className="flex-1 min-h-0 overflow-y-auto max-w-xl w-full mx-auto px-5 py-6 flex flex-col items-center justify-center text-center">
         <Mascot size={100} mood="happy" />
 
         {currentStep === 'experience' && (
@@ -124,7 +124,7 @@ export default function Onboarding() {
         )}
       </div>
 
-      <div className="max-w-xl w-full mx-auto px-5 pb-8">
+      <div className="shrink-0 max-w-xl w-full mx-auto px-5 pt-2 pb-5">
         <button
           onClick={goNext}
           disabled={!canContinue}

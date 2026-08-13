@@ -27,7 +27,7 @@ export default function Profile() {
     <div className="min-h-dvh bg-carbon-900">
       <TopBar />
 
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="max-w-2xl mx-auto px-4 py-6 pb-safe">
         <div className="bg-carbon-850 rounded-3xl border border-carbon-800 p-6 flex flex-col sm:flex-row items-center gap-5">
           <Mascot size={90} mood="happy" />
           <div className="text-center sm:text-left flex-1">

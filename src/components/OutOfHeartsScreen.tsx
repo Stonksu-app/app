@@ -10,29 +10,31 @@ export default function OutOfHeartsScreen({ blockedEntry }: { blockedEntry?: boo
   const [line] = useState(() => randomLine('outOfHearts'));
 
   return (
-    <div className="min-h-dvh bg-carbon-900 flex flex-col items-center justify-center gap-4 p-6 text-center">
-      <Mascot size={110} mood="sad" className="animate-shake" />
-      <h1 className="text-2xl font-black text-carbon-50">
-        {blockedEntry ? 'Sin vidas por ahora' : '¡Te quedaste sin vidas!'}
-      </h1>
-      <p className="text-carbon-400 max-w-xs">{line}</p>
+    <div className="screen-safe bg-carbon-900 flex flex-col px-6">
+      <div className="m-auto py-6 flex flex-col items-center gap-4 text-center">
+        <Mascot size={110} mood="sad" className="animate-shake" />
+        <h1 className="text-2xl font-black text-carbon-50">
+          {blockedEntry ? 'Sin vidas por ahora' : '¡Te quedaste sin vidas!'}
+        </h1>
+        <p className="text-carbon-400 max-w-xs">{line}</p>
 
-      {msUntilNextHeart !== null && (
-        <div className="mt-1 flex items-center gap-2 bg-carbon-850 border border-carbon-800 rounded-2xl px-5 py-3">
-          <Icon name="heart" size={20} className="text-lime-500" />
-          <div className="text-left">
-            <p className="text-[10px] font-black text-carbon-400 uppercase tracking-wide">Próxima vida en</p>
-            <p className="text-xl font-black text-carbon-50 tabular-nums">{formatCountdown(msUntilNextHeart)}</p>
+        {msUntilNextHeart !== null && (
+          <div className="mt-1 flex items-center gap-2 bg-carbon-850 border border-carbon-800 rounded-2xl px-5 py-3">
+            <Icon name="heart" size={20} className="text-lime-500" />
+            <div className="text-left">
+              <p className="text-[10px] font-black text-carbon-400 uppercase tracking-wide">Próxima vida en</p>
+              <p className="text-xl font-black text-carbon-50 tabular-nums">{formatCountdown(msUntilNextHeart)}</p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <button
-        onClick={() => navigate('/home')}
-        className="mt-2 bg-lime-500 hover:bg-lime-400 text-carbon-900 font-black px-8 py-3.5 rounded-2xl transition active:scale-95"
-      >
-        Volver al mapa
-      </button>
+        <button
+          onClick={() => navigate('/home')}
+          className="mt-2 bg-lime-500 hover:bg-lime-400 text-carbon-900 font-black px-8 py-3.5 rounded-2xl transition active:scale-95"
+        >
+          Volver al mapa
+        </button>
+      </div>
     </div>
   );
 }
