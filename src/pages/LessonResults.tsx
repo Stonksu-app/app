@@ -41,7 +41,7 @@ export default function LessonResults() {
   const justPlatinumed = maxStage > 0 && stage >= maxStage;
 
   return (
-    <div className="min-h-screen bg-carbon-900 flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
+    <div className="min-h-dvh bg-carbon-900 flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
       <Confetti count={perfect ? 90 : 50} />
 
       <Mascot size={130} mood="hype" />

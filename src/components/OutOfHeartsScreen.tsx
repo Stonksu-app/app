@@ -10,7 +10,7 @@ export default function OutOfHeartsScreen({ blockedEntry }: { blockedEntry?: boo
   const [line] = useState(() => randomLine('outOfHearts'));
 
   return (
-    <div className="min-h-screen bg-carbon-900 flex flex-col items-center justify-center gap-4 p-6 text-center">
+    <div className="min-h-dvh bg-carbon-900 flex flex-col items-center justify-center gap-4 p-6 text-center">
       <Mascot size={110} mood="sad" className="animate-shake" />
       <h1 className="text-2xl font-black text-carbon-50">
         {blockedEntry ? 'Sin vidas por ahora' : '¡Te quedaste sin vidas!'}

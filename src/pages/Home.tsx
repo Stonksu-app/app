@@ -50,7 +50,7 @@ export default function Home() {
     .join(' ');
 
   return (
-    <div className="min-h-screen bg-carbon-900">
+    <div className="min-h-dvh bg-carbon-900">
       <TopBar />
 
       <div className="max-w-2xl mx-auto px-4 pt-6">
@@ -65,7 +65,7 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 pb-20">
+      <div className="max-w-2xl mx-auto px-4 pb-20 pb-safe">
         <div className="relative" style={{ height: totalHeight }}>
           <svg
             className="absolute inset-0 w-full h-full pointer-events-none"

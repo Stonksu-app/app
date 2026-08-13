@@ -25,7 +25,7 @@ export default function TopBar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-carbon-900/90 backdrop-blur border-b border-carbon-800">
+    <header className="sticky top-0 z-30 bg-carbon-900/90 backdrop-blur border-b border-carbon-800 pt-safe">
       <div className="max-w-4xl mx-auto px-2 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-1 sm:gap-3">
         <Link to="/home" className="flex items-center shrink-0" aria-label="Stonksu">
           <Mascot size={34} mood="happy" />

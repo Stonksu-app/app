@@ -47,7 +47,7 @@ export default function Onboarding() {
       : name.trim().length > 0;
 
   return (
-    <div className="min-h-screen bg-carbon-900 flex flex-col">
+    <div className="min-h-dvh bg-carbon-900 flex flex-col">
       <div className="max-w-xl w-full mx-auto px-5 pt-6">
         <div className="h-2.5 bg-carbon-800 rounded-full overflow-hidden">
           <div

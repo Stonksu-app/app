@@ -5,7 +5,8 @@ import HeartsDisplay from './HeartsDisplay';
 export default function LessonHeader({ progressPct, hearts }: { progressPct: number; hearts: number }) {
   const navigate = useNavigate();
   return (
-    <div className="max-w-xl w-full mx-auto px-4 pt-4 flex items-center gap-3">
+    <div className="shrink-0 pt-safe">
+      <div className="max-w-xl w-full mx-auto px-4 pt-4 pb-1 flex items-center gap-3">
       <button onClick={() => navigate('/home')} className="text-carbon-500 hover:text-carbon-300" aria-label="Salir">
         <Icon name="close" size={24} />
       </button>
@@ -15,7 +16,8 @@ export default function LessonHeader({ progressPct, hearts }: { progressPct: num
           style={{ width: `${progressPct}%` }}
         />
       </div>
-      <HeartsDisplay hearts={hearts} />
+        <HeartsDisplay hearts={hearts} />
+      </div>
     </div>
   );
 }

@@ -62,7 +62,7 @@ export default function Lesson() {
 
   if (!data || activities.length === 0) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-carbon-900 p-6 text-center">
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-carbon-900 p-6 text-center">
         <p className="font-bold text-carbon-50">No encontramos esa lección.</p>
         <button onClick={() => navigate('/home')} className="text-lime-400 font-bold">
           Volver al mapa
@@ -155,7 +155,7 @@ export default function Lesson() {
   if (showOutOfHearts) return <OutOfHeartsScreen />;
 
   return (
-    <div className={`min-h-screen bg-carbon-900 flex flex-col relative overflow-hidden ${zoomPulse} ${shakeClass}`}>
+    <div className={`h-dvh bg-carbon-900 flex flex-col relative overflow-hidden ${zoomPulse} ${shakeClass}`}>
       {celebration && <ComboCelebration tier={celebration} />}
 
       {lastResult && (
@@ -169,7 +169,10 @@ export default function Lesson() {
 
       <LessonHeader progressPct={progressPct} hearts={hearts} />
 
-      <div className="flex-1 max-w-xl w-full mx-auto px-4 py-6 flex flex-col relative">
+      {/* min-h-0 lets this flex child actually shrink so it scrolls instead of
+          pushing the footer button off-screen on short phone viewports. */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="max-w-xl w-full mx-auto px-4 py-5 flex flex-col relative">
         <div className="flex items-center justify-between mb-1 gap-2">
           <div className="flex items-center gap-2">
             <p className="text-xs font-black text-lime-400 uppercase tracking-wide">{node.title}</p>
@@ -274,11 +277,12 @@ export default function Lesson() {
             />
           </div>
         )}
+        </div>
       </div>
 
       {isQuiz && checked && (
         <div
-          className={`w-full border-t-2 transition-colors ${
+          className={`shrink-0 w-full border-t-2 transition-colors pb-safe ${
             isCorrect ? 'bg-lime-500/5 border-lime-500/20' : 'bg-danger-950 border-danger-500/20'
           }`}
         >
