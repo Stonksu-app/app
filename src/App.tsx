@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import SplashScreen from './components/SplashScreen';
 import Landing from './pages/Landing';
 import Onboarding from './pages/Onboarding';
 import Home from './pages/Home';
@@ -15,7 +17,13 @@ function RequireOnboarded({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  // App mounts once per launch, so this runs on cold start only — not on
+  // navigation between routes.
+  const [booting, setBooting] = useState(true);
+
   return (
+    <>
+      {booting && <SplashScreen onDone={() => setBooting(false)} />}
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/onboarding" element={<Onboarding />} />
@@ -61,6 +69,7 @@ function App() {
       />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 }
 

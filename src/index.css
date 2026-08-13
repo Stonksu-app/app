@@ -90,6 +90,57 @@ button {
   animation: float 3s ease-in-out infinite;
 }
 
+/* --- Splash screen ------------------------------------------------------ */
+
+/* Idle bob for the mascot, with a slight tilt so it reads as hovering
+   rather than sliding straight up and down. */
+@keyframes splash-bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-10px) rotate(2deg); }
+}
+.animate-splash-bob {
+  animation: splash-bob 1.8s ease-in-out infinite;
+}
+
+/* LONG chips float up and fade; SHORT chips do the reverse. */
+@keyframes tape-up {
+  0% { transform: translateY(78vh) scale(0.85); opacity: 0; }
+  15% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translateY(6vh) scale(1); opacity: 0; }
+}
+.animate-tape-up {
+  animation: tape-up linear infinite;
+}
+
+@keyframes tape-down {
+  0% { transform: translateY(6vh) scale(0.85); opacity: 0; }
+  15% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translateY(78vh) scale(1); opacity: 0; }
+}
+.animate-tape-down {
+  animation: tape-down linear infinite;
+}
+
+/* Duolingo pulses its status line instead of counting up a percentage. */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.animate-pulse-soft {
+  animation: pulse-soft 1.3s ease-in-out infinite;
+}
+
+@keyframes splash-progress {
+  0% { width: 8%; }
+  60% { width: 72%; }
+  100% { width: 100%; }
+}
+.animate-splash-progress {
+  animation: splash-progress 2.1s ease-out forwards;
+}
+
 @keyframes pop-in {
   0% { transform: scale(0.6); opacity: 0; }
   70% { transform: scale(1.08); opacity: 1; }
