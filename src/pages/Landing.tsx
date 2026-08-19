@@ -64,7 +64,7 @@ export default function Landing() {
 
           <div className="mt-auto lg:mt-8 pt-8 w-full max-w-[330px] flex flex-col gap-3">
             <ButtonLink to="/onboarding">Empieza ahora</ButtonLink>
-            <ButtonLink to="/onboarding" variant="secondary">
+            <ButtonLink to="/entrar" variant="secondary">
               Ya tengo una cuenta
             </ButtonLink>
           </div>

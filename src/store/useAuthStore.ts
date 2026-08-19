@@ -34,11 +34,16 @@ interface AuthState {
   /** Machine-readable form of the same failure, so the UI can offer a way out
    *  of the specific problem instead of only describing it. */
   errorCode: string | null;
+  /** True when the address went up but the server refused the password, so
+   *  it still has to be set once the email is confirmed. */
+  passwordDeferred: boolean;
   /** Set while a link attempt is in flight. */
   busy: boolean;
 
   init: () => void;
-  linkEmail: (email: string) => Promise<boolean>;
+  linkEmail: (email: string, password?: string) => Promise<boolean>;
+  signInWithPassword: (email: string, password: string) => Promise<boolean>;
+  setPassword: (password: string) => Promise<boolean>;
   linkProvider: (provider: 'google' | 'apple') => Promise<void>;
   /** Signs in to the account a provider is already attached to, abandoning this
    *  device's anonymous one. The only way out of identity_already_exists. */
@@ -99,6 +104,9 @@ function translate(message: string): string {
   if (m.includes('already') && m.includes('registered')) return 'Ese correo ya tiene cuenta. Inicia sesión con él.';
   if (m.includes('identity') && (m.includes('already') || m.includes('linked')))
     return 'Esa cuenta de Google ya está vinculada a otro perfil de Stonksu.';
+  if (m.includes('invalid login credentials')) return 'Correo o contraseña incorrectos.';
+  if (m.includes('email not confirmed')) return 'Aún no has confirmado ese correo. Mira tu bandeja.';
+  if (m.includes('password') && m.includes('should be at least')) return 'La contraseña es demasiado corta.';
   if (m.includes('invalid') && m.includes('email')) return 'Ese correo no parece válido.';
   if (m.includes('rate limit') || m.includes('too many')) return 'Demasiados intentos. Espera un momento y vuelve a probar.';
   if (m.includes('manual linking')) return 'Falta activar "Manual Linking" en Supabase (ver supabase/README.md).';
@@ -112,6 +120,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   pendingEmail: null,
   error: null,
   errorCode: null,
+  passwordDeferred: false,
   busy: false,
 
   init: () => {
@@ -129,23 +138,58 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     supabase.auth.onAuthStateChange((_event, session) => set(applySession(session)));
   },
 
-  linkEmail: async (email) => {
+  /**
+   * Attaches an email — and a password when one is offered — to the account
+   * currently being played.
+   *
+   * Supabase refuses to set a password on an anonymous account that has no
+   * address yet: "Updating password of an anonymous user without an email or
+   * phone is not allowed". Whether it accepts both in a single call depends on
+   * the server, so both are sent together and the password is quietly dropped
+   * if that is what's rejected. The address is what actually rescues the
+   * account; a password can always be added afterwards from the profile.
+   */
+  linkEmail: async (email, password) => {
     if (!supabase) return false;
     set({ busy: true, error: null, errorCode: null });
 
-    // updateUser on an anonymous account attaches the address and sends the
-    // confirmation. Until the link is clicked it lives in new_email, so the
-    // account stays anonymous and nothing is lost if they never confirm.
-    const { error } = await supabase.auth.updateUser(
-      { email: email.trim() },
-      { emailRedirectTo: `${window.location.origin}/home` }
+    const address = email.trim();
+    const redirect = { emailRedirectTo: `${window.location.origin}/home` };
+
+    let { error } = await supabase.auth.updateUser(
+      password ? { email: address, password } : { email: address },
+      redirect
     );
+
+    // Retry without it rather than losing the whole sign-up over a password
+    // the server won't take yet.
+    if (error && password && /anonymous user|password/i.test(error.message)) {
+      ({ error } = await supabase.auth.updateUser({ email: address }, redirect));
+      if (!error) {
+        set({ busy: false, pendingEmail: address, passwordDeferred: true });
+        return true;
+      }
+    }
 
     if (error) {
       set({ busy: false, error: translate(error.message), errorCode: 'link_failed' });
       return false;
     }
-    set({ busy: false, pendingEmail: email.trim() });
+    set({ busy: false, pendingEmail: address, passwordDeferred: false });
+    return true;
+  },
+
+  /** Sets or replaces the password once an address is confirmed. */
+  setPassword: async (password) => {
+    if (!supabase) return false;
+    set({ busy: true, error: null, errorCode: null });
+
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) {
+      set({ busy: false, error: translate(error.message), errorCode: 'password_failed' });
+      return false;
+    }
+    set({ busy: false, passwordDeferred: false });
     return true;
   },
 
@@ -162,6 +206,23 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
     if (error) set({ busy: false, error: translate(error.message), errorCode: 'link_failed' });
     // On success the browser navigates away, so there is no state to settle.
+  },
+
+  signInWithPassword: async (email, password) => {
+    if (!supabase) return false;
+    set({ busy: true, error: null, errorCode: null });
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    if (error) {
+      set({ busy: false, error: translate(error.message), errorCode: 'sign_in_failed' });
+      return false;
+    }
+    set({ busy: false });
+    return true;
   },
 
   signInExisting: async (provider) => {

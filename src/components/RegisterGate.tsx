@@ -22,13 +22,16 @@ const CLICKS_BETWEEN_PROMPTS = 5;
  * Routes that never nag.
  *
  * Landing and onboarding have nothing to save yet, and a modal over them would
- * block the flow that creates the progress in the first place. An active lesson
- * is excluded because interrupting mid-question would lose the answer and make
- * lessons untestable — the results screen right after is a better moment
- * anyway, since that is when the player has most to lose.
+ * block the flow that creates the progress in the first place. The sign-in page
+ * is the strongest case of all: someone is already there to rescue their
+ * account, and covering it with "save your progress" would sit on top of the
+ * very form that does it. An active lesson is excluded because interrupting
+ * mid-question would lose the answer and make lessons untestable — the results
+ * screen right after is a better moment anyway, since that is when the player
+ * has most to lose.
  */
 function isQuietRoute(pathname: string): boolean {
-  if (pathname === '/' || pathname.startsWith('/onboarding')) return true;
+  if (pathname === '/' || pathname.startsWith('/onboarding') || pathname.startsWith('/entrar')) return true;
   return /^\/lesson\/[^/]+$/.test(pathname);
 }
 

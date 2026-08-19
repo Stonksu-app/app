@@ -3,6 +3,8 @@ export type IconName =
   | 'map'
   | 'user'
   | 'users'
+  | 'eye'
+  | 'eye-off'
   | 'flame'
   | 'star'
   | 'heart'

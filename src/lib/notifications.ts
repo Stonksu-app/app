@@ -20,7 +20,18 @@ const CHANNEL_ID = 'streak';
 /** Ids are fixed and derived from the day offset, so replanning overwrites
  *  rather than piling up duplicates. */
 const ID_BASE = 4200;
-const DAYS_AHEAD = 7;
+
+/**
+ * How far ahead reminders are laid down.
+ *
+ * Once scheduled, the operating system owns them: they fire with the app
+ * closed, backgrounded, or even force-quit, with no network involved. But the
+ * queue is only topped up when the app is opened, so this number is also how
+ * long someone can stay away and still be reminded — which is exactly the
+ * person the reminder is for. iOS keeps at most 64 pending notifications per
+ * app, so a month fits comfortably.
+ */
+const DAYS_AHEAD = 30;
 
 export const DEFAULT_REMINDER_HOUR = 20;
 
