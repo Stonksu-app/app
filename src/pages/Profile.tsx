@@ -9,6 +9,7 @@ import { byRelevance, computeAchievements } from '../data/achievements';
 import { getLessonById } from '../data/lessons';
 import { useUserStore, xpToLevel } from '../store/useUserStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { appEnv, isCloudEnabled } from '../lib/supabase';
 import type { IconName } from '../types';
 
 /* Section headings are 24px/700 and stat tiles sit in a 2x2 grid, matching the
@@ -183,6 +184,9 @@ export default function Profile() {
               : authStatus === 'registered'
               ? 'progreso guardado en la nube'
               : 'sin cuenta — progreso solo local'}
+            {appEnv === 'dev' && isCloudEnabled && (
+              <span className="text-[#FFC93C]"> · base de datos de pruebas</span>
+            )}
           </p>
         </div>
       </div>

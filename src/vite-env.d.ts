@@ -6,6 +6,8 @@ interface ImportMetaEnv {
   /** Publishable anon key. Safe in the client — row level security is what
    *  actually protects the data. The service_role key must never appear here. */
   readonly VITE_SUPABASE_ANON_KEY?: string;
+  /** "dev" or "production", set by CI. Absent locally, which reads as dev. */
+  readonly VITE_APP_ENV?: string;
 }
 
 interface ImportMeta {

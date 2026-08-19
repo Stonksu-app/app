@@ -134,21 +134,36 @@ select * from public.account_summary;
 
 Vite incrusta las variables `VITE_*` **al compilar**, y `.env` está en `.gitignore`, así que GitHub Actions no las tiene. Sin ellas el `.ipa` sale con el backend apagado: sin sincronización, sin cuenta y sin aviso de registro.
 
-En GitHub → **Settings → Secrets and variables → Actions**:
+Las variables y secrets de repositorio en GitHub son **únicos por repositorio**, no por rama, así que los dos entornos se distinguen por un sufijo en el nombre. En **Settings → Secrets and variables → Actions**:
 
 | Pestaña | Nombre | Valor |
 | --- | --- | --- |
-| *Variables* | `VITE_SUPABASE_URL` | `https://<proyecto>.supabase.co` |
-| *Secrets* | `VITE_SUPABASE_ANON_KEY` | la clave anon |
+| *Variables* | `VITE_SUPABASE_URL_DEV` | URL del proyecto dev |
+| *Secrets* | `VITE_SUPABASE_ANON_KEY_DEV` | clave anon de dev |
+| *Variables* | `VITE_SUPABASE_URL_PROD` | URL del proyecto de producción |
+| *Secrets* | `VITE_SUPABASE_ANON_KEY_PROD` | clave anon de producción |
 
 La URL va como variable porque no es secreta; la clave va como secret solo para no dejarla escrita en el repositorio — en el bundle acaba igual, y no pasa nada, porque lo que protege los datos es RLS.
 
-Si faltan, el workflow no falla: avisa y compila igual, en modo local.
+Los nombres **sin sufijo** siguen valiendo, pero solo para dev. Producción exige los `_PROD` explícitos y el build **falla** si faltan: un `.ipa` distribuido hablando con la base de datos de pruebas es peor que no tener `.ipa`.
+
+### Qué entorno usa cada build
+
+Lo decide el tag:
+
+| Tag | Entorno |
+| --- | --- |
+| `v0.8.0-dev`, `v0.8.0-beta`, `v0.8.0-rc1` | dev |
+| `v0.8.0` | producción |
+
+También puedes lanzarlo a mano desde la pestaña **Actions**, eligiendo el entorno en un desplegable.
+
+El artefacto sale nombrado `Stonksu-dev-v0.8.0-dev` o `Stonksu-production-v0.8.0`, para que dos `.ipa` descargados no se confundan. Y dentro de la app, el pie de **Perfil** avisa en ámbar **"base de datos de pruebas"** cuando el build es de dev.
 
 **El `.ipa` solo se construye al crear un tag `v*`.** Es la causa habitual de "la app del móvil no se ha actualizado": hay commits nuevos en `dev` pero ningún tag desde el último build.
 
 ```bash
-git tag v0.8.0 && git push origin v0.8.0
+git tag v0.8.0-dev && git push origin v0.8.0-dev
 ```
 
 Para comprobar qué build lleva realmente el móvil, mira el pie de **Perfil**: muestra `git describe`, así que `v0.7.0-6-g60c3091` significa "seis commits por delante de v0.7.0" y deja claro de un vistazo si el teléfono va atrasado.

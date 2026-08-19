@@ -3,8 +3,22 @@ name: Build iOS IPA (unsigned)
 # Builds an unsigned .ipa for sideloading. AltStore re-signs it with your own
 # Apple ID at install time, so no certificates or provisioning profiles are
 # needed here — nothing secret ever touches this workflow.
+# Which Supabase project the build points at is decided by the tag:
+#
+#   v0.8.0-dev  ->  dev          v0.8.0  ->  production
+#
+# Repository variables and secrets are per-repo, not per-branch, so the two
+# environments are told apart by a _DEV / _PROD suffix on the name. Anything
+# ending in -dev, -beta or -rc counts as dev, so a release candidate can never
+# be the thing that accidentally points a shipped app at the dev database.
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: Qué proyecto de Supabase usar
+        type: choice
+        options: [dev, production]
+        default: dev
   push:
     tags:
       - 'v*'
@@ -16,6 +30,22 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Decide target environment
+        id: target
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            NAME="${{ inputs.environment }}"
+          else
+            case "${{ github.ref_name }}" in
+              *-dev|*-beta|*-rc|*-rc.*) NAME=dev ;;
+              *) NAME=production ;;
+            esac
+          fi
+          SUFFIX=$([ "$NAME" = "dev" ] && echo DEV || echo PROD)
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "suffix=$SUFFIX" >> "$GITHUB_OUTPUT"
+          echo "Compilando para: $NAME (usando *_$SUFFIX)"
 
       - uses: actions/setup-node@v4
         with:
@@ -32,10 +62,24 @@ jobs:
       # secrets purely to keep it out of the repository.
       - name: Build web assets
         env:
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          TARGET: ${{ steps.target.outputs.name }}
+          VITE_APP_ENV: ${{ steps.target.outputs.name }}
+          # The unsuffixed names are a fallback for dev only. Production must be
+          # named explicitly: a shipped app silently talking to the dev database
+          # is worth failing a build over.
+          VITE_SUPABASE_URL: >-
+            ${{ vars[format('VITE_SUPABASE_URL_{0}', steps.target.outputs.suffix)]
+                || (steps.target.outputs.name == 'dev' && vars.VITE_SUPABASE_URL) }}
+          VITE_SUPABASE_ANON_KEY: >-
+            ${{ secrets[format('VITE_SUPABASE_ANON_KEY_{0}', steps.target.outputs.suffix)]
+                || (steps.target.outputs.name == 'dev' && secrets.VITE_SUPABASE_ANON_KEY) }}
         run: |
           if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            if [ "$TARGET" = "production" ]; then
+              echo "::error::Faltan VITE_SUPABASE_URL_PROD y/o VITE_SUPABASE_ANON_KEY_PROD."
+              echo "Sin ellas este .ipa de producción saldría sin backend, o peor, apuntando a dev."
+              exit 1
+            fi
             echo "::warning::Sin claves de Supabase — este .ipa guardará el progreso solo en el dispositivo."
           fi
           npm run build
@@ -70,8 +114,9 @@ jobs:
           (cd payload-root && zip -qry ../Stonksu.ipa Payload)
           ls -lh Stonksu.ipa
 
+      # Named per environment so two downloaded .ipa files can't be mixed up.
       - uses: actions/upload-artifact@v4
         with:
-          name: Stonksu-ipa
+          name: Stonksu-${{ steps.target.outputs.name }}-${{ github.ref_name }}
           path: Stonksu.ipa
           retention-days: 30

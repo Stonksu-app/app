@@ -32,6 +32,16 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
  */
 export const isCloudEnabled = Boolean(url && anonKey);
 
+/**
+ * Which backend this build talks to.
+ *
+ * Surfaced in Profile because a sideloaded .ipa gives no other way to tell a
+ * dev build from a production one, and "why is my progress missing?" is almost
+ * always the answer being "you're on the other database".
+ */
+export const appEnv: 'dev' | 'production' =
+  import.meta.env.VITE_APP_ENV === 'production' ? 'production' : 'dev';
+
 export const supabase: SupabaseClient | null = isCloudEnabled
   ? createClient(url as string, anonKey as string, {
       auth: {
