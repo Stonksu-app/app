@@ -63,6 +63,17 @@ button {
   touch-action: manipulation;
 }
 
+/* Duolingo's signature chunky button: a solid slab of colour sitting on a
+   darker lip, which the press animation squashes down into. */
+.btn-3d {
+  box-shadow: 0 4px 0 var(--btn-lip);
+  transition: transform 0.06s ease-out, box-shadow 0.06s ease-out, background-color 0.15s;
+}
+.btn-3d:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 var(--btn-lip);
+}
+
 /* Padding helpers for the notch and the home indicator. */
 .pt-safe {
   padding-top: env(safe-area-inset-top);

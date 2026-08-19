@@ -1,80 +1,100 @@
 import { Link } from 'react-router-dom';
 import Mascot from '../components/Mascot';
 import Icon from '../components/Icon';
-import type { IconName } from '../types';
+import { SKILL_TREE } from '../data/lessons';
 
-const FEATURES: { icon: IconName; title: string; desc: string }[] = [
-  { icon: 'candle', title: 'Lee las velas', desc: 'Domina candlesticks sin morir en el intento' },
-  { icon: 'shield', title: 'Gestiona el riesgo', desc: 'Stop loss, take profit y no todo el YOLO' },
-  { icon: 'flame', title: 'Mantén tu racha', desc: 'Aprende un poco cada día, como debe ser' },
-  { icon: 'trophy', title: 'Compite en ligas', desc: 'De Paper Hands a Diamond Hands' },
-];
+/* Laid out like Duolingo's landing page: wordmark up top, the mascot as the
+ * hero, one big headline, and two stacked calls to action. Stacks vertically on
+ * a phone and splits into two columns on a wide screen. */
+
+/** Floating chips around the mascot, standing in for Duolingo's cast of
+ * characters. Positions are percentages of the hero box. */
+const ORBIT = [
+  { label: 'LONG', dir: 'up', top: 6, left: 2, delay: '0s' },
+  { label: 'SHORT', dir: 'down', top: 22, left: 76, delay: '0.6s' },
+  { label: 'LONG', dir: 'up', top: 68, left: 80, delay: '1.2s' },
+  { label: 'SHORT', dir: 'down', top: 78, left: 0, delay: '1.8s' },
+] as const;
 
 export default function Landing() {
+  const topics = SKILL_TREE.slice(0, 6);
+
   return (
-    <div className="min-h-dvh bg-carbon-900 pt-safe pb-safe">
-      <header className="max-w-5xl mx-auto flex items-center justify-between px-5 py-4">
-        <Mascot size={40} mood="happy" />
-        <Link
-          to="/onboarding"
-          className="text-sm font-bold text-lime-400 hover:text-lime-300 px-4 py-2 rounded-full border-2 border-carbon-700 hover:border-lime-500/50 transition"
-        >
-          Ya tengo cuenta
-        </Link>
+    <div className="min-h-dvh bg-carbon-900 flex flex-col pt-safe pb-safe">
+      <header className="shrink-0 w-full max-w-6xl mx-auto px-5 py-4 flex items-center justify-center lg:justify-start">
+        <div className="flex items-center gap-2">
+          <Mascot size={34} mood="happy" />
+          <span className="text-2xl font-black text-lime-500 tracking-tight">Stonksu</span>
+        </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-5 pt-8 pb-20 text-center">
-        <div className="flex justify-center mb-4">
-          <Mascot size={140} mood="hype" />
+      <main className="flex-1 w-full max-w-6xl mx-auto px-6 flex flex-col justify-center lg:flex-row lg:items-center gap-6 lg:gap-16 py-4">
+        {/* Hero */}
+        <div className="lg:flex-1 flex items-center justify-center">
+          <div className="relative w-64 h-56 sm:w-80 sm:h-72 flex items-center justify-center">
+            {/* Soft glow so the mascot doesn't float in flat black */}
+            <div className="absolute w-40 h-40 sm:w-52 sm:h-52 rounded-full bg-lime-500/10 blur-3xl" />
+            {ORBIT.map((chip, i) => (
+              <span
+                key={i}
+                style={{ top: `${chip.top}%`, left: `${chip.left}%`, animationDelay: chip.delay }}
+                className={`absolute flex items-center gap-1 text-[10px] font-black rounded-full px-2 py-1 border animate-float ${
+                  chip.dir === 'up'
+                    ? 'text-lime-400 border-lime-500/30 bg-lime-500/10'
+                    : 'text-danger-400 border-danger-500/30 bg-danger-500/10'
+                }`}
+              >
+                <Icon name={chip.dir === 'up' ? 'trending-up' : 'trending-down'} size={11} strokeWidth={2.6} />
+                {chip.label}
+              </span>
+            ))}
+            <Mascot size={168} mood="hype" className="relative" />
+          </div>
         </div>
-        <h1 className="text-4xl sm:text-6xl font-black text-carbon-50 leading-tight tracking-tight">
-          Aprende a invertir<br />
-          <span className="text-lime-400">gratis, gamificado y sin rekt.</span>
-        </h1>
-        <p className="mt-5 text-lg sm:text-xl text-carbon-300 max-w-2xl mx-auto font-medium">
-          La forma más divertida (y menos aburrida) de aprender trading e inversión.
-          Lecciones cortas, XP, rachas y un toro motivacional.
-        </p>
 
-        <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center items-center">
-          <Link
-            to="/onboarding"
-            className="w-full sm:w-auto bg-lime-500 hover:bg-lime-400 text-carbon-900 font-black text-lg px-10 py-4 rounded-2xl shadow-lg shadow-lime-500/20 transition active:scale-95"
-          >
-            Empezar gratis
-          </Link>
-        </div>
-        <p className="mt-3 text-sm text-carbon-400">Sin tarjeta. Sin excusas. Solo diamond hands.</p>
+        {/* Copy + calls to action. On a phone the buttons sit at the bottom of
+            the screen (mt-auto), the way Duolingo anchors them. */}
+        <div className="flex-1 lg:flex-1 flex flex-col items-center text-center">
+          {/* Type and button metrics lifted from es.duolingo.com: 32px bold
+              headline; 330x50 buttons, 12px radius, 15px/700 with 0.8px
+              tracking, 12px apart. */}
+          <h1 className="text-[28px] sm:text-[32px] font-black text-carbon-50 leading-tight max-w-[480px]">
+            ¡La forma más divertida de aprender trading, inversión y más!
+          </h1>
 
-        <div className="mt-20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-left">
-          {FEATURES.map((f) => (
-            <div
-              key={f.title}
-              className="bg-carbon-850 rounded-2xl p-5 border border-carbon-800 hover:border-lime-500/30 transition"
+          <div className="mt-auto lg:mt-8 pt-8 w-full max-w-[330px] flex flex-col gap-3">
+            <Link
+              to="/onboarding"
+              style={{ ['--btn-lip' as string]: 'var(--color-lime-700)' }}
+              className="btn-3d w-full h-[50px] flex items-center justify-center bg-lime-500 hover:bg-lime-400 text-carbon-900 font-bold text-[15px] tracking-[0.8px] uppercase rounded-xl"
             >
-              <Icon name={f.icon} size={28} className="text-lime-500 mb-2" />
-              <h3 className="font-extrabold text-carbon-50">{f.title}</h3>
-              <p className="text-sm text-carbon-400 mt-1">{f.desc}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-20 bg-carbon-850 border border-carbon-800 rounded-3xl p-8 sm:p-12">
-          <h2 className="text-2xl sm:text-3xl font-black text-carbon-50">¿Listo para dejar de ser Paper Hands?</h2>
-          <p className="mt-2 text-carbon-300 max-w-xl mx-auto">
-            Únete y empieza tu racha hoy. Tu portafolio (y tu ego) te lo van a agradecer.
-          </p>
-          <Link
-            to="/onboarding"
-            className="inline-block mt-6 bg-lime-500 hover:bg-lime-400 text-carbon-900 font-black px-8 py-3.5 rounded-2xl transition active:scale-95"
-          >
-            Crear mi cuenta
-          </Link>
+              Empieza ahora
+            </Link>
+            <Link
+              to="/onboarding"
+              style={{ ['--btn-lip' as string]: 'var(--color-carbon-950)' }}
+              className="btn-3d w-full h-[50px] flex items-center justify-center bg-carbon-850 hover:bg-carbon-800 text-lime-400 border-2 border-carbon-700 font-bold text-[15px] tracking-[0.8px] uppercase rounded-xl"
+            >
+              Ya tengo una cuenta
+            </Link>
+          </div>
         </div>
       </main>
 
-      <footer className="text-center text-xs text-carbon-500 pb-8">
-        Stonksu no es asesoría financiera. Es un juego para aprender, fren.
+      {/* Topic strip — the counterpart to Duolingo's row of languages, which
+          they only show from tablet width up. */}
+      <footer className="hidden lg:block shrink-0 border-t border-carbon-800 mt-4">
+        <div className="max-w-6xl mx-auto px-5 py-3.5 flex items-center gap-6 overflow-x-auto justify-start lg:justify-center">
+          {topics.map((node) => (
+            <span
+              key={node.id}
+              className="flex items-center gap-2 shrink-0 text-[11px] font-black uppercase tracking-wide text-carbon-400"
+            >
+              <Icon name={node.icon} size={16} className="text-lime-500" />
+              {node.title}
+            </span>
+          ))}
+        </div>
       </footer>
     </div>
   );
