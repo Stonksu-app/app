@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { Button, optionLip } from '../components/Button';
 import CandleChart from '../components/CandleChart';
 import ComboCelebration from '../components/ComboCelebration';
 import DirectionBadge from '../components/DirectionBadge';
@@ -212,7 +213,8 @@ export default function Lesson() {
                     key={opt.id}
                     onClick={() => handleSelect(opt.id)}
                     disabled={checked}
-                    className={`text-left px-4 py-3.5 rounded-2xl border-2 font-bold transition flex items-center gap-3 ${
+                    style={{ ['--btn-lip' as string]: optionLip(showCorrect, showIncorrect) }}
+                    className={`btn-3d text-left px-4 py-3.5 rounded-2xl border-2 font-bold flex items-center gap-3 ${
                       showCorrect
                         ? 'border-lime-500 bg-lime-500/10 text-lime-300'
                         : showIncorrect
@@ -301,16 +303,13 @@ export default function Lesson() {
                 <p className="text-sm text-carbon-400">{activity.question.explanation}</p>
               </div>
             </div>
-            <button
+            <Button
               onClick={advance}
-              className={`w-full font-black text-lg py-4 rounded-2xl transition active:scale-95 ${
-                isCorrect
-                  ? 'bg-lime-500 hover:bg-lime-400 text-carbon-900 animate-pulse-ring'
-                  : 'bg-danger-500 hover:bg-danger-600 text-white'
-              }`}
+              variant={isCorrect ? 'primary' : 'danger'}
+              className={isCorrect ? 'animate-pulse-ring' : ''}
             >
               Continuar
-            </button>
+            </Button>
           </div>
         </div>
       )}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar';
 import Mascot from '../components/Mascot';
 import Icon from '../components/Icon';
+import { Button } from '../components/Button';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import { SKILL_TREE } from '../data/lessons';
 import { useUserStore } from '../store/useUserStore';
@@ -186,22 +187,23 @@ export default function Home() {
                   )}
                 </div>
               ) : (
-                <button
-                  onClick={() => {
-                    const lessonId = selected.lessons[0].id;
-                    const needsIntro = !!selected.intro && !hasSeenIntro(selected.id);
-                    navigate(needsIntro ? `/lesson/${lessonId}/intro` : `/lesson/${lessonId}`);
-                  }}
-                  className="mt-4 w-full bg-lime-500 hover:bg-lime-400 text-carbon-900 font-black py-3.5 rounded-2xl transition active:scale-95 flex items-center justify-center gap-2"
-                >
-                  {isLessonCompleted(selected.lessons[0].id) ? (
-                    <>
-                      <Icon name="refresh" size={20} /> Repasar lección
-                    </>
-                  ) : (
-                    'Empezar lección'
-                  )}
-                </button>
+                <div className="mt-4">
+                  <Button
+                    onClick={() => {
+                      const lessonId = selected.lessons[0].id;
+                      const needsIntro = !!selected.intro && !hasSeenIntro(selected.id);
+                      navigate(needsIntro ? `/lesson/${lessonId}/intro` : `/lesson/${lessonId}`);
+                    }}
+                  >
+                    {isLessonCompleted(selected.lessons[0].id) ? (
+                      <>
+                        <Icon name="refresh" size={18} /> Repasar lección
+                      </>
+                    ) : (
+                      'Empezar lección'
+                    )}
+                  </Button>
+                </div>
               )
             ) : (
               <p className="mt-6 text-sm font-bold text-carbon-400 bg-carbon-800 rounded-xl py-3">

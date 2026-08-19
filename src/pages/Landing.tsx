@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom';
 import Mascot from '../components/Mascot';
 import Icon from '../components/Icon';
+import { ButtonLink } from '../components/Button';
 import { SKILL_TREE } from '../data/lessons';
 
 /* Laid out like Duolingo's landing page: wordmark up top, the mascot as the
@@ -63,20 +63,10 @@ export default function Landing() {
           </h1>
 
           <div className="mt-auto lg:mt-8 pt-8 w-full max-w-[330px] flex flex-col gap-3">
-            <Link
-              to="/onboarding"
-              style={{ ['--btn-lip' as string]: 'var(--color-lime-700)' }}
-              className="btn-3d w-full h-[50px] flex items-center justify-center bg-lime-500 hover:bg-lime-400 text-carbon-900 font-bold text-[15px] tracking-[0.8px] uppercase rounded-xl"
-            >
-              Empieza ahora
-            </Link>
-            <Link
-              to="/onboarding"
-              style={{ ['--btn-lip' as string]: 'var(--color-carbon-950)' }}
-              className="btn-3d w-full h-[50px] flex items-center justify-center bg-carbon-850 hover:bg-carbon-800 text-lime-400 border-2 border-carbon-700 font-bold text-[15px] tracking-[0.8px] uppercase rounded-xl"
-            >
+            <ButtonLink to="/onboarding">Empieza ahora</ButtonLink>
+            <ButtonLink to="/onboarding" variant="secondary">
               Ya tengo una cuenta
-            </Link>
+            </ButtonLink>
           </div>
         </div>
       </main>

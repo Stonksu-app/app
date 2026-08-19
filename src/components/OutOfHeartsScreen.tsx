@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
+import { Button } from './Button';
 import Icon from './Icon';
 import Mascot, { randomLine } from './Mascot';
 
@@ -28,12 +29,11 @@ export default function OutOfHeartsScreen({ blockedEntry }: { blockedEntry?: boo
           </div>
         )}
 
-        <button
-          onClick={() => navigate('/home')}
-          className="mt-2 bg-lime-500 hover:bg-lime-400 text-carbon-900 font-black px-8 py-3.5 rounded-2xl transition active:scale-95"
-        >
-          Volver al mapa
-        </button>
+        <div className="mt-2">
+          <Button onClick={() => navigate('/home')} fullWidth={false}>
+            Volver al mapa
+          </Button>
+        </div>
       </div>
     </div>
   );

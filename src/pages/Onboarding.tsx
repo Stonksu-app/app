@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Mascot from '../components/Mascot';
 import Icon from '../components/Icon';
+import { Button } from '../components/Button';
 import { useUserStore } from '../store/useUserStore';
 import type { IconName, TradingExperience } from '../types';
 
@@ -125,13 +126,9 @@ export default function Onboarding() {
       </div>
 
       <div className="shrink-0 max-w-xl w-full mx-auto px-5 pt-2 pb-5">
-        <button
-          onClick={goNext}
-          disabled={!canContinue}
-          className="w-full bg-lime-500 disabled:bg-carbon-800 disabled:text-carbon-500 disabled:cursor-not-allowed hover:enabled:bg-lime-400 text-carbon-900 font-black text-lg py-4 rounded-2xl transition active:scale-95"
-        >
+        <Button onClick={goNext} disabled={!canContinue}>
           {step < STEPS.length - 1 ? 'Continuar' : 'Empezar a aprender'}
-        </button>
+        </Button>
       </div>
     </div>
   );

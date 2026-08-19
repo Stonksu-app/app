@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Button } from '../components/Button';
 import Confetti from '../components/Confetti';
 import Icon from '../components/Icon';
 import Mascot, { randomLine } from '../components/Mascot';
@@ -113,12 +114,7 @@ export default function LessonResults() {
       </div>
 
       <div className="mt-8 w-full max-w-sm flex flex-col gap-3">
-        <button
-          onClick={() => navigate('/home')}
-          className="w-full bg-lime-500 hover:bg-lime-400 text-carbon-900 font-black text-lg py-4 rounded-2xl transition active:scale-95"
-        >
-          Continuar
-        </button>
+        <Button onClick={() => navigate('/home')}>Continuar</Button>
       </div>
       </div>
     </div>

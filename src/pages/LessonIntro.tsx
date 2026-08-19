@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { Button } from '../components/Button';
 import FlashcardDeck from '../components/FlashcardDeck';
 import Icon from '../components/Icon';
 import Mascot from '../components/Mascot';
@@ -71,12 +72,9 @@ export default function LessonIntro() {
           <p className="mt-4 text-sm text-carbon-500 font-medium">
             Vas a mezclar preguntas con minijuegos de repaso durante la lección.
           </p>
-          <button
-            onClick={finish}
-            className="mt-6 w-full bg-lime-500 hover:bg-lime-400 text-carbon-900 font-black text-lg py-3.5 rounded-2xl transition active:scale-95"
-          >
-            Empezar
-          </button>
+          <div className="mt-6 w-full">
+            <Button onClick={finish}>Empezar</Button>
+          </div>
         </div>
       )}
     </div>

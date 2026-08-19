@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { SentenceRound } from '../types';
+import { Button, optionLip } from './Button';
 import Icon from './Icon';
 import { shuffle } from '../utils/shuffle';
 
@@ -67,7 +68,8 @@ export default function SentenceRoundCard({
               key={opt.id}
               onClick={() => handleSelect(opt.id)}
               disabled={checked}
-              className={`text-left px-4 py-3.5 rounded-2xl border-2 font-bold transition flex items-center gap-3 ${
+              style={{ ['--btn-lip' as string]: optionLip(showCorrect, showIncorrect) }}
+              className={`btn-3d text-left px-4 py-3.5 rounded-2xl border-2 font-bold flex items-center gap-3 ${
                 showCorrect
                   ? 'border-lime-500 bg-lime-500/10 text-lime-300'
                   : showIncorrect
@@ -90,16 +92,9 @@ export default function SentenceRoundCard({
       )}
 
       {checked && (
-        <button
-          onClick={handleContinue}
-          className={`w-full font-black text-lg py-3.5 rounded-2xl transition active:scale-95 ${
-            isCorrect
-              ? 'bg-lime-500 hover:bg-lime-400 text-carbon-900'
-              : 'bg-danger-500 hover:bg-danger-600 text-white'
-          }`}
-        >
+        <Button onClick={handleContinue} variant={isCorrect ? 'primary' : 'danger'}>
           {isCorrect ? 'Continuar' : 'Reintentar'}
-        </button>
+        </Button>
       )}
     </div>
   );

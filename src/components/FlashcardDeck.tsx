@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Flashcard } from '../types';
+import { Button } from './Button';
 import Icon from './Icon';
 
 export default function FlashcardDeck({ cards, onDone }: { cards: Flashcard[]; onDone: () => void }) {
@@ -64,12 +65,9 @@ export default function FlashcardDeck({ cards, onDone }: { cards: Flashcard[]; o
         {index + 1} / {cards.length}
       </p>
 
-      <button
-        onClick={handleNext}
-        className="shrink-0 mt-4 w-full max-w-xs bg-lime-500 hover:bg-lime-400 text-carbon-900 font-black text-lg py-3.5 rounded-2xl transition active:scale-95"
-      >
-        {!flipped ? 'Voltear' : isLast ? 'Continuar' : 'Siguiente'}
-      </button>
+      <div className="shrink-0 mt-4 w-full max-w-xs">
+        <Button onClick={handleNext}>{!flipped ? 'Voltear' : isLast ? 'Continuar' : 'Siguiente'}</Button>
+      </div>
     </div>
   );
 }

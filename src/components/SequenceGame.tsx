@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import type { SequenceGame as SequenceGameType } from '../types';
+import { Button } from './Button';
 import { shuffle } from '../utils/shuffle';
 
 const ROW_HEIGHT = 60;
@@ -121,21 +122,13 @@ export default function SequenceGame({
         <p className="text-center text-danger-400 text-sm font-bold mt-3">Ese orden no es correcto, ¡sigue intentando!</p>
       )}
 
-      {checked && isCorrect ? (
-        <button
-          onClick={onDone}
-          className="mt-6 w-full bg-lime-500 hover:bg-lime-400 text-carbon-900 font-black text-lg py-3.5 rounded-2xl transition active:scale-95"
-        >
-          Continuar
-        </button>
-      ) : (
-        <button
-          onClick={handleCheck}
-          className="mt-6 w-full bg-lime-500 hover:bg-lime-400 text-carbon-900 font-black text-lg py-3.5 rounded-2xl transition active:scale-95"
-        >
-          Comprobar orden
-        </button>
-      )}
+      <div className="mt-6">
+        {checked && isCorrect ? (
+          <Button onClick={onDone}>Continuar</Button>
+        ) : (
+          <Button onClick={handleCheck}>Comprobar orden</Button>
+        )}
+      </div>
     </div>
   );
 }
