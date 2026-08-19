@@ -179,6 +179,29 @@ check(
   /sessionInFlight/.test(pullSource)
 );
 
+// --------------------------------- the deep link scheme agrees everywhere
+// Three files have to name the same scheme, and none of them can see the
+// others. A mismatch shows up as a sign-in that opens the browser, succeeds,
+// and then simply never comes back — with nothing anywhere saying why.
+const nativeAuth = readFileSync('src/lib/nativeAuth.ts', 'utf8');
+const manifest = readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');
+const plist = readFileSync('ios/App/App/Info.plist', 'utf8');
+
+const scheme = nativeAuth.match(/NATIVE_SCHEME = '([^']+)'/)?.[1];
+check('nativeAuth.ts declares a scheme', !!scheme, scheme ?? 'none');
+check(
+  'AndroidManifest registers the same scheme',
+  !!scheme && new RegExp(`android:scheme="${scheme}"`).test(manifest)
+);
+check(
+  'Info.plist registers the same scheme',
+  !!scheme && new RegExp(`<string>${scheme.replace(/\./g, '\\.')}</string>`).test(plist)
+);
+check(
+  'the Android intent filter is browsable, or the browser cannot reopen the app',
+  /android\.intent\.category\.BROWSABLE/.test(manifest)
+);
+
 // -------------------------------------------- which side wins on first sync
 check('a fresh cloud profile does not count as progress', !hasProgress({ onboarded: false, xp: 0, attempts: [] }));
 check('an onboarded profile counts', hasProgress({ onboarded: true, xp: 0, attempts: [] }));

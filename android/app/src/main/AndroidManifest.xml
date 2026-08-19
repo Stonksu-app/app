@@ -18,6 +18,20 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!--
+              Brings the app back after signing in. Google refuses OAuth inside
+              a web view, so the flow runs in a Custom Tab, and this is the only
+              thing that lets that browser hand the session back — without it
+              the redirect dead-ends on "page not found" and the sign-in is
+              lost. Must match NATIVE_SCHEME in src/lib/nativeAuth.ts.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.stonksu.app" />
+            </intent-filter>
         </activity>
 
         <provider

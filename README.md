@@ -75,6 +75,24 @@ El pie de **Perfil** muestra el `git describe` del build y el id de la cuenta,
 que es la única forma de saber qué versión y qué usuario lleva realmente el
 móvil.
 
+### Iniciar sesión desde la app
+
+Google **rechaza OAuth dentro de un web view** (`disallowed_useragent`), así que
+el flujo no puede correr dentro de la app. Se abre el navegador del sistema —
+una Custom Tab en Android, un Safari view controller en iOS — y vuelve por un
+esquema propio, `com.stonksu.app://auth`, que el sistema sabe que nos
+pertenece.
+
+De vuelta, los tokens llegan en esa URL, se los pasamos a Supabase y quedan
+guardados en disco. **Se entra una vez**: la sesión sobrevive a cerrar la app y
+a reiniciar el teléfono, y el token se renueva solo.
+
+El esquema está registrado en tres sitios que tienen que coincidir: el
+`intent-filter` de `AndroidManifest.xml`, el `CFBundleURLTypes` de
+`Info.plist`, y `NATIVE_SCHEME` en [`src/lib/nativeAuth.ts`](src/lib/nativeAuth.ts).
+Y `com.stonksu.app://**` tiene que estar en las Redirect URLs de Supabase, o el
+callback se pierde.
+
 Dos límites de Apple que conviene tener presentes: una cuenta gratuita **no
 puede recibir notificaciones push** ni usar *Sign in with Apple*. Por eso los
 recordatorios de racha son notificaciones locales, que sí funcionan — y en

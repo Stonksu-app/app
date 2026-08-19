@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Session } from '@supabase/supabase-js';
 import { isCloudEnabled, supabase } from '../lib/supabase';
 import type { ProviderId } from '../lib/providers';
+import { authRedirectUrl, isNative, listenForAuthCallback, openAuthUrl } from '../lib/nativeAuth';
 
 /**
  * Who the player currently is, as far as Supabase is concerned.
@@ -138,6 +139,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     // twice in development.
     initialised = true;
 
+    // On a device the provider comes back through a custom scheme rather than
+    // a page load, so the session has to be picked up from that deep link.
+    listenForAuthCallback();
+
     const failure = readRedirectError();
     if (failure) {
       set({ errorCode: failure.code, error: translate(failure.message || failure.code) });
@@ -235,13 +240,21 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
     // linkIdentity, not signInWithOAuth: signing in would abandon the anonymous
     // account and every lesson played on it. Requires "Manual Linking" enabled.
-    const { error } = await supabase.auth.linkIdentity({
+    const { data, error } = await supabase.auth.linkIdentity({
       provider,
-      options: { redirectTo: `${window.location.origin}/home` },
+      options: { redirectTo: authRedirectUrl(), skipBrowserRedirect: isNative() },
     });
 
-    if (error) set({ busy: false, error: translate(error.message), errorCode: 'link_failed' });
-    // On success the browser navigates away, so there is no state to settle.
+    if (error) {
+      set({ busy: false, error: translate(error.message), errorCode: 'link_failed' });
+      return;
+    }
+
+    // On the web the page has already navigated away and there is no state to
+    // settle. On a device nothing has happened yet: the URL has to be opened
+    // in the real browser, because Google rejects OAuth inside a web view.
+    if (isNative() && data?.url) await openAuthUrl(data.url);
+    set({ busy: false });
   },
 
   signInWithPassword: async (email, password) => {
@@ -269,12 +282,18 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     // account the provider already belongs to. Whatever this device holds
     // anonymously is left behind, so only call this once the player has been
     // told that in plain words.
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/home` },
+      options: { redirectTo: authRedirectUrl(), skipBrowserRedirect: isNative() },
     });
 
-    if (error) set({ busy: false, error: translate(error.message), errorCode: 'link_failed' });
+    if (error) {
+      set({ busy: false, error: translate(error.message), errorCode: 'link_failed' });
+      return;
+    }
+
+    if (isNative() && data?.url) await openAuthUrl(data.url);
+    set({ busy: false });
   },
 
   clearError: () => {

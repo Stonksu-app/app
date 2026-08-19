@@ -106,7 +106,10 @@ Site URL:       https://dev-stonksu.vercel.app
 ```
 Redirect URLs:  http://localhost:5173/**
                 https://dev-stonksu.vercel.app/**
+                com.stonksu.app://**
 ```
+
+**La tercera es la de las apps de móvil y es tan obligatoria como las otras.** Dentro del APK o del `.ipa` no hay ningún `localhost` al que volver: la app se identifica ante el sistema con ese esquema propio, y es así como el navegador le devuelve la sesión. Si no está en la lista, Supabase la sustituye por el *Site URL*, la app nunca recibe el aviso y el login se queda a medias sin decir por qué.
 
 Y para producción, lo mismo con su dominio.
 
