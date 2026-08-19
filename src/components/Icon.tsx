@@ -265,6 +265,7 @@ const ICON_PATHS: Record<IconName, React.ReactNode> = {
   ),
   'chevron-up': <path d="M5 15l7-7 7 7" />,
   'chevron-down': <path d="M5 9l7 7 7-7" />,
+  'chevron-left': <path d="M15 5l-7 7 7 7" />,
   pencil: (
     <>
       <path d="M4 20.5 4.8 16.6 15.5 5.9a1.5 1.5 0 0 1 2.1 0l1.5 1.5a1.5 1.5 0 0 1 0 2.1L8.4 19.7 4 20.5Z" />

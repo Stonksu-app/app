@@ -34,6 +34,7 @@ export type IconName =
   | 'shuffle'
   | 'chevron-up'
   | 'chevron-down'
+  | 'chevron-left'
   | 'pencil'
   | 'chest';
 
