@@ -1,7 +1,15 @@
-import type { Activity, IntroGame, QuizQuestion } from '../types';
+import type { Activity, Flashcard, IntroGame, QuizQuestion, SkillNode } from '../types';
 import { chunk, shuffle } from './shuffle';
 
 const BATCH_SIZE = 5;
+
+/** How much a single stage serves up. Short on purpose: a topic is covered
+ *  across several stages rather than repeated whole every time. */
+const TARGET_QUIZ = 4;
+const TARGET_GAMES = 3;
+/** The review pulls from everything, so it earns a little more length. */
+const REVIEW_QUIZ = 5;
+const REVIEW_GAMES = 4;
 
 function nonBatchedActivities(game: IntroGame, gameIndex: number): Activity[] {
   if (game.type === 'sequence') {
@@ -105,9 +113,81 @@ function interleave(primary: Activity[], secondary: Activity[]): Activity[] {
   return result;
 }
 
-export function buildActivityStream(baseQuestions: QuizQuestion[], games: IntroGame[] = []): Activity[] {
-  const quizPool: Activity[] = baseQuestions.map((q) => ({ type: 'quiz', id: q.id, question: q }));
-  const gamePool: Activity[] = [...batchedActivities(games), ...games.flatMap((g, i) => nonBatchedActivities(g, i))];
+/** Contiguous, balanced split — contiguous so each group keeps the thematic
+ *  ordering the content was authored in, balanced so no group is left tiny. */
+function splitInto<T>(arr: T[], groups: number): T[][] {
+  if (groups <= 1) return [arr];
+  const out: T[][] = [];
+  const base = Math.floor(arr.length / groups);
+  let extra = arr.length % groups;
+  let at = 0;
+  for (let g = 0; g < groups; g++) {
+    const take = base + (extra > 0 ? 1 : 0);
+    if (extra > 0) extra--;
+    out.push(arr.slice(at, at + take));
+    at += take;
+  }
+  return out;
+}
 
-  return interleave(quizPool, gamePool);
+/** An even spread across the whole array rather than the first n, so a review
+ *  touches every part of the topic instead of only its opening. */
+function spread<T>(arr: T[], n: number): T[] {
+  if (arr.length <= n) return [...arr];
+  const step = arr.length / n;
+  return Array.from({ length: n }, (_, i) => arr[Math.floor(i * step)]);
+}
+
+export interface StagePlan {
+  title: string;
+  isReview: boolean;
+  activities: Activity[];
+  /** Only the terms this stage introduces, so the intro stays short too. */
+  flashcards: Flashcard[];
+}
+
+/**
+ * Builds the run for one stage of a topic.
+ *
+ * Stages before the last each teach a different slice of the topic; the last
+ * one reviews the whole thing. Replaying the same full lesson every stage is
+ * what made mastery a grind.
+ *
+ * @param stage 0-based index of the stage about to be played.
+ */
+export function buildStage(node: SkillNode, questions: QuizQuestion[], stage: number, maxStage: number): StagePlan {
+  const games = node.intro?.games ?? [];
+  const cards = node.intro?.flashcards ?? [];
+
+  const quizPool: Activity[] = questions.map((q) => ({ type: 'quiz', id: q.id, question: q }));
+  const gamePool: Activity[] = [
+    ...batchedActivities(games),
+    ...games.flatMap((g, i) => nonBatchedActivities(g, i)),
+  ];
+
+  const teachingStages = Math.max(1, maxStage - 1);
+  const isReview = stage >= teachingStages;
+
+  if (isReview) {
+    return {
+      title: 'Repaso',
+      isReview: true,
+      activities: interleave(spread(quizPool, REVIEW_QUIZ), spread(gamePool, REVIEW_GAMES)),
+      flashcards: [],
+    };
+  }
+
+  const quizSlice = splitInto(quizPool, teachingStages)[stage] ?? [];
+  const gameSlice = splitInto(gamePool, teachingStages)[stage] ?? [];
+  const cardSlice = splitInto(cards, teachingStages)[stage] ?? [];
+
+  const named = cardSlice.slice(0, 2).map((c) => c.term);
+  const title = named.length ? named.join(' y ') : `Parte ${stage + 1}`;
+
+  return {
+    title,
+    isReview: false,
+    activities: interleave(quizSlice.slice(0, TARGET_QUIZ), gameSlice.slice(0, TARGET_GAMES)),
+    flashcards: cardSlice,
+  };
 }

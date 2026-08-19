@@ -17,7 +17,7 @@ import StreakPill from '../components/StreakPill';
 import { getLessonById, getNodeById } from '../data/lessons';
 import { useComboFeedback } from '../hooks/useComboFeedback';
 import { useUserStore } from '../store/useUserStore';
-import { buildActivityStream } from '../utils/buildActivityStream';
+import { buildStage } from '../utils/buildActivityStream';
 import type { Activity, IconName } from '../types';
 
 const XP_PER_CORRECT = 10;
@@ -49,10 +49,19 @@ export default function Lesson() {
   } = useComboFeedback();
 
   const data = useMemo(() => (lessonId ? getLessonById(lessonId) : undefined), [lessonId]);
-  const activities = useMemo(
-    () => (data ? buildActivityStream(data.lesson.questions, data.node.intro?.games) : []),
-    [data]
+
+  // The stage you're about to play is the one after what you've cleared, so
+  // each attempt serves different content instead of replaying the whole topic.
+  const [stageAtEntry] = useState(() => (data ? getNodeStage(data.node.id) : 0));
+  const plan = useMemo(
+    () =>
+      data
+        ? buildStage(data.node, data.lesson.questions, stageAtEntry, getNodeMaxStage(data.node.id))
+        : null,
+    // getNodeMaxStage is a stable store getter; stageAtEntry is frozen for the run.
+    [data, stageAtEntry, getNodeMaxStage]
   );
+  const activities = plan?.activities ?? [];
 
   const [index, setIndex] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -175,8 +184,10 @@ export default function Lesson() {
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="max-w-xl w-full mx-auto px-4 py-5 flex flex-col relative">
         <div className="flex items-center justify-between mb-1 gap-2">
-          <div className="flex items-center gap-2">
-            <p className="text-xs font-black text-lime-400 uppercase tracking-wide">{node.title}</p>
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="text-xs font-black text-lime-400 uppercase tracking-wide truncate">
+              {plan?.isReview ? `${node.title} · Repaso` : plan?.title ?? node.title}
+            </p>
             {badge && (
               <span className="flex items-center gap-1 text-[10px] font-black text-carbon-300 bg-carbon-800 px-2 py-0.5 rounded-full uppercase">
                 <Icon name={badge.icon} size={11} />

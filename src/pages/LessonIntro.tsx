@@ -6,6 +6,7 @@ import Icon from '../components/Icon';
 import Mascot from '../components/Mascot';
 import OutOfHeartsScreen from '../components/OutOfHeartsScreen';
 import { getLessonById } from '../data/lessons';
+import { buildStage } from '../utils/buildActivityStream';
 import { useUserStore } from '../store/useUserStore';
 
 const GOAL_MESSAGES: Record<string, string> = {
@@ -19,9 +20,18 @@ export default function LessonIntro() {
   useUserStore.getState().tickHeartRegen();
   const { lessonId } = useParams<{ lessonId: string }>();
   const navigate = useNavigate();
-  const { onboardingAnswers, markIntroSeen, name, hearts } = useUserStore();
+  const { onboardingAnswers, markIntroSeen, name, hearts, getNodeStage, getNodeMaxStage } = useUserStore();
 
   const data = useMemo(() => (lessonId ? getLessonById(lessonId) : undefined), [lessonId]);
+
+  // Preview only the terms this stage introduces, not the whole topic.
+  const plan = useMemo(
+    () =>
+      data
+        ? buildStage(data.node, data.lesson.questions, getNodeStage(data.node.id), getNodeMaxStage(data.node.id))
+        : null,
+    [data, getNodeStage, getNodeMaxStage]
+  );
 
   useEffect(() => {
     if (lessonId && (!data || !data.node.intro)) {
@@ -33,7 +43,7 @@ export default function LessonIntro() {
   if (hearts <= 0) return <OutOfHeartsScreen blockedEntry />;
   const { node, lesson } = data;
   if (!node.intro) return null;
-  const { intro } = node;
+  const cards = plan?.flashcards ?? [];
   const skipFlashcards = onboardingAnswers.experience === 'some' || onboardingAnswers.experience === 'experienced';
   const goalMessage = GOAL_MESSAGES[onboardingAnswers.goal ?? ''] ?? 'Aquí tienes un poco de contexto antes de empezar.';
 
@@ -44,21 +54,23 @@ export default function LessonIntro() {
 
   return (
     <div className="h-dvh bg-carbon-900 flex flex-col px-6 pt-safe pb-safe">
-      {!skipFlashcards ? (
+      {!skipFlashcards && cards.length > 0 ? (
         <div className="flex-1 min-h-0 w-full max-w-sm mx-auto flex flex-col animate-pop-in py-4">
           <div className="shrink-0 flex flex-col items-center text-center mb-4">
             <Mascot size={72} mood="happy" />
-            <p className="text-xs font-black text-lime-400 uppercase tracking-wide mt-2">{node.title}</p>
+            <p className="text-xs font-black text-lime-400 uppercase tracking-wide mt-2">
+              {node.title} · {plan?.title}
+            </p>
             <h1 className="text-lg font-black text-carbon-50 mt-0.5">
               {name ? `${name}, ` : ''}antes de empezar...
             </h1>
             <div className="mt-2 flex items-center gap-2 text-xs text-carbon-300 font-medium">
               <Icon name="cards" size={16} className="text-lime-500 shrink-0" />
-              Repasa {intro.flashcards.length} términos clave antes de jugar
+              Repasa {cards.length} {cards.length === 1 ? 'término' : 'términos'} de esta etapa
             </div>
           </div>
           <div className="flex-1 min-h-0">
-            <FlashcardDeck cards={intro.flashcards} onDone={finish} />
+            <FlashcardDeck cards={cards} onDone={finish} />
           </div>
         </div>
       ) : (
