@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { isCloudEnabled } from '../lib/supabase';
 import { ensureSession, hasProgress, pullState, pushState, type CloudState } from '../lib/cloud';
+import { suffixName } from '../lib/names';
 import { useUserStore } from '../store/useUserStore';
 
 /**
@@ -69,7 +70,36 @@ export function useCloudSync(): SyncStatus {
         timer = null;
       }
       if (!userId.current) return;
-      void pushState(userId.current, snapshot());
+      void save(userId.current);
+    };
+
+    /**
+     * Pushes, and recovers from the one race the availability check can't close:
+     * two players confirming the same nickname in the same instant. Without this
+     * the loser's every future push fails on the same unique violation, so their
+     * progress silently stops syncing over a name.
+     *
+     * `applying` is held throughout so renaming doesn't schedule another push
+     * and spin.
+     */
+    const save = async (id: string) => {
+      if ((await pushState(id, snapshot())) !== 'name-taken') return;
+
+      applying.current = true;
+      try {
+        const wanted = useUserStore.getState().name;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          useUserStore.setState({ name: suffixName(wanted, attempt) });
+          if ((await pushState(id, snapshot())) === 'ok') {
+            console.warn(`[cloud] "${wanted}" was taken; you are now "${useUserStore.getState().name}"`);
+            return;
+          }
+        }
+        useUserStore.setState({ name: wanted });
+        console.warn('[cloud] could not find a free variant of the nickname; not syncing');
+      } finally {
+        applying.current = false;
+      }
     };
 
     const schedulePush = () => {
@@ -107,7 +137,7 @@ export function useCloudSync(): SyncStatus {
       } else {
         // Fresh account. Anything already on this device — progress from before
         // the backend existed — goes up rather than being thrown away.
-        await pushState(id, snapshot());
+        await save(id);
       }
       if (cancelled) return;
 

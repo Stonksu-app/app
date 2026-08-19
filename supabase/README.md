@@ -121,6 +121,7 @@ Ejecútalas en orden desde el **SQL Editor**. Las dos son re-ejecutables.
 | --- | --- |
 | [`0001_init.sql`](migrations/0001_init.sql) | `profiles`, `attempts`, RLS y restricciones |
 | [`0002_account_status.sql`](migrations/0002_account_status.sql) | refleja `email` / `is_anonymous` / `registered_at` desde `auth.users`, más la vista `account_summary` |
+| [`0003_unique_names.sql`](migrations/0003_unique_names.sql) | apodos únicos e insensibles a mayúsculas, más la función `name_available` |
 
 `auth.users` no se puede leer desde el cliente, así que sin la 0002 no hay forma de saber por consulta qué cuentas son reales, y el Table Editor te muestra un muro de perfiles sin distinguir personas de sesiones anónimas que morirán con la caché de un navegador.
 
@@ -167,6 +168,18 @@ git tag v0.8.0-dev && git push origin v0.8.0-dev
 ```
 
 Para comprobar qué build lleva realmente el móvil, mira el pie de **Perfil**: muestra `git describe`, así que `v0.7.0-6-g60c3091` significa "seis commits por delante de v0.7.0" y deja claro de un vistazo si el teléfono va atrasado.
+
+## Apodos únicos
+
+Solo puede existir un "mordekai". La unicidad la impone un índice único sobre `lower(btrim(name))`, que es el único sitio donde puede imponerse de verdad: dos personas pueden estar escribiendo el mismo apodo en el mismo instante, y ninguna comprobación previa cierra esa ventana.
+
+Es **insensible a mayúsculas** a propósito — "Pollo" y "pollo" son el mismo apodo para una persona, así que permitir los dos vaciaría de sentido la regla.
+
+RLS impide al cliente leer perfiles ajenos, así que tampoco puede comprobar si un apodo está libre. Para eso está `name_available(text)`, una función `security definer` que ve todas las filas pero **devuelve un solo booleano**: no filtra nada más allá de "cogido o no", que es inherente a tener nombres únicos. Excluye tu propia fila, para que reguardar tu nombre no choque contigo mismo.
+
+Si la migración no está aplicada, la llamada falla, la app lo trata como "no se pudo comprobar" y deja continuar. Nunca bloquea a nadie por un fallo de red.
+
+Para la carrera que sí queda abierta —dos confirmaciones simultáneas— el índice rechaza a uno, y el cliente prueba `pollo2`, `pollo3`… hasta encontrar hueco. Se pierde el apodo exacto, pero no la sincronización, que es lo caro.
 
 ## Cuentas duplicadas
 

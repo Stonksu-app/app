@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Mascot from '../components/Mascot';
 import Icon from '../components/Icon';
 import { Button } from '../components/Button';
 import { useUserStore } from '../store/useUserStore';
+import { isNameFree, NAME_MAX, validateName, type NameState } from '../lib/names';
 import type { IconName, TradingExperience } from '../types';
 
 const EXPERIENCE_OPTIONS: { id: TradingExperience; label: string; icon: IconName }[] = [
@@ -27,6 +28,29 @@ export default function Onboarding() {
   const { onboardingAnswers, setOnboardingAnswer, finishOnboarding } = useUserStore();
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
+  const [nameState, setNameState] = useState<NameState>('empty');
+
+  const formatError = validateName(name);
+
+  // Debounced so it asks once you've stopped typing rather than on every key.
+  // The request is tagged and stale replies are dropped, or a slow answer for
+  // "pol" could land after a fast one for "pollo" and label the wrong name.
+  const checkId = useRef(0);
+  useEffect(() => {
+    const candidate = name.trim();
+    if (!candidate) return setNameState('empty');
+    if (formatError) return setNameState('invalid');
+
+    setNameState('checking');
+    const id = ++checkId.current;
+    const timer = setTimeout(async () => {
+      const free = await isNameFree(candidate);
+      if (id !== checkId.current) return;
+      setNameState(free === null ? 'unknown' : free ? 'free' : 'taken');
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [name, formatError]);
 
   const progress = ((step + 1) / STEPS.length) * 100;
 
@@ -49,7 +73,10 @@ export default function Onboarding() {
       ? !!onboardingAnswers.experience
       : currentStep === 'goal'
       ? !!onboardingAnswers.goal
-      : name.trim().length > 0;
+      : // 'unknown' passes: a check that couldn't run is not a reason to trap
+        // someone on the last step of onboarding. The unique index still has
+        // the final say when the profile is saved.
+        name.trim().length > 0 && (nameState === 'free' || nameState === 'unknown');
 
   return (
     <div className="h-dvh bg-carbon-900 flex flex-col pt-safe pb-safe">
@@ -136,13 +163,31 @@ export default function Onboarding() {
             <input
               autoFocus
               value={name}
+              maxLength={NAME_MAX}
               onChange={(e) => setName(e.target.value)}
               placeholder="Tu nombre o apodo"
-              className="mt-6 w-full text-center text-lg font-bold px-4 py-3.5 rounded-2xl border-2 border-carbon-700 focus:border-lime-500 outline-none bg-carbon-850 text-carbon-50 placeholder:text-carbon-500"
+              aria-invalid={nameState === 'taken' || nameState === 'invalid'}
+              className={`mt-6 w-full text-center text-lg font-bold px-4 py-3.5 rounded-2xl border-2 outline-none bg-carbon-850 text-carbon-50 placeholder:text-carbon-500 transition-colors ${
+                nameState === 'taken' || nameState === 'invalid'
+                  ? 'border-danger-500 focus:border-danger-400'
+                  : nameState === 'free'
+                  ? 'border-lime-500'
+                  : 'border-carbon-700 focus:border-lime-500'
+              }`}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && canContinue) goNext();
               }}
             />
+
+            {/* Fixed height so the layout doesn't jump as the state changes. */}
+            <p className="mt-2 h-5 text-sm font-bold text-center" aria-live="polite">
+              {nameState === 'invalid' && <span className="text-danger-400">{formatError}</span>}
+              {nameState === 'checking' && <span className="text-carbon-500">Comprobando…</span>}
+              {nameState === 'free' && <span className="text-lime-400">¡Libre! Es todo tuyo.</span>}
+              {nameState === 'taken' && (
+                <span className="text-danger-400">Ese apodo ya está cogido. Prueba con otro.</span>
+              )}
+            </p>
           </div>
         )}
       </div>

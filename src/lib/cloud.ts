@@ -180,13 +180,24 @@ export async function pullState(userId: string): Promise<CloudState | null> {
  * the schema declares unique — so replaying a full local history is idempotent
  * rather than duplicating every entry in the streak calendar.
  */
-export async function pushState(userId: string, state: CloudState): Promise<boolean> {
-  if (!supabase) return false;
+export type PushResult =
+  | 'ok'
+  /** The nickname was claimed between the availability check and the save.
+   *  Called out separately because it is the one failure the caller can fix. */
+  | 'name-taken'
+  | 'failed';
+
+export async function pushState(userId: string, state: CloudState): Promise<PushResult> {
+  if (!supabase) return 'failed';
 
   const { error: profileError } = await supabase.from('profiles').upsert(toRow(state, userId));
   if (profileError) {
+    // 23505 is a unique violation, and the only unique constraint on the table
+    // is the nickname index. Left unhandled it would poison every later push
+    // too, so progress would quietly stop syncing over a name clash.
+    if (profileError.code === '23505') return 'name-taken';
     console.warn('[cloud] could not save profile:', profileError.message);
-    return false;
+    return 'failed';
   }
 
   if (state.attempts.length) {
@@ -204,11 +215,11 @@ export async function pushState(userId: string, state: CloudState): Promise<bool
     );
     if (attemptsError) {
       console.warn('[cloud] could not save attempts:', attemptsError.message);
-      return false;
+      return 'failed';
     }
   }
 
-  return true;
+  return 'ok';
 }
 
 /**
