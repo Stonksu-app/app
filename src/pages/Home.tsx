@@ -8,7 +8,7 @@ import { Button } from '../components/Button';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import { SKILL_TREE } from '../data/lessons';
 import StatPanel, { type StatKey } from '../components/StatPanels';
-import { useUserStore, xpToLevel } from '../store/useUserStore';
+import { CHEST_REWARD, useUserStore, xpToLevel } from '../store/useUserStore';
 import type { IconName, SkillNode } from '../types';
 
 /* Three-column learn layout, in the shape Duolingo uses: nav rail on the left,
@@ -22,9 +22,9 @@ const NODE_PITCH = 116;
 /** A chest sits after every CHEST_EVERY topics and opens once the topic before
  *  it is platinum, so it pays out for mastering a subject rather than for
  *  merely walking past it. One per topic keeps the first reward reachable —
- *  at two, you'd have to platinum two whole subjects before seeing one. */
+ *  at two, you'd have to platinum two whole subjects before seeing one.
+ *  The payout itself lives in the store as CHEST_REWARD. */
 const CHEST_EVERY = 1;
-const CHEST_XP = 100;
 
 function StatRail({
   hearts,
@@ -152,7 +152,7 @@ export default function Home() {
   // path would keep rendering a chest as unopened after you claimed it.
   const { openedChestIds, nodeStageProgress, openChest, testMode } = useUserStore();
   const [selected, setSelected] = useState<SkillNode | null>(null);
-  const [reward, setReward] = useState<number | null>(null);
+  const [reward, setReward] = useState(false);
   const { hearts, msUntilNextHeart } = useHeartRegen();
 
   const nodes = useMemo(
@@ -239,8 +239,8 @@ export default function Home() {
                     <button
                       disabled={!item.unlocked || item.opened}
                       onClick={() => {
-                        openChest(item.key, CHEST_XP);
-                        setReward(CHEST_XP);
+                        openChest(item.key);
+                        setReward(true);
                       }}
                       aria-label={item.opened ? 'Cofre abierto' : 'Abrir cofre'}
                       style={{
@@ -258,8 +258,23 @@ export default function Home() {
                     >
                       <Icon name="chest" size={32} strokeWidth={1.9} />
                     </button>
-                    <span className="mt-2 text-[11px] font-black text-carbon-500">
-                      {item.opened ? 'ABIERTO' : item.unlocked ? `+${CHEST_XP} XP` : 'PLATINA PARA ABRIR'}
+                    <span className="mt-2 text-[11px] font-black text-carbon-500 flex items-center gap-1.5">
+                      {item.opened ? (
+                        'ABIERTO'
+                      ) : item.unlocked ? (
+                        <>
+                          <span className="flex items-center gap-0.5">
+                            <Icon name="star" size={11} className="text-lime-500" />
+                            {CHEST_REWARD.xp}
+                          </span>
+                          <span className="flex items-center gap-0.5">
+                            <Icon name="coins" size={11} className="text-lime-500" />
+                            {CHEST_REWARD.coins}
+                          </span>
+                        </>
+                      ) : (
+                        'PLATINA PARA ABRIR'
+                      )}
                     </span>
                   </div>
                 );
@@ -327,19 +342,26 @@ export default function Home() {
         active={current ? { node: current.node, stage: current.stage, maxStage: current.maxStage } : null}
       />
 
-      {reward !== null && (
+      {reward && (
         <div
           className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-          onClick={() => setReward(null)}
+          onClick={() => setReward(false)}
         >
           <div className="text-center animate-pop-in" onClick={(e) => e.stopPropagation()}>
             <div className="w-24 h-24 rounded-3xl bg-[#FFC93C] text-carbon-900 flex items-center justify-center mx-auto animate-bounce-in">
               <Icon name="chest" size={48} strokeWidth={1.8} />
             </div>
-            <p className="mt-5 text-3xl font-black text-[#FFC93C]">+{reward} XP</p>
-            <p className="mt-1 text-carbon-300 font-bold">¡Cofre reclamado!</p>
+            <p className="mt-4 text-carbon-100 font-black text-lg">¡Cofre reclamado!</p>
+            <div className="mt-4 flex items-center justify-center gap-4">
+              <span className="flex items-center gap-1.5 text-2xl font-black text-lime-400">
+                <Icon name="star" size={24} /> +{CHEST_REWARD.xp}
+              </span>
+              <span className="flex items-center gap-1.5 text-2xl font-black text-[#FFC93C]">
+                <Icon name="coins" size={24} /> +{CHEST_REWARD.coins}
+              </span>
+            </div>
             <div className="mt-6 w-[240px] mx-auto">
-              <Button onClick={() => setReward(null)}>Genial</Button>
+              <Button onClick={() => setReward(false)}>Genial</Button>
             </div>
           </div>
         </div>

@@ -49,16 +49,18 @@ interface UserState {
   getNodeMaxStage: (nodeId: string) => number;
   isNodePlatinum: (nodeId: string) => boolean;
   isChestOpened: (chestId: string) => boolean;
-  openChest: (chestId: string, reward: number) => void;
+  openChest: (chestId: string) => void;
   buyHeartRefill: () => boolean;
   buyStreakProtector: () => boolean;
   resetProgress: () => void;
 }
 
 export const COIN_PRICES = { heartRefill: 350, streakProtector: 200 } as const;
-/** Coins minted per correct answer, and per chest opened. */
+/** Coins minted per correct answer. */
 export const COINS_PER_CORRECT = 2;
-export const COINS_PER_CHEST = 50;
+/** What a chest pays out. Kept here so the amounts the path advertises and the
+ *  amounts actually granted can't drift apart. */
+export const CHEST_REWARD = { xp: 100, coins: 50 } as const;
 /** Owning more than this many protectors at once isn't useful. */
 export const MAX_PROTECTORS = 2;
 
@@ -214,15 +216,15 @@ export const useUserStore = create<UserState>()(
 
       isChestOpened: (chestId) => get().openedChestIds.includes(chestId),
 
-      openChest: (chestId, reward) =>
+      openChest: (chestId) =>
         set((s) =>
           // Guarded so a double tap can't pay out twice.
           s.openedChestIds.includes(chestId)
             ? s
             : {
                 openedChestIds: [...s.openedChestIds, chestId],
-                xp: s.xp + reward,
-                coins: s.coins + COINS_PER_CHEST,
+                xp: s.xp + CHEST_REWARD.xp,
+                coins: s.coins + CHEST_REWARD.coins,
               }
         ),
 
