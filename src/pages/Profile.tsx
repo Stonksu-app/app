@@ -11,6 +11,7 @@ import { getLessonById } from '../data/lessons';
 import { useUserStore, xpToLevel } from '../store/useUserStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { appEnv, isCloudEnabled } from '../lib/supabase';
+import { useSyncStore } from '../store/useSyncStore';
 import type { IconName } from '../types';
 
 /* Section headings are 24px/700 and stat tiles sit in a 2x2 grid, matching the
@@ -59,6 +60,7 @@ export default function Profile() {
   } = useUserStore();
   const { level } = xpToLevel(xp);
   const authStatus = useAuthStore((s) => s.status);
+  const syncUserId = useSyncStore((s) => s.userId);
 
   const achievements = computeAchievements({ streak, xp, attempts, nodeStageProgress, openedChestIds });
   const preview = [...achievements].sort(byRelevance).slice(0, 3);
@@ -190,6 +192,12 @@ export default function Profile() {
             {appEnv === 'dev' && isCloudEnabled && (
               <span className="text-[#FFC93C]"> · base de datos de pruebas</span>
             )}
+            {/* The first characters of the account id. "Why am I not my old
+                self?" is almost always "you are signed into a different
+                account than you think", and nothing else on screen says
+                which. Enough to match against a row in the database, far too
+                little to identify anyone. */}
+            {syncUserId && <span className="text-carbon-700"> · {syncUserId.slice(0, 8)}</span>}
           </p>
         </div>
       </div>

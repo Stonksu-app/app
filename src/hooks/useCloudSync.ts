@@ -52,6 +52,7 @@ function snapshot(): CloudState {
 
 export function useCloudSync(): void {
   const setStatus = useSyncStore((s) => s.setStatus);
+  const setUserId = useSyncStore((s) => s.setUserId);
   // Set while a pull is being written into the store, so the subscription it
   // triggers doesn't immediately push the same data straight back up.
   const applying = useRef(false);
@@ -92,6 +93,7 @@ export function useCloudSync(): void {
         const fresh = await restartSession();
         if (!fresh) return;
         userId.current = fresh;
+        setUserId(fresh);
         await pushState(fresh, snapshot());
         return;
       }
@@ -137,6 +139,7 @@ export function useCloudSync(): void {
         return;
       }
       userId.current = id;
+      setUserId(id);
 
       const remote = await pullState(id);
       if (cancelled) return;
