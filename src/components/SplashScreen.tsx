@@ -20,13 +20,15 @@ const TIPS = [
 
 /** Pre-computed so the tape doesn't reshuffle on every render. Kept to the
  * outer margins so the chips never collide with the mascot or the wordmark. */
+/* Every delay stays under the splash's ~2.5s lifetime, otherwise a chip would
+   never get on screen before the screen fades out. */
 const TICKERS = [
-  { dir: 'long', side: 'left', offset: 2, delay: 0, duration: 3.4 },
-  { dir: 'short', side: 'left', offset: 9, delay: 1.6, duration: 3.9 },
-  { dir: 'long', side: 'left', offset: 4, delay: 3.2, duration: 3.6 },
-  { dir: 'short', side: 'right', offset: 3, delay: 0.8, duration: 3.7 },
-  { dir: 'long', side: 'right', offset: 10, delay: 2.4, duration: 3.2 },
-  { dir: 'short', side: 'right', offset: 5, delay: 4.1, duration: 3.5 },
+  { dir: 'long', side: 'left', offset: 2, delay: 0, duration: 3.0 },
+  { dir: 'short', side: 'left', offset: 9, delay: 0.8, duration: 3.4 },
+  { dir: 'long', side: 'left', offset: 4, delay: 1.6, duration: 3.2 },
+  { dir: 'short', side: 'right', offset: 3, delay: 0.4, duration: 3.2 },
+  { dir: 'long', side: 'right', offset: 10, delay: 1.2, duration: 2.9 },
+  { dir: 'short', side: 'right', offset: 5, delay: 2.0, duration: 3.3 },
 ] as const;
 
 export default function SplashScreen({ onDone }: { onDone: () => void }) {
