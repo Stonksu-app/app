@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { LessonAttempt, MascotLook, OnboardingAnswers, TradingExperience } from '../types';
+import type { AccessoryStyle, LessonAttempt, MascotLook, OnboardingAnswers, TradingExperience } from '../types';
+import { findMission } from '../data/missions';
 import { DEFAULT_LOOK } from '../components/Mascot';
 import { SKILL_TREE } from '../data/lessons';
 import { stagesForDifficulty } from '../utils/mastery';
@@ -29,6 +30,9 @@ interface UserState {
   coins: number;
   streakProtectors: number;
   avatar: MascotLook;
+  claimedMissionIds: string[];
+  /** Cosmetics earned from missions. Everything not listed stays locked. */
+  unlockedAccessories: AccessoryStyle[];
   /** Set by onboarding as the name "test". Unlocks the whole tree and seeds
    *  every topic one stage short of platinum, so each can be finished in a
    *  single lesson to check the mastery and chest flows end to end. */
@@ -55,6 +59,8 @@ interface UserState {
   buyHeartRefill: () => boolean;
   buyStreakProtector: () => boolean;
   setAvatar: (look: MascotLook) => void;
+  claimMission: (missionId: string) => void;
+  isAccessoryUnlocked: (style: AccessoryStyle) => boolean;
   resetProgress: () => void;
 }
 
@@ -93,6 +99,8 @@ export const useUserStore = create<UserState>()(
       coins: 0,
       streakProtectors: 0,
       avatar: DEFAULT_LOOK,
+      claimedMissionIds: [],
+      unlockedAccessories: ['ninguno'],
       testMode: false,
 
       startOnboarding: () => set({ onboarded: false }),
@@ -248,6 +256,34 @@ export const useUserStore = create<UserState>()(
 
       setAvatar: (avatar) => set({ avatar }),
 
+      claimMission: (missionId) =>
+        set((s) => {
+          // Guarded so a double tap can't pay out twice, and re-checked against
+          // the mission's own condition rather than trusting the caller.
+          if (s.claimedMissionIds.includes(missionId)) return s;
+          const mission = findMission(missionId);
+          if (!mission) return s;
+          const done =
+            mission.progress({
+              streak: s.streak,
+              xp: s.xp,
+              attempts: s.attempts,
+              nodeStageProgress: s.nodeStageProgress,
+              openedChestIds: s.openedChestIds,
+            }) >= mission.target;
+          if (!done) return s;
+
+          return {
+            claimedMissionIds: [...s.claimedMissionIds, missionId],
+            coins: s.coins + (mission.reward.coins ?? 0),
+            unlockedAccessories: mission.reward.accessory
+              ? [...new Set([...s.unlockedAccessories, mission.reward.accessory])]
+              : s.unlockedAccessories,
+          };
+        }),
+
+      isAccessoryUnlocked: (style) => style === 'ninguno' || get().unlockedAccessories.includes(style),
+
       resetProgress: () =>
         set({
           name: '',
@@ -268,6 +304,8 @@ export const useUserStore = create<UserState>()(
           coins: 0,
           streakProtectors: 0,
           avatar: DEFAULT_LOOK,
+          claimedMissionIds: [],
+          unlockedAccessories: ['ninguno'],
           testMode: false,
         }),
     }),

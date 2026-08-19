@@ -130,7 +130,7 @@ export type NodeDifficulty = 'easy' | 'medium' | 'hard';
 
 export type HornStyle = 'curvos' | 'rectos' | 'cortos' | 'largos' | 'gruesos';
 export type EyeStyle = 'arco' | 'puntos' | 'decididos' | 'guino' | 'estrellas';
-export type AccessoryStyle = 'ninguno' | 'gorra' | 'corona' | 'auriculares';
+export type AccessoryStyle = 'ninguno' | 'corona';
 
 /** How the player has dressed up their bull. The logo keeps the brand look;
  *  only the player-facing avatar follows this. */

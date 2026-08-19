@@ -34,39 +34,19 @@ const HORNS: Record<HornStyle, { left: string; right: string }> = {
   },
 };
 
-/** Accessories sit on the crown, between the horns, so they never collide with
+/** Sits on the crown of the head, between the horns, so it never collides with
  *  whichever horn shape is picked. */
 function Accessory({ style, color, mask }: { style: AccessoryStyle; color: string; mask: string }) {
-  if (style === 'gorra') {
-    return (
-      <>
-        <path d="M31 26 C33 16 42 11 50 11 C58 11 67 16 69 26 Z" fill={color} />
-        <path d="M69 26 C76 26 80 28 81 31 L67 31 Z" fill={color} opacity="0.75" />
-        <circle cx="50" cy="12" r="3" fill={mask} opacity="0.35" />
-      </>
-    );
-  }
-  if (style === 'corona') {
-    return (
-      <path
-        d="M31 27 L34 13 L42 21 L50 10 L58 21 L66 13 L69 27 Z"
-        fill={color}
-        stroke={mask}
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-    );
-  }
-  if (style === 'auriculares') {
-    return (
-      <>
-        <path d="M26 34 C27 18 37 11 50 11 C63 11 73 18 74 34" stroke={color} strokeWidth="5" fill="none" strokeLinecap="round" />
-        <rect x="19" y="32" width="11" height="17" rx="5" fill={color} />
-        <rect x="70" y="32" width="11" height="17" rx="5" fill={color} />
-      </>
-    );
-  }
-  return null;
+  if (style !== 'corona') return null;
+  return (
+    <path
+      d="M31 27 L34 13 L42 21 L50 10 L58 21 L66 13 L69 27 Z"
+      fill={color}
+      stroke={mask}
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    />
+  );
 }
 
 interface MascotProps {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import Mascot, { DEFAULT_LOOK } from '../components/Mascot';
 import { useUserStore } from '../store/useUserStore';
@@ -35,9 +35,7 @@ const EYE_OPTIONS: { id: EyeStyle; label: string }[] = [
 
 const ACCESSORY_OPTIONS: { id: AccessoryStyle; label: string }[] = [
   { id: 'ninguno', label: 'Ninguno' },
-  { id: 'gorra', label: 'Gorra' },
   { id: 'corona', label: 'Corona' },
-  { id: 'auriculares', label: 'Cascos' },
 ];
 
 const ACCESSORY_COLORS = ['#FFC93C', '#FF5252', '#47BFFF', '#A78BFA', '#C6FF34', '#E8E8E8'];
@@ -92,7 +90,7 @@ function ShapeOption({
 
 export default function AvatarEditor() {
   const navigate = useNavigate();
-  const { avatar, setAvatar } = useUserStore();
+  const { avatar, setAvatar, isAccessoryUnlocked } = useUserStore();
   const [draft, setDraft] = useState<MascotLook>(avatar);
   const [tab, setTab] = useState<Tab>('cuerpo');
 
@@ -212,20 +210,47 @@ export default function AvatarEditor() {
               {tab === 'extras' && (
                 <>
                   <h3 className="text-[19px] font-black text-carbon-50 mb-3">Accesorio</h3>
-                  <div className="grid grid-cols-4 gap-3">
-                    {ACCESSORY_OPTIONS.map((o) => (
-                      <ShapeOption
-                        key={o.id}
-                        label={o.label}
-                        active={draft.accessory === o.id}
-                        onClick={() => set({ accessory: o.id })}
-                      >
-                        <Mascot size={60} look={{ ...draft, accessory: o.id }} />
-                      </ShapeOption>
-                    ))}
+                  <div className="grid grid-cols-3 gap-3">
+                    {ACCESSORY_OPTIONS.map((o) => {
+                      const unlocked = isAccessoryUnlocked(o.id);
+                      if (!unlocked) {
+                        return (
+                          <div
+                            key={o.id}
+                            className="flex flex-col items-center gap-1 rounded-2xl border-2 border-carbon-800 bg-carbon-900 p-3 opacity-70"
+                          >
+                            <div className="w-[60px] h-[60px] flex items-center justify-center text-carbon-600">
+                              <Icon name="lock" size={26} />
+                            </div>
+                            <span className="text-[11px] font-black uppercase tracking-wide text-carbon-500">
+                              {o.label}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <ShapeOption
+                          key={o.id}
+                          label={o.label}
+                          active={draft.accessory === o.id}
+                          onClick={() => set({ accessory: o.id })}
+                        >
+                          <Mascot size={60} look={{ ...draft, accessory: o.id }} />
+                        </ShapeOption>
+                      );
+                    })}
                   </div>
 
-                  {draft.accessory !== 'ninguno' && (
+                  {!isAccessoryUnlocked('corona') && (
+                    <p className="mt-3 text-sm text-carbon-400">
+                      La corona se gana platinando tu primer tema.{' '}
+                      <Link to="/misiones" className="font-black text-lime-400 hover:text-lime-300">
+                        Ver misiones
+                      </Link>
+                    </p>
+                  )}
+
+                  {draft.accessory !== 'ninguno' && isAccessoryUnlocked(draft.accessory) && (
                     <>
                       <h3 className="text-[19px] font-black text-carbon-50 mt-6 mb-3">Color del accesorio</h3>
                       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
