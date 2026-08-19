@@ -3,7 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '../components/Button';
 import Confetti from '../components/Confetti';
 import Icon from '../components/Icon';
-import Mascot, { randomLine } from '../components/Mascot';
+import Avatar from '../components/Avatar';
+import { randomLine } from '../components/Mascot';
 import { BADGES } from '../data/badges';
 import { useCountUp } from '../hooks/useCountUp';
 
@@ -46,7 +47,7 @@ export default function LessonResults() {
       <Confetti count={perfect ? 90 : 50} />
 
       <div className="m-auto py-6 w-full flex flex-col items-center">
-      <Mascot size={130} mood="hype" />
+      <Avatar size={130} mood="hype" glow />
       <div className="flex items-center gap-2 mt-4">
         <Icon name={perfect ? 'trophy' : 'sparkles'} size={30} className="text-lime-500" />
         <h1 className="text-3xl sm:text-4xl font-black text-carbon-50">

@@ -1,12 +1,14 @@
-import type { EyeStyle, HornStyle, MascotLook } from '../types';
+import type { AccessoryStyle, EyeStyle, HornStyle, MascotLook } from '../types';
 
-/** The brand look. Every logo usage renders this; only the profile avatar
+/** The brand look. Every logo usage renders this; only the player's avatar
  *  passes something else. */
 export const DEFAULT_LOOK: MascotLook = {
   body: '#C6FF34',
   mask: '#171717',
   horns: 'curvos',
   eyes: 'arco',
+  accessory: 'ninguno',
+  accessoryColor: '#FFC93C',
 };
 
 const HORNS: Record<HornStyle, { left: string; right: string }> = {
@@ -22,7 +24,50 @@ const HORNS: Record<HornStyle, { left: string; right: string }> = {
     left: 'M20 25 C16 28 15 32 17 36.5 C19 37.6 22 37.6 25 36.5 C22 33 20.5 29 20 25 Z',
     right: 'M80 25 C84 28 85 32 83 36.5 C81 37.6 78 37.6 75 36.5 C78 33 79.5 29 80 25 Z',
   },
+  largos: {
+    left: 'M9 4 C4 14 6 27 13 36.5 C16 38 20 38 23 36.5 C15 27 11 15 9 4 Z',
+    right: 'M91 4 C96 14 94 27 87 36.5 C84 38 80 38 77 36.5 C85 27 89 15 91 4 Z',
+  },
+  gruesos: {
+    left: 'M12 14 C4 21 4 31 11 37.5 C16 39.5 22 39.5 26 37 C18 31 14 22 12 14 Z',
+    right: 'M88 14 C96 21 96 31 89 37.5 C84 39.5 78 39.5 74 37 C82 31 86 22 88 14 Z',
+  },
 };
+
+/** Accessories sit on the crown, between the horns, so they never collide with
+ *  whichever horn shape is picked. */
+function Accessory({ style, color, mask }: { style: AccessoryStyle; color: string; mask: string }) {
+  if (style === 'gorra') {
+    return (
+      <>
+        <path d="M31 26 C33 16 42 11 50 11 C58 11 67 16 69 26 Z" fill={color} />
+        <path d="M69 26 C76 26 80 28 81 31 L67 31 Z" fill={color} opacity="0.75" />
+        <circle cx="50" cy="12" r="3" fill={mask} opacity="0.35" />
+      </>
+    );
+  }
+  if (style === 'corona') {
+    return (
+      <path
+        d="M31 27 L34 13 L42 21 L50 10 L58 21 L66 13 L69 27 Z"
+        fill={color}
+        stroke={mask}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    );
+  }
+  if (style === 'auriculares') {
+    return (
+      <>
+        <path d="M26 34 C27 18 37 11 50 11 C63 11 73 18 74 34" stroke={color} strokeWidth="5" fill="none" strokeLinecap="round" />
+        <rect x="19" y="32" width="11" height="17" rx="5" fill={color} />
+        <rect x="70" y="32" width="11" height="17" rx="5" fill={color} />
+      </>
+    );
+  }
+  return null;
+}
 
 interface MascotProps {
   size?: number;
@@ -58,6 +103,31 @@ export default function Mascot({ size = 96, mood = 'happy', className = '', look
         </>
       );
     }
+    if (eyeStyle === 'guino') {
+      return (
+        <>
+          <path
+            d="M34 55.8 Q38 50 42.1 55.8"
+            stroke={look.body}
+            strokeWidth="4.5"
+            fill="none"
+            strokeLinecap="round"
+          />
+          <circle cx="62" cy="52.5" r="3.6" fill={look.body} />
+        </>
+      );
+    }
+    if (eyeStyle === 'estrellas') {
+      const star = (cx: number) =>
+        `M${cx} 46.5 L${cx + 1.9} 51 L${cx + 6.6} 51.4 L${cx + 3} 54.4 L${cx + 4.1} 59 L${cx} 56.5 ` +
+        `L${cx - 4.1} 59 L${cx - 3} 54.4 L${cx - 6.6} 51.4 L${cx - 1.9} 51 Z`;
+      return (
+        <>
+          <path d={star(38)} fill={look.body} />
+          <path d={star(62)} fill={look.body} />
+        </>
+      );
+    }
     const left = sad ? 'M34 51 Q38 57 42.1 51' : 'M34 55.8 Q38 50 42.1 55.8';
     const right = sad ? 'M57.9 51 Q62 57 66 51' : 'M57.9 55.8 Q62 50 66 55.8';
     return (
@@ -85,6 +155,7 @@ export default function Mascot({ size = 96, mood = 'happy', className = '', look
         d="M50 24 C64 24 75 29 79.5 37 C82 42 83 47 83 54 C83 72 69 85.5 50 85.5 C31 85.5 17 72 17 54 C17 47 18 42 20.5 37 C25 29 36 24 50 24 Z"
         fill={look.body}
       />
+      <Accessory style={look.accessory} color={look.accessoryColor} mask={look.mask} />
       <rect x="25.5" y="42.3" width="49" height="18.9" rx="9.5" fill={look.mask} />
       {renderEyes()}
       <path d="M45.5 66.5 C46.5 68 48 69.5 49.3 70.3 C48.5 68 47.3 66.6 45.5 66.5 Z" fill={look.mask} />

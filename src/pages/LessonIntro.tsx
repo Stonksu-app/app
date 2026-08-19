@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../components/Button';
 import FlashcardDeck from '../components/FlashcardDeck';
 import Icon from '../components/Icon';
-import Mascot from '../components/Mascot';
+import Avatar from '../components/Avatar';
 import OutOfHeartsScreen from '../components/OutOfHeartsScreen';
 import { getLessonById } from '../data/lessons';
 import { buildStage } from '../utils/buildActivityStream';
@@ -57,7 +57,7 @@ export default function LessonIntro() {
       {!skipFlashcards && cards.length > 0 ? (
         <div className="flex-1 min-h-0 w-full max-w-sm mx-auto flex flex-col animate-pop-in py-4">
           <div className="shrink-0 flex flex-col items-center text-center mb-4">
-            <Mascot size={72} mood="happy" />
+            <Avatar size={72} mood="happy" />
             <p className="text-xs font-black text-lime-400 uppercase tracking-wide mt-2">
               {node.title} · {plan?.title}
             </p>
@@ -75,7 +75,7 @@ export default function LessonIntro() {
         </div>
       ) : (
         <div className="m-auto w-full max-w-sm py-6 flex flex-col items-center text-center animate-pop-in">
-          <Mascot size={110} mood="happy" />
+          <Avatar size={110} mood="happy" />
           <p className="text-xs font-black text-lime-400 uppercase tracking-wide mt-4">{node.title}</p>
           <h1 className="text-2xl font-black text-carbon-50 mt-1">
             {name ? `${name}, ` : ''}antes de empezar...

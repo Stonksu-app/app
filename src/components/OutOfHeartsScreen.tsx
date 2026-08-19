@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import { Button } from './Button';
 import Icon from './Icon';
-import Mascot, { randomLine } from './Mascot';
+import Avatar from './Avatar';
+import { randomLine } from './Mascot';
 
 export default function OutOfHeartsScreen({ blockedEntry }: { blockedEntry?: boolean }) {
   const navigate = useNavigate();
@@ -13,7 +14,7 @@ export default function OutOfHeartsScreen({ blockedEntry }: { blockedEntry?: boo
   return (
     <div className="screen-safe bg-carbon-900 flex flex-col px-6">
       <div className="m-auto py-6 flex flex-col items-center gap-4 text-center">
-        <Mascot size={110} mood="sad" className="animate-shake" />
+        <Avatar size={110} mood="sad" className="animate-shake" />
         <h1 className="text-2xl font-black text-carbon-50">
           {blockedEntry ? 'Sin vidas por ahora' : '¡Te quedaste sin vidas!'}
         </h1>

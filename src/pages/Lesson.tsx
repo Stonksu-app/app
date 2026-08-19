@@ -6,7 +6,8 @@ import ComboCelebration from '../components/ComboCelebration';
 import DirectionBadge from '../components/DirectionBadge';
 import Icon from '../components/Icon';
 import LessonHeader from '../components/LessonHeader';
-import Mascot, { randomLine } from '../components/Mascot';
+import Avatar from '../components/Avatar';
+import { randomLine } from '../components/Mascot';
 import MatchPairsGame from '../components/MatchPairsGame';
 import OutOfHeartsScreen from '../components/OutOfHeartsScreen';
 import ParticleBurst from '../components/ParticleBurst';
@@ -303,7 +304,7 @@ export default function Lesson() {
             <div className="flex items-center gap-3 mb-3 animate-pop-in">
               <div className="relative shrink-0 flex items-center justify-center">
                 <DirectionBadge direction={isCorrect ? 'long' : 'short'} />
-                <Mascot size={44} mood={isCorrect ? 'hype' : 'sad'} className={isWrong ? 'animate-shake' : ''} />
+                <Avatar size={44} mood={isCorrect ? 'hype' : 'sad'} className={isWrong ? 'animate-shake' : ''} />
                 <ParticleBurst show={isCorrect} />
               </div>
               <div>

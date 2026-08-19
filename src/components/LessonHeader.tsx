@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from './Button';
 import Icon from './Icon';
 import HeartsDisplay from './HeartsDisplay';
-import Mascot from './Mascot';
+import Avatar from './Avatar';
 
 export default function LessonHeader({ progressPct, hearts }: { progressPct: number; hearts: number }) {
   const navigate = useNavigate();
@@ -42,7 +42,7 @@ export default function LessonHeader({ progressPct, hearts }: { progressPct: num
             className="bg-carbon-850 border-2 border-carbon-800 rounded-3xl w-full max-w-sm p-6 text-center animate-pop-in"
             onClick={(e) => e.stopPropagation()}
           >
-            <Mascot size={90} mood="sad" className="mx-auto" />
+            <Avatar size={90} mood="sad" className="mx-auto" />
             <h2 className="mt-3 text-xl font-black text-carbon-50">¿Seguro que quieres salir?</h2>
             <p className="mt-1.5 text-sm text-carbon-400">
               Perderás todo el progreso de esta lección y las vidas que hayas gastado.

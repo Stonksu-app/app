@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import Mascot, { DEFAULT_LOOK } from '../components/Mascot';
 import { useUserStore } from '../store/useUserStore';
-import type { EyeStyle, HornStyle, IconName, MascotLook } from '../types';
+import type { AccessoryStyle, EyeStyle, HornStyle, IconName, MascotLook } from '../types';
 
 /* Header metrics from the reference: 58px bar with a 2px underline, 20px/700
  * title, and a 136x48 confirm at 16px/700 with 0.64px tracking. Edits are held
@@ -21,20 +21,34 @@ const HORN_OPTIONS: { id: HornStyle; label: string }[] = [
   { id: 'curvos', label: 'Curvos' },
   { id: 'rectos', label: 'Rectos' },
   { id: 'cortos', label: 'Cortos' },
+  { id: 'largos', label: 'Largos' },
+  { id: 'gruesos', label: 'Gruesos' },
 ];
 
 const EYE_OPTIONS: { id: EyeStyle; label: string }[] = [
   { id: 'arco', label: 'Contento' },
   { id: 'puntos', label: 'Redondos' },
   { id: 'decididos', label: 'Decidido' },
+  { id: 'guino', label: 'Guiño' },
+  { id: 'estrellas', label: 'Estrellas' },
 ];
 
-type Tab = 'cuerpo' | 'antifaz' | 'cuernos' | 'ojos';
+const ACCESSORY_OPTIONS: { id: AccessoryStyle; label: string }[] = [
+  { id: 'ninguno', label: 'Ninguno' },
+  { id: 'gorra', label: 'Gorra' },
+  { id: 'corona', label: 'Corona' },
+  { id: 'auriculares', label: 'Cascos' },
+];
+
+const ACCESSORY_COLORS = ['#FFC93C', '#FF5252', '#47BFFF', '#A78BFA', '#C6FF34', '#E8E8E8'];
+
+type Tab = 'cuerpo' | 'antifaz' | 'cuernos' | 'ojos' | 'extras';
 const TABS: { id: Tab; icon: IconName; label: string }[] = [
   { id: 'cuerpo', icon: 'bull', label: 'Color' },
   { id: 'antifaz', icon: 'shield', label: 'Antifaz' },
   { id: 'cuernos', icon: 'trending-up', label: 'Cuernos' },
   { id: 'ojos', icon: 'target', label: 'Ojos' },
+  { id: 'extras', icon: 'sparkles', label: 'Extras' },
 ];
 
 function Swatch({ color, active, onClick }: { color: string; active: boolean; onClick: () => void }) {
@@ -192,6 +206,40 @@ export default function AvatarEditor() {
                       </ShapeOption>
                     ))}
                   </div>
+                </>
+              )}
+
+              {tab === 'extras' && (
+                <>
+                  <h3 className="text-[19px] font-black text-carbon-50 mb-3">Accesorio</h3>
+                  <div className="grid grid-cols-4 gap-3">
+                    {ACCESSORY_OPTIONS.map((o) => (
+                      <ShapeOption
+                        key={o.id}
+                        label={o.label}
+                        active={draft.accessory === o.id}
+                        onClick={() => set({ accessory: o.id })}
+                      >
+                        <Mascot size={60} look={{ ...draft, accessory: o.id }} />
+                      </ShapeOption>
+                    ))}
+                  </div>
+
+                  {draft.accessory !== 'ninguno' && (
+                    <>
+                      <h3 className="text-[19px] font-black text-carbon-50 mt-6 mb-3">Color del accesorio</h3>
+                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
+                        {ACCESSORY_COLORS.map((c) => (
+                          <Swatch
+                            key={c}
+                            color={c}
+                            active={draft.accessoryColor === c}
+                            onClick={() => set({ accessoryColor: c })}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 

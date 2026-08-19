@@ -128,16 +128,19 @@ export interface NodeIntro {
 
 export type NodeDifficulty = 'easy' | 'medium' | 'hard';
 
-export type HornStyle = 'curvos' | 'rectos' | 'cortos';
-export type EyeStyle = 'arco' | 'puntos' | 'decididos';
+export type HornStyle = 'curvos' | 'rectos' | 'cortos' | 'largos' | 'gruesos';
+export type EyeStyle = 'arco' | 'puntos' | 'decididos' | 'guino' | 'estrellas';
+export type AccessoryStyle = 'ninguno' | 'gorra' | 'corona' | 'auriculares';
 
 /** How the player has dressed up their bull. The logo keeps the brand look;
- *  only the profile avatar follows this. */
+ *  only the player-facing avatar follows this. */
 export interface MascotLook {
   body: string;
   mask: string;
   horns: HornStyle;
   eyes: EyeStyle;
+  accessory: AccessoryStyle;
+  accessoryColor: string;
 }
 
 export interface SkillNode {
