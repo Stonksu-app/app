@@ -4,7 +4,8 @@ import Mascot from '../components/Mascot';
 import Icon from '../components/Icon';
 import { Button } from '../components/Button';
 import PasswordField from '../components/PasswordField';
-import { GoogleMark } from '../components/ProviderMarks';
+import ProviderButton from '../components/ProviderButton';
+import { ACTIVE_PROVIDERS } from '../lib/providers';
 import { useAuthStore } from '../store/useAuthStore';
 import { useUserStore } from '../store/useUserStore';
 
@@ -56,15 +57,17 @@ export default function Login() {
             </p>
           )}
 
-          <button
-            onClick={() => void signInExisting('google')}
-            disabled={busy}
-            className="btn-3d mt-6 w-full h-[50px] rounded-xl bg-white hover:enabled:bg-carbon-100 text-carbon-900 font-bold text-[15px] uppercase tracking-[0.8px] inline-flex items-center justify-center gap-2.5 disabled:opacity-60"
-            style={{ ['--btn-lip' as string]: '#b8b8b8' }}
-          >
-            <GoogleMark />
-            Entrar con Google
-          </button>
+          <div className="mt-6 space-y-2.5">
+            {ACTIVE_PROVIDERS.map((provider) => (
+              <ProviderButton
+                key={provider.id}
+                provider={provider}
+                verb="Entrar con"
+                disabled={busy}
+                onClick={() => void signInExisting(provider.id)}
+              />
+            ))}
+          </div>
 
           <div className="flex items-center gap-3 my-5">
             <span className="h-0.5 flex-1 bg-carbon-800" />

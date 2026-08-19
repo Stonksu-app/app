@@ -6,18 +6,8 @@ import Avatar from './Avatar';
 import { useAuthStore } from '../store/useAuthStore';
 import { useUserStore } from '../store/useUserStore';
 import PasswordField, { validatePassword } from './PasswordField';
-import { AppleMark, GoogleMark } from './ProviderMarks';
-
-/**
- * Sign in with Apple needs a paid Apple Developer Program membership to set up,
- * so the button is hidden until there is one. Everything behind it already
- * works — useAuthStore.linkProvider takes 'apple' — so turning this back on is
- * this one line, plus enabling the provider in Supabase.
- *
- * It becomes mandatory rather than optional the day Stonksu ships on the App
- * Store offering Google, so this is a "not yet", not a "no".
- */
-const SHOW_APPLE = false;
+import ProviderButton from './ProviderButton';
+import { ACTIVE_PROVIDERS } from '../lib/providers';
 
 /**
  * The "save your progress" gate for anonymous accounts.
@@ -109,7 +99,7 @@ export default function RegisterModal({ onClose }: { onClose: () => void }) {
             {alreadyTaken && (
               <div className="mt-4 rounded-2xl border-2 border-[#FFC93C]/40 bg-[#FFC93C]/10 p-4">
                 <p className="text-sm font-bold text-[#FFC93C]">
-                  Esa cuenta de Google ya tiene un perfil de Stonksu.
+                  Esa cuenta ya tiene un perfil de Stonksu.
                 </p>
                 <p className="text-sm text-carbon-300 mt-1.5">
                   Puedes entrar en él, pero el progreso de este dispositivo
@@ -124,27 +114,15 @@ export default function RegisterModal({ onClose }: { onClose: () => void }) {
             )}
 
             <div className="mt-5 space-y-2.5">
-              <button
-                onClick={() => void linkProvider('google')}
-                disabled={busy}
-                className="btn-3d w-full h-[50px] rounded-xl bg-white hover:enabled:bg-carbon-100 text-carbon-900 font-bold text-[15px] uppercase tracking-[0.8px] inline-flex items-center justify-center gap-2.5 disabled:opacity-60"
-                style={{ ['--btn-lip' as string]: '#b8b8b8' }}
-              >
-                <GoogleMark />
-                Continuar con Google
-              </button>
-
-              {SHOW_APPLE && (
-                <button
-                  onClick={() => void linkProvider('apple')}
+              {ACTIVE_PROVIDERS.map((provider) => (
+                <ProviderButton
+                  key={provider.id}
+                  provider={provider}
+                  verb="Continuar con"
                   disabled={busy}
-                  className="btn-3d w-full h-[50px] rounded-xl bg-carbon-50 hover:enabled:bg-white text-carbon-950 font-bold text-[15px] uppercase tracking-[0.8px] inline-flex items-center justify-center gap-2.5 disabled:opacity-60"
-                  style={{ ['--btn-lip' as string]: '#b8b8b8' }}
-                >
-                  <AppleMark />
-                  Continuar con Apple
-                </button>
-              )}
+                  onClick={() => void linkProvider(provider.id)}
+                />
+              ))}
             </div>
 
             <div className="flex items-center gap-3 my-4">

@@ -172,7 +172,34 @@ https://<tu-proyecto>.supabase.co/auth/v1/callback
 
 Copia el *Client ID* y el *Client secret* en **Authentication → Sign In / Providers → Google**.
 
-### 4. Apple
+### 4. Otros proveedores
+
+La app soporta **Google, Discord, Twitch, Facebook y Apple**. Todos funcionan ya en el código; lo que decide cuáles se ven es [`src/lib/providers.ts`](../src/lib/providers.ts):
+
+```ts
+{ id: 'discord', label: 'Discord', enabled: false, … }
+```
+
+Pon `enabled: true` **solo después** de activarlo en Supabase. Un botón para un proveedor sin configurar falla con "provider is not enabled", que es peor que no ofrecerlo.
+
+El procedimiento es el mismo para todos: creas una aplicación OAuth en el proveedor, pones el `callback` de Supabase como URI de redirección, y pegas el Client ID y el Secret en **Authentication → Sign In / Providers**.
+
+```
+https://<tu-proyecto>.supabase.co/auth/v1/callback
+```
+
+| Proveedor | Dónde se crea la app | Fricción |
+| --- | --- | --- |
+| **Discord** | [Developer Portal](https://discord.com/developers/applications) → New Application → OAuth2 | Ninguna. Gratis, sin revisión, cinco minutos |
+| **Twitch** | [dev.twitch.tv](https://dev.twitch.tv/console/apps) → Register Your Application | Ninguna. Gratis, sin revisión |
+| **Facebook** | [Meta for Developers](https://developers.facebook.com) | Pide revisión de la app antes de salir de modo desarrollo |
+| **Apple** | Services ID + clave | 99 €/año del Developer Program |
+
+> Si tuviera que elegir el siguiente, **Discord**: no cuesta nada, no hay revisión, y es donde está la gente que ya sigue mercados. Twitch es igual de barato y el público se solapa.
+
+Añadir uno que no esté en la lista —LinkedIn, Spotify, GitHub…— es una entrada más en ese array y su logotipo en `ProviderMarks.tsx`. Supabase soporta bastantes más.
+
+### 5. Apple
 
 Esto tiene un coste que conviene saber antes: **Sign in with Apple exige estar en el Apple Developer Program, 99 €/año**. No se puede montar con una cuenta gratuita, a diferencia de instalar por AltStore. Si aún no la tienes, deja Apple para cuando vayas a publicar en la App Store — donde además pasa a ser obligatorio si ofreces Google.
 

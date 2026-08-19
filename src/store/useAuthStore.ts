@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Session } from '@supabase/supabase-js';
 import { isCloudEnabled, supabase } from '../lib/supabase';
+import type { ProviderId } from '../lib/providers';
 
 /**
  * Who the player currently is, as far as Supabase is concerned.
@@ -44,10 +45,10 @@ interface AuthState {
   linkEmail: (email: string, password?: string) => Promise<boolean>;
   signInWithPassword: (email: string, password: string) => Promise<boolean>;
   setPassword: (password: string) => Promise<boolean>;
-  linkProvider: (provider: 'google' | 'apple') => Promise<void>;
+  linkProvider: (provider: ProviderId) => Promise<void>;
   /** Signs in to the account a provider is already attached to, abandoning this
    *  device's anonymous one. The only way out of identity_already_exists. */
-  signInExisting: (provider: 'google' | 'apple') => Promise<void>;
+  signInExisting: (provider: ProviderId) => Promise<void>;
   clearError: () => void;
 }
 
@@ -103,7 +104,7 @@ function translate(message: string): string {
   const m = message.toLowerCase();
   if (m.includes('already') && m.includes('registered')) return 'Ese correo ya tiene cuenta. Inicia sesión con él.';
   if (m.includes('identity') && (m.includes('already') || m.includes('linked')))
-    return 'Esa cuenta de Google ya está vinculada a otro perfil de Stonksu.';
+    return 'Esa cuenta ya está vinculada a otro perfil de Stonksu.';
   if (m.includes('invalid login credentials')) return 'Correo o contraseña incorrectos.';
   if (m.includes('email not confirmed')) return 'Aún no has confirmado ese correo. Mira tu bandeja.';
   if (m.includes('password') && m.includes('should be at least')) return 'La contraseña es demasiado corta.';
