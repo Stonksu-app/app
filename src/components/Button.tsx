@@ -57,10 +57,14 @@ export function Button({
   className = '',
   onClick,
   disabled,
+  // Defaults to "button" so a Button sitting inside a form doesn't submit it by
+  // accident; pass "submit" when that is the point.
+  type = 'button',
   children,
-}: CommonProps & { onClick?: () => void; disabled?: boolean }) {
+}: CommonProps & { onClick?: () => void; disabled?: boolean; type?: 'button' | 'submit' }) {
   return (
     <button
+      type={type}
       onClick={onClick}
       disabled={disabled}
       style={{ ['--btn-lip' as string]: VARIANTS[variant].lip }}

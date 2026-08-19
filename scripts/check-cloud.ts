@@ -10,7 +10,8 @@
  * Run: npx esbuild scripts/check-cloud.ts --bundle --platform=node --format=esm
  *        --outfile=.check.mjs && node .check.mjs && rm .check.mjs
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { toRow, fromRow, hasProgress, type CloudState, type ProfileRow } from '../src/lib/cloud';
 import { useUserStore } from '../src/store/useUserStore';
 
@@ -109,13 +110,24 @@ for (const key of cloudKeys) {
   check(`"${key}" still exists in the store`, persistedKeys.includes(key), 'CloudState has a field the store dropped');
 }
 
-// --------------------------------- the migration has a column for each one
-const sql = readFileSync('supabase/migrations/0001_init.sql', 'utf8');
-const profilesBlock = sql.slice(sql.indexOf('create table if not exists public.profiles'), sql.indexOf('-- ---------------------------------------------------------------- attempts'));
+// --------------------------------- the migrations have a column for each one
+// Read in order and concatenated, so a later migration that alters or drops
+// something the earlier one created is reflected rather than ignored.
+const migrationDir = 'supabase/migrations';
+const migrations = readdirSync(migrationDir)
+  .filter((f) => f.endsWith('.sql'))
+  .sort();
+const sql = migrations.map((f) => readFileSync(join(migrationDir, f), 'utf8')).join('\n');
+
+check('migrations are numbered so they apply in order', migrations.every((f) => /^\d{4}_/.test(f)), migrations.join(', '));
 
 for (const column of Object.keys(row)) {
   if (column === 'id') continue;
-  check(`the profiles table declares "${column}"`, new RegExp(`\\n\\s+${column}\\s`).test(profilesBlock), 'missing from 0001_init.sql');
+  check(
+    `the profiles table declares "${column}"`,
+    new RegExp(`\\n\\s+${column}\\s`).test(sql),
+    `missing from ${migrationDir}`
+  );
 }
 
 check('row level security is enabled on profiles', /alter table public\.profiles enable row level security/.test(sql));
@@ -124,8 +136,17 @@ check(
   'attempts are unique per completion, so re-syncing cannot duplicate history',
   /unique \(user_id, lesson_id, completed_at\)/.test(sql)
 );
-check('a profile row is created automatically for new accounts', /on_auth_user_created/.test(sql));
-check('the migration never mentions the service_role key', !/service_role/.test(sql));
+
+// A profile has to exist the moment an account does, or the client hits a
+// logged-in-but-no-row state. 0002 replaces 0001's insert-only trigger with one
+// that also tracks registration, so exactly one of them must survive.
+const createsProfileTrigger = /on_auth_user_status_changed\n\s+after insert or update/.test(sql);
+const legacyTriggerDropped = /drop trigger if exists on_auth_user_created on auth\.users;\n\n--/.test(sql);
+check('a profile row is created automatically for new accounts', createsProfileTrigger);
+check('the superseded trigger from 0001 is dropped, not left duplicating work', legacyTriggerDropped);
+
+check('the account summary view cannot leak other players', /security_invoker = true/.test(sql));
+check('the migrations never mention the service_role key', !/service_role/.test(sql));
 
 // -------------------------------------------- which side wins on first sync
 check('a fresh cloud profile does not count as progress', !hasProgress({ onboarded: false, xp: 0, attempts: [] }));

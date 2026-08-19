@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import SplashScreen from './components/SplashScreen';
 import Landing from './pages/Landing';
@@ -15,6 +15,8 @@ import LessonResults from './pages/LessonResults';
 import Profile from './pages/Profile';
 import { useUserStore } from './store/useUserStore';
 import { useCloudSync } from './hooks/useCloudSync';
+import RegisterGate from './components/RegisterGate';
+import { useAuthStore } from './store/useAuthStore';
 
 function RequireOnboarded({ children }: { children: React.ReactNode }) {
   const onboarded = useUserStore((s) => s.onboarded);
@@ -31,9 +33,14 @@ function App() {
   // already 10 seconds, which comfortably covers the first pull.
   useCloudSync();
 
+  // Watches the session so the nag knows whether this account is anonymous.
+  const initAuth = useAuthStore((s) => s.init);
+  useEffect(() => initAuth(), [initAuth]);
+
   return (
     <>
       {booting && <SplashScreen onDone={() => setBooting(false)} />}
+      {!booting && <RegisterGate />}
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/onboarding" element={<Onboarding />} />

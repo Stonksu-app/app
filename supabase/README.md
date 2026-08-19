@@ -74,7 +74,64 @@ npm run check -- cloud
 
 Cruza las tres capas: los campos del store, el mapeo de `src/lib/cloud.ts` y las columnas de la migración. Si añades un campo al store y olvidas cualquiera de las otras dos, falla. Ese es justo el fallo que si no aparece en silencio y solo se nota cuando alguien reinstala y ha perdido las monedas.
 
+## Registro real
+
+La app ya insiste en registrarse ([`RegisterGate`](../src/components/RegisterGate.tsx)) y sabe vincular la cuenta anónima, pero el panel de Supabase tiene que permitirlo. Cuatro cosas:
+
+### 1. Manual Linking (obligatorio)
+
+**Authentication → Sign In / Providers → Manual Linking → Enable.**
+
+Sin esto, `linkIdentity()` falla. Es lo que permite **añadir** una identidad a la cuenta anónima en vez de crear una cuenta nueva: si se hiciera con `signInWithOAuth`, se abandonaría la cuenta anónima y con ella todo lo jugado.
+
+### 2. Verificación de correo
+
+**Authentication → Sign In / Providers → Email → Confirm email → ON.**
+
+Con esto activado, `updateUser({ email })` deja la dirección en `new_email` y no la confirma hasta que se pulsa el enlace. Es justo lo que quieres: hasta ese momento la cuenta sigue siendo anónima y no se ha perdido nada si el correo nunca llega.
+
+Y en **Authentication → URL Configuration**:
+
+- *Site URL*: la de producción.
+- *Redirect URLs*: añade `http://localhost:5173/**`, el dominio de preview de Vercel y el de producción. Sin esto el enlace del correo rebota.
+
+### 3. Google
+
+En [Google Cloud Console](https://console.cloud.google.com) → APIs & Services → Credentials → **OAuth client ID** (tipo *Web application*). En *Authorized redirect URIs* pon exactamente:
+
+```
+https://<tu-proyecto>.supabase.co/auth/v1/callback
+```
+
+Copia el *Client ID* y el *Client secret* en **Authentication → Sign In / Providers → Google**.
+
+### 4. Apple
+
+Esto tiene un coste que conviene saber antes: **Sign in with Apple exige estar en el Apple Developer Program, 99 €/año**. No se puede montar con una cuenta gratuita, a diferencia de instalar por AltStore. Si aún no la tienes, deja Apple para cuando vayas a publicar en la App Store — donde además pasa a ser obligatorio si ofreces Google.
+
+Cuando la tengas: Services ID + una clave Sign in with Apple, y el mismo `callback` de arriba como *Return URL*.
+
+> Estado ahora mismo (comprobado contra tu proyecto dev): **ninguno de los dos proveedores está activado todavía** — `linkIdentity` responde `provider is not enabled`. La app lo traduce a "Ese proveedor aún no está activado en Supabase" en vez de tragárselo.
+
+## Migraciones
+
+Ejecútalas en orden desde el **SQL Editor**. Las dos son re-ejecutables.
+
+| Archivo | Qué hace |
+| --- | --- |
+| [`0001_init.sql`](migrations/0001_init.sql) | `profiles`, `attempts`, RLS y restricciones |
+| [`0002_account_status.sql`](migrations/0002_account_status.sql) | refleja `email` / `is_anonymous` / `registered_at` desde `auth.users`, más la vista `account_summary` |
+
+`auth.users` no se puede leer desde el cliente, así que sin la 0002 no hay forma de saber por consulta qué cuentas son reales, y el Table Editor te muestra un muro de perfiles sin distinguir personas de sesiones anónimas que morirán con la caché de un navegador.
+
+Después de la 0002:
+
+```sql
+select * from public.account_summary;
+```
+
 ## Lo que falta
 
-- **Vincular la cuenta anónima** a un email o a Apple, para cambiar de móvil sin perder el progreso. La cuenta anónima ya es una fila real de `auth.users`, así que vincularla conserva el mismo `id` y por tanto el mismo perfil — falta la pantalla.
-- **Ranking / ligas**, que necesitarían una vista pública con datos agregados, no acceso directo a `profiles`.
+- **Ranking / ligas**, que necesitarían una vista con datos agregados, no acceso directo a `profiles`.
+- **Recuperar la cuenta al desinstalar**: si borras la app antes de registrarte, la sesión anónima se pierde y el perfil queda huérfano en la base de datos. Merece un borrado periódico de anónimos sin actividad.
+- **Reducir el bundle**: con las claves puestas, `supabase-js` ya no se puede descartar por tree-shaking y añade unos 52 kB comprimidos (de 127 a 179 kB). Cargarlo de forma diferida detrás de la pantalla de carga lo sacaría del camino crítico, que además dura 10 segundos.
