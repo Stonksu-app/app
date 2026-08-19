@@ -125,6 +125,26 @@ Si usas los despliegues de vista previa de Vercel, cada uno tiene su propio subd
 
 En [`templates/`](templates/) están los cuatro correos, con la paleta y los botones de la app. Se pegan en **Authentication → Emails**, cada uno en su plantilla. El detalle de cuál va dónde y por qué están escritas en tablas está en [`templates/_shell.md`](templates/_shell.md).
 
+### Antes hace falta un SMTP propio
+
+Desde el [3 de junio de 2026](https://supabase.com/changelog/46599-changes-to-email-template-customisation-on-free-tier), los proyectos gratuitos **creados después de esa fecha** no pueden editar las plantillas si usan el servidor de correo de Supabase. Lo hicieron porque unas pocas cuentas abusivas estaban a punto de conseguir que les pusieran toda la infraestructura en listas negras.
+
+La excepción es la salida: **un proyecto gratuito con SMTP propio sí puede editarlas**. Y conviene igualmente, porque el correo de serie de Supabase está limitado a un puñado de envíos por hora y no sirve para producción.
+
+Con [Resend](https://resend.com) (3.000 correos al mes gratis), en **Project Settings → Authentication → SMTP Settings**:
+
+| Campo | Valor |
+| --- | --- |
+| Host | `smtp.resend.com` |
+| Puerto | `465` |
+| Usuario | `resend` |
+| Contraseña | tu API key de Resend |
+| Sender email | una dirección de tu dominio verificado |
+
+> El remitente es el matiz que hace perder una tarde: mientras no verifiques un dominio en Resend, solo puedes usar `onboarding@resend.dev`, **y solo envía a la dirección con la que te registraste en Resend**. Para probar tú mismo vale; en cuanto quieras que se registre otra persona, necesitas el dominio.
+
+Cualquier otro proveedor sirve igual — Postmark, SendGrid, Amazon SES. Lo que desbloquea las plantillas es dejar de usar el SMTP compartido, no cuál elijas.
+
 La que usa el paso de cuenta anónima a registrada es **Change Email Address**, no *Confirm signup* — es fácil cambiar la equivocada y no entender por qué el correo sigue saliendo como antes.
 
 ## La pantalla de Google
@@ -250,6 +270,33 @@ El **toque de un amigo sí es push remoto**, porque lo dispara otra persona. Has
 Supabase **ya impide** que una misma cuenta de Google quede vinculada a dos perfiles: ese es exactamente el error `identity_already_exists`. La app lo detecta y ofrece entrar en el perfil que ya la tiene, porque dos progresos separados no se pueden fusionar.
 
 Lo que sí se acumula son las **cuentas anónimas**: se crea una por cada navegador o dispositivo que abre la app sin registrarse. Es el precio de dejar jugar sin registro, y conviene barrerlas de vez en cuando.
+
+### "Ese apodo ya está cogido" siendo el tuyo
+
+`name_available()` excluye tu propia fila, así que reguardar tu nombre nunca choca contigo. Si te dice que está cogido, **no estás en la cuenta que crees**: el apodo pertenece a otro perfil.
+
+Es lo que dejan los intentos de vinculación que fallaron mientras `detectSessionInUrl` estaba mal: el progreso se quedó en una cuenta anónima y la identidad de Google acabó pegada a otra distinta. Al entrar con Google aterrizas en la segunda, que está vacía.
+
+Para verlo:
+
+```sql
+select p.name, p.xp, u.is_anonymous, u.email,
+       (select string_agg(i.provider, ', ')
+          from auth.identities i where i.user_id = u.id) as proveedores
+from auth.users u
+join public.profiles p on p.id = u.id
+order by p.xp desc;
+```
+
+Si el apodo con XP sale en una fila anónima sin proveedores, y hay otra fila con `google` y cero XP, ese es el reparto.
+
+**Recuperarlo**, en este orden:
+
+1. Borra la cuenta huérfana que se quedó el Google, con la consulta de `auth.identities` de abajo para encontrar su `user_id`.
+2. Vuelve al navegador donde sigues siendo el apodo con progreso — su sesión anónima está en el `localStorage` de ese navegador.
+3. Desde ahí, **Guarda tu progreso → Continuar con Google**. Ahora la identidad se vincula a la cuenta buena.
+
+El orden importa: mientras el Google siga pegado a la otra cuenta, el paso 3 falla con `identity_already_exists`.
 
 Ver el estado real (desde el **SQL Editor**, que no pasa por RLS):
 
