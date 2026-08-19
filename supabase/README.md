@@ -93,7 +93,26 @@ Con esto activado, `updateUser({ email })` deja la dirección en `new_email` y n
 Y en **Authentication → URL Configuration**:
 
 - *Site URL*: la de producción.
-- *Redirect URLs*: añade `http://localhost:5173/**`, el dominio de preview de Vercel y el de producción. Sin esto el enlace del correo rebota.
+- *Redirect URLs*: añade `http://localhost:5173/**`, el dominio de preview de Vercel y el de producción.
+
+> **Esto no es opcional.** La app pide volver a `http://localhost:5173/home`, pero Supabase solo respeta esa petición si la URL está en la lista; si no, **te manda al Site URL**, que de fábrica es `http://localhost:3000`. El síntoma es un `ERR_CONNECTION_REFUSED` en el puerto 3000 con el token colgando de la barra de direcciones. La verificación en sí habrá funcionado — el token lo demuestra —, solo que el navegador aterriza donde no hay nada escuchando.
+
+## Plantillas de correo
+
+En [`templates/`](templates/) están los cuatro correos, con la paleta y los botones de la app. Se pegan en **Authentication → Emails**, cada uno en su plantilla. El detalle de cuál va dónde y por qué están escritas en tablas está en [`templates/_shell.md`](templates/_shell.md).
+
+La que usa el paso de cuenta anónima a registrada es **Change Email Address**, no *Confirm signup* — es fácil cambiar la equivocada y no entender por qué el correo sigue saliendo como antes.
+
+## La pantalla de Google
+
+Lo que ves al pulsar "Continuar con Google" lo controla Google, no Supabase. En [Google Cloud Console](https://console.cloud.google.com) → **Pantalla de consentimiento → Branding**:
+
+- *Nombre de la aplicación*: `Stonksu`
+- *Logotipo*: [`public/google-consent-logo.png`](../public/google-consent-logo.png), ya generado a 120x120, que es lo que Google pide
+
+> Subir un logotipo **dispara la verificación de marca de Google**, que tarda días. El nombre de la aplicación se puede cambiar sin eso. Si tienes prisa por probar, pon solo el nombre y deja el logo para cuando vayas a publicar.
+
+El `fqebfuvdvuoxxafvnrju.supabase.co` que aparece en "Ir a…" **no se puede cambiar** en el plan gratuito: requiere un dominio propio de autenticación, que es un añadido de pago de Supabase. Es cosmético, pero conviene saber que ahí seguirá hasta entonces.
 
 ### 3. Google
 
