@@ -31,12 +31,18 @@ interface AuthState {
   pendingEmail: string | null;
   /** Last failure, in Spanish, ready to render. */
   error: string | null;
+  /** Machine-readable form of the same failure, so the UI can offer a way out
+   *  of the specific problem instead of only describing it. */
+  errorCode: string | null;
   /** Set while a link attempt is in flight. */
   busy: boolean;
 
   init: () => void;
   linkEmail: (email: string) => Promise<boolean>;
   linkProvider: (provider: 'google' | 'apple') => Promise<void>;
+  /** Signs in to the account a provider is already attached to, abandoning this
+   *  device's anonymous one. The only way out of identity_already_exists. */
+  signInExisting: (provider: 'google' | 'apple') => Promise<void>;
   clearError: () => void;
 }
 
@@ -60,6 +66,33 @@ function applySession(session: Session | null): Partial<AuthState> {
   };
 }
 
+/**
+ * Pulls an OAuth failure out of the redirect URL.
+ *
+ * A failed provider round trip comes back as parameters rather than as a
+ * rejected promise — there is no call in flight any more to reject. Left
+ * unread it looks like nothing happened at all, so the prompt reopens and the
+ * player tries again, forever.
+ *
+ * Supabase writes them into both the query string and the fragment, so both are
+ * checked, and the URL is cleaned afterwards so a refresh doesn't replay it.
+ */
+function readRedirectError(): { code: string; message: string } | null {
+  if (typeof window === 'undefined') return null;
+
+  const fromQuery = new URLSearchParams(window.location.search);
+  const fromHash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const source = fromQuery.get('error') || fromQuery.get('error_code') ? fromQuery : fromHash;
+
+  const error = source.get('error');
+  const code = source.get('error_code');
+  if (!error && !code) return null;
+
+  const description = (source.get('error_description') || '').replace(/\+/g, ' ');
+  window.history.replaceState({}, '', window.location.pathname);
+  return { code: code || error || 'unknown', message: description || error || '' };
+}
+
 /** Supabase speaks English; the player doesn't. */
 function translate(message: string): string {
   const m = message.toLowerCase();
@@ -78,10 +111,16 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   email: null,
   pendingEmail: null,
   error: null,
+  errorCode: null,
   busy: false,
 
   init: () => {
     if (!supabase) return;
+
+    const failure = readRedirectError();
+    if (failure) {
+      set({ errorCode: failure.code, error: translate(failure.message || failure.code) });
+    }
 
     void supabase.auth.getSession().then(({ data }) => set(applySession(data.session)));
 
@@ -92,7 +131,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   linkEmail: async (email) => {
     if (!supabase) return false;
-    set({ busy: true, error: null });
+    set({ busy: true, error: null, errorCode: null });
 
     // updateUser on an anonymous account attaches the address and sends the
     // confirmation. Until the link is clicked it lives in new_email, so the
@@ -103,7 +142,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     );
 
     if (error) {
-      set({ busy: false, error: translate(error.message) });
+      set({ busy: false, error: translate(error.message), errorCode: 'link_failed' });
       return false;
     }
     set({ busy: false, pendingEmail: email.trim() });
@@ -112,7 +151,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   linkProvider: async (provider) => {
     if (!supabase) return;
-    set({ busy: true, error: null });
+    set({ busy: true, error: null, errorCode: null });
 
     // linkIdentity, not signInWithOAuth: signing in would abandon the anonymous
     // account and every lesson played on it. Requires "Manual Linking" enabled.
@@ -121,11 +160,27 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       options: { redirectTo: `${window.location.origin}/home` },
     });
 
-    if (error) set({ busy: false, error: translate(error.message) });
+    if (error) set({ busy: false, error: translate(error.message), errorCode: 'link_failed' });
     // On success the browser navigates away, so there is no state to settle.
   },
 
+  signInExisting: async (provider) => {
+    if (!supabase) return;
+    set({ busy: true, error: null, errorCode: null });
+
+    // signInWithOAuth, not linkIdentity: the point here is to land on the
+    // account the provider already belongs to. Whatever this device holds
+    // anonymously is left behind, so only call this once the player has been
+    // told that in plain words.
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/home` },
+    });
+
+    if (error) set({ busy: false, error: translate(error.message), errorCode: 'link_failed' });
+  },
+
   clearError: () => {
-    if (get().error) set({ error: null });
+    if (get().error || get().errorCode) set({ error: null, errorCode: null });
   },
 }));

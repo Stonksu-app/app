@@ -168,6 +168,52 @@ git tag v0.8.0-dev && git push origin v0.8.0-dev
 
 Para comprobar qué build lleva realmente el móvil, mira el pie de **Perfil**: muestra `git describe`, así que `v0.7.0-6-g60c3091` significa "seis commits por delante de v0.7.0" y deja claro de un vistazo si el teléfono va atrasado.
 
+## Cuentas duplicadas
+
+Supabase **ya impide** que una misma cuenta de Google quede vinculada a dos perfiles: ese es exactamente el error `identity_already_exists`. La app lo detecta y ofrece entrar en el perfil que ya la tiene, porque dos progresos separados no se pueden fusionar.
+
+Lo que sí se acumula son las **cuentas anónimas**: se crea una por cada navegador o dispositivo que abre la app sin registrarse. Es el precio de dejar jugar sin registro, y conviene barrerlas de vez en cuando.
+
+Ver el estado real (desde el **SQL Editor**, que no pasa por RLS):
+
+```sql
+select u.id, u.email, u.is_anonymous, u.created_at,
+       p.xp, p.streak, p.coins,
+       (select string_agg(i.provider, ', ')
+          from auth.identities i where i.user_id = u.id) as proveedores
+from auth.users u
+left join public.profiles p on p.id = u.id
+order by u.created_at desc;
+```
+
+Saber qué perfil se quedó una cuenta de Google:
+
+```sql
+select user_id, provider, identity_data->>'email' as correo
+from auth.identities
+where provider = 'google';
+```
+
+Borrar anónimas viejas que nunca llegaron a jugar. El `on delete cascade` se lleva por delante su perfil y su historial:
+
+```sql
+delete from auth.users u
+using public.profiles p
+where p.id = u.id
+  and u.is_anonymous
+  and p.xp = 0
+  and not p.onboarded
+  and u.created_at < now() - interval '7 days';
+```
+
+Y si en pruebas necesitas **liberar** una cuenta de Google que quedó pegada a un perfil huérfano, borra ese usuario y podrás volver a vincularla:
+
+```sql
+delete from auth.users where id = '<el user_id de la consulta anterior>';
+```
+
+> Cuidado con la última: borra el perfil y todo su historial. En producción solo tiene sentido sobre una cuenta anónima abandonada.
+
 ## Lo que falta
 
 - **Ranking / ligas**, que necesitarían una vista con datos agregados, no acceso directo a `profiles`.

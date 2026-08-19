@@ -46,7 +46,8 @@ const SHOW_APPLE = false;
  * buttons inside it, since those are the way out.
  */
 export default function RegisterModal({ onClose }: { onClose: () => void }) {
-  const { linkEmail, linkProvider, error, busy, pendingEmail, clearError } = useAuthStore();
+  const { linkEmail, linkProvider, signInExisting, error, errorCode, busy, pendingEmail, clearError } =
+    useAuthStore();
   const { xp, streak, coins } = useUserStore();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
@@ -58,6 +59,9 @@ export default function RegisterModal({ onClose }: { onClose: () => void }) {
   };
 
   const waitingFor = sent ? email.trim() : pendingEmail;
+  /** That Google account belongs to a Stonksu profile already, so linking can
+   *  never work — the only move left is to go to that profile instead. */
+  const alreadyTaken = errorCode === 'identity_already_exists';
 
   return (
     <div className="fixed inset-0 z-[60] bg-carbon-950/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -116,6 +120,23 @@ export default function RegisterModal({ onClose }: { onClose: () => void }) {
               </div>
             )}
 
+            {alreadyTaken && (
+              <div className="mt-4 rounded-2xl border-2 border-[#FFC93C]/40 bg-[#FFC93C]/10 p-4">
+                <p className="text-sm font-bold text-[#FFC93C]">
+                  Esa cuenta de Google ya tiene un perfil de Stonksu.
+                </p>
+                <p className="text-sm text-carbon-300 mt-1.5">
+                  Puedes entrar en él, pero el progreso de este dispositivo
+                  {xp > 0 ? ` (${xp} XP)` : ''} se quedará aquí: no se puede fusionar con el otro.
+                </p>
+                <div className="mt-3">
+                  <Button size="sm" variant="secondary" onClick={() => void signInExisting('google')} disabled={busy}>
+                    Entrar en esa cuenta
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="mt-5 space-y-2.5">
               <button
                 onClick={() => void linkProvider('google')}
@@ -166,7 +187,9 @@ export default function RegisterModal({ onClose }: { onClose: () => void }) {
               </div>
             </form>
 
-            {error && <p className="mt-3 text-sm font-bold text-danger-400">{error}</p>}
+            {/* Suppressed when the callout above is already saying it, with a
+                button attached. */}
+            {error && !alreadyTaken && <p className="mt-3 text-sm font-bold text-danger-400">{error}</p>}
 
             <button
               onClick={onClose}
