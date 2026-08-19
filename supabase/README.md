@@ -130,6 +130,29 @@ Después de la 0002:
 select * from public.account_summary;
 ```
 
+## La app de iPhone (.ipa)
+
+Vite incrusta las variables `VITE_*` **al compilar**, y `.env` está en `.gitignore`, así que GitHub Actions no las tiene. Sin ellas el `.ipa` sale con el backend apagado: sin sincronización, sin cuenta y sin aviso de registro.
+
+En GitHub → **Settings → Secrets and variables → Actions**:
+
+| Pestaña | Nombre | Valor |
+| --- | --- | --- |
+| *Variables* | `VITE_SUPABASE_URL` | `https://<proyecto>.supabase.co` |
+| *Secrets* | `VITE_SUPABASE_ANON_KEY` | la clave anon |
+
+La URL va como variable porque no es secreta; la clave va como secret solo para no dejarla escrita en el repositorio — en el bundle acaba igual, y no pasa nada, porque lo que protege los datos es RLS.
+
+Si faltan, el workflow no falla: avisa y compila igual, en modo local.
+
+**El `.ipa` solo se construye al crear un tag `v*`.** Es la causa habitual de "la app del móvil no se ha actualizado": hay commits nuevos en `dev` pero ningún tag desde el último build.
+
+```bash
+git tag v0.8.0 && git push origin v0.8.0
+```
+
+Para comprobar qué build lleva realmente el móvil, mira el pie de **Perfil**: muestra `git describe`, así que `v0.7.0-6-g60c3091` significa "seis commits por delante de v0.7.0" y deja claro de un vistazo si el teléfono va atrasado.
+
 ## Lo que falta
 
 - **Ranking / ligas**, que necesitarían una vista con datos agregados, no acceso directo a `profiles`.

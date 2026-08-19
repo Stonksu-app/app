@@ -28,6 +28,17 @@ function AppleMark() {
 }
 
 /**
+ * Sign in with Apple needs a paid Apple Developer Program membership to set up,
+ * so the button is hidden until there is one. Everything behind it already
+ * works — useAuthStore.linkProvider takes 'apple' — so turning this back on is
+ * this one line, plus enabling the provider in Supabase.
+ *
+ * It becomes mandatory rather than optional the day Stonksu ships on the App
+ * Store offering Google, so this is a "not yet", not a "no".
+ */
+const SHOW_APPLE = false;
+
+/**
  * The "save your progress" gate for anonymous accounts.
  *
  * Deliberately not dismissible into silence: closing it hides this instance,
@@ -116,15 +127,17 @@ export default function RegisterModal({ onClose }: { onClose: () => void }) {
                 Continuar con Google
               </button>
 
-              <button
-                onClick={() => void linkProvider('apple')}
-                disabled={busy}
-                className="btn-3d w-full h-[50px] rounded-xl bg-carbon-50 hover:enabled:bg-white text-carbon-950 font-bold text-[15px] uppercase tracking-[0.8px] inline-flex items-center justify-center gap-2.5 disabled:opacity-60"
-                style={{ ['--btn-lip' as string]: '#b8b8b8' }}
-              >
-                <AppleMark />
-                Continuar con Apple
-              </button>
+              {SHOW_APPLE && (
+                <button
+                  onClick={() => void linkProvider('apple')}
+                  disabled={busy}
+                  className="btn-3d w-full h-[50px] rounded-xl bg-carbon-50 hover:enabled:bg-white text-carbon-950 font-bold text-[15px] uppercase tracking-[0.8px] inline-flex items-center justify-center gap-2.5 disabled:opacity-60"
+                  style={{ ['--btn-lip' as string]: '#b8b8b8' }}
+                >
+                  <AppleMark />
+                  Continuar con Apple
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-3 my-4">

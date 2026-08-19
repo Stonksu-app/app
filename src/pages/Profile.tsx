@@ -8,6 +8,7 @@ import AchievementRow from '../components/AchievementRow';
 import { byRelevance, computeAchievements } from '../data/achievements';
 import { getLessonById } from '../data/lessons';
 import { useUserStore, xpToLevel } from '../store/useUserStore';
+import { useAuthStore } from '../store/useAuthStore';
 import type { IconName } from '../types';
 
 /* Section headings are 24px/700 and stat tiles sit in a 2x2 grid, matching the
@@ -55,6 +56,7 @@ export default function Profile() {
     resetProgress,
   } = useUserStore();
   const { level } = xpToLevel(xp);
+  const authStatus = useAuthStore((s) => s.status);
 
   const achievements = computeAchievements({ streak, xp, attempts, nodeStageProgress, openedChestIds });
   const preview = [...achievements].sort(byRelevance).slice(0, 3);
@@ -171,6 +173,17 @@ export default function Profile() {
           >
             Reiniciar progreso
           </button>
+
+          {/* Settles "is the new build actually on my phone?" without guesswork,
+              which a sideloaded .ipa otherwise gives you no way to answer. */}
+          <p className="mt-6 text-[11px] text-carbon-600 font-bold tabular-nums">
+            Versión {__BUILD_ID__} ·{' '}
+            {authStatus === 'off'
+              ? 'solo en este dispositivo'
+              : authStatus === 'registered'
+              ? 'progreso guardado en la nube'
+              : 'sin cuenta — progreso solo local'}
+          </p>
         </div>
       </div>
     </div>

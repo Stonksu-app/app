@@ -25,8 +25,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Vite bakes VITE_* variables into the bundle at build time, and .env is
+      # gitignored, so without these the .ipa ships with the backend switched
+      # off: no sync, no account, no registration prompt. The anon key is
+      # designed to be public and ends up in the bundle either way; it lives in
+      # secrets purely to keep it out of the repository.
       - name: Build web assets
-        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "::warning::Sin claves de Supabase — este .ipa guardará el progreso solo en el dispositivo."
+          fi
+          npm run build
 
       - name: Sync web assets into the iOS project
         run: npx cap sync ios
