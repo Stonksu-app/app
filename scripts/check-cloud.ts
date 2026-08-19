@@ -156,6 +156,29 @@ check('a foreign key violation is read as a deleted account', classifyWriteError
 check('anything else is just a failure', classifyWriteError('42501') === 'failed');
 check('a missing code is a failure, not a guess', classifyWriteError(undefined) === 'failed');
 
+// ------------------------------- a failed read is not an empty account
+// pullState used to answer null for both, and the caller reads "nothing there"
+// as permission to seed the account from this device. On a device that has
+// just been cleared that means writing an empty profile over a real one.
+const pullSource = readFileSync('src/lib/cloud.ts', 'utf8');
+check(
+  'pullState distinguishes a failed read from an empty account',
+  /status: 'error'/.test(pullSource) && /status: 'empty'/.test(pullSource)
+);
+const syncSource = readFileSync('src/hooks/useCloudSync.ts', 'utf8');
+check(
+  'a failed read never seeds the account from this device',
+  /remote\.status === 'error'[\s\S]{0,400}?return;/.test(syncSource)
+);
+check(
+  'only a genuinely empty account gets seeded',
+  /remote\.status === 'found' && hasProgress/.test(syncSource)
+);
+check(
+  'concurrent callers share one sign-in, so two never race to create accounts',
+  /sessionInFlight/.test(pullSource)
+);
+
 // -------------------------------------------- which side wins on first sync
 check('a fresh cloud profile does not count as progress', !hasProgress({ onboarded: false, xp: 0, attempts: [] }));
 check('an onboarded profile counts', hasProgress({ onboarded: true, xp: 0, attempts: [] }));

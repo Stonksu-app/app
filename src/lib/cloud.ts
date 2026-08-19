@@ -128,7 +128,27 @@ const PROFILE_COLUMNS =
  * server-side before the player ever gives an email; linking one later keeps
  * the same id and therefore the same profile.
  */
-export async function ensureSession(): Promise<string | null> {
+/**
+ * Shared by every concurrent caller.
+ *
+ * Two calls overlapping each create their own anonymous account — visible in
+ * the database as a pair of users milliseconds apart. React runs effects twice
+ * in development, and two tabs opening together do it in production, so this
+ * is not hypothetical.
+ */
+let sessionInFlight: Promise<string | null> | null = null;
+
+export function ensureSession(): Promise<string | null> {
+  if (!supabase) return Promise.resolve(null);
+  if (!sessionInFlight) {
+    sessionInFlight = resolveSession().finally(() => {
+      sessionInFlight = null;
+    });
+  }
+  return sessionInFlight;
+}
+
+async function resolveSession(): Promise<string | null> {
   if (!supabase) return null;
 
   const { data: existing } = await supabase.auth.getSession();
@@ -197,9 +217,24 @@ function waitForSession(timeoutMs = 4000): Promise<string | null> {
   });
 }
 
-/** Reads the player's whole state. Null means "no usable cloud state". */
-export async function pullState(userId: string): Promise<CloudState | null> {
-  if (!supabase) return null;
+export type PullResult =
+  /** A profile row exists; `state` is it. */
+  | { status: 'found'; state: CloudState }
+  /** The account has no profile yet. Safe to seed from this device. */
+  | { status: 'empty' }
+  /** The read failed. Says nothing about what is up there. */
+  | { status: 'error' };
+
+/**
+ * Reads the player's whole state.
+ *
+ * The three outcomes are kept apart deliberately. Collapsing "the read failed"
+ * into "there is nothing there" is how a real profile gets destroyed: the
+ * caller seeds an empty account from whatever this device holds, and on a
+ * device that has just been cleared, that is nothing at all.
+ */
+export async function pullState(userId: string): Promise<PullResult> {
+  if (!supabase) return { status: 'error' };
 
   const [profile, attempts] = await Promise.all([
     supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle(),
@@ -212,9 +247,15 @@ export async function pullState(userId: string): Promise<CloudState | null> {
 
   if (profile.error) {
     console.warn('[cloud] could not read profile:', profile.error.message);
-    return null;
+    return { status: 'error' };
   }
-  if (!profile.data) return null;
+  if (attempts.error) {
+    // Half a history is worse than none: it would look like lost lessons and
+    // then be written back as the truth.
+    console.warn('[cloud] could not read attempts:', attempts.error.message);
+    return { status: 'error' };
+  }
+  if (!profile.data) return { status: 'empty' };
 
   const history: LessonAttempt[] = (attempts.data ?? []).map((a) => ({
     lessonId: a.lesson_id,
@@ -225,7 +266,7 @@ export async function pullState(userId: string): Promise<CloudState | null> {
     totalQuestions: a.total_questions,
   }));
 
-  return fromRow(profile.data as unknown as ProfileRow, history);
+  return { status: 'found', state: fromRow(profile.data as unknown as ProfileRow, history) };
 }
 
 /**

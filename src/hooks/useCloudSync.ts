@@ -141,15 +141,25 @@ export function useCloudSync(): void {
       const remote = await pullState(id);
       if (cancelled) return;
 
-      if (remote && hasProgress(remote)) {
+      if (remote.status === 'error') {
+        // Nothing is known about what is up there, so nothing may be written
+        // over it. Seeding from this device on a failed read is how a real
+        // profile gets replaced by an empty one — worst of all right after
+        // clearing site data, when this device holds nothing.
+        setStatus('error');
+        return;
+      }
+
+      if (remote.status === 'found' && hasProgress(remote.state)) {
         // The cloud is the record of a player who has already done something,
         // so it wins over whatever this device happens to hold.
         applying.current = true;
-        useUserStore.setState(remote);
+        useUserStore.setState(remote.state);
         applying.current = false;
       } else {
-        // Fresh account. Anything already on this device — progress from before
-        // the backend existed — goes up rather than being thrown away.
+        // Genuinely empty account. Anything already on this device — progress
+        // from before the backend existed — goes up rather than being thrown
+        // away.
         await save(id);
       }
       if (cancelled) return;
