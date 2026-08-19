@@ -34,7 +34,12 @@ export default function RegisterModal({ onClose }: { onClose: () => void }) {
     if (await linkEmail(email, password)) setSent(true);
   };
 
-  const waitingFor = sent ? email.trim() : pendingEmail;
+  // linkEmail clears pendingEmail when the server confirmed the address on the
+  // spot — which it does when confirmations are turned off. Reading it back
+  // rather than assuming keeps the modal from sending anyone to an inbox that
+  // will never receive anything.
+  const waitingFor = pendingEmail;
+  const finished = sent && !pendingEmail;
   /** That Google account belongs to a Stonksu profile already, so linking can
    *  never work — the only move left is to go to that profile instead. */
   const alreadyTaken = errorCode === 'identity_already_exists';
@@ -53,7 +58,20 @@ export default function RegisterModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {waitingFor ? (
+        {finished ? (
+          <>
+            <h2 className="text-2xl font-black text-carbon-50 mt-3">¡Cuenta guardada!</h2>
+            <p className="text-sm text-carbon-400 mt-2">
+              Tu progreso ya no depende de este dispositivo. Puedes entrar con{' '}
+              <span className="font-black text-lime-400">{email.trim()}</span> desde donde quieras.
+            </p>
+            <div className="mt-5">
+              <Button onClick={onClose} fullWidth>
+                Seguir jugando
+              </Button>
+            </div>
+          </>
+        ) : waitingFor ? (
           <>
             <h2 className="text-2xl font-black text-carbon-50 mt-3">Revisa tu correo</h2>
             <p className="text-sm text-carbon-400 mt-2">

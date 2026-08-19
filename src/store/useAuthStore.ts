@@ -178,7 +178,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     const address = email.trim();
     const redirect = { emailRedirectTo: `${window.location.origin}/home` };
 
-    let { error } = await supabase.auth.updateUser(
+    let { data, error } = await supabase.auth.updateUser(
       password ? { email: address, password } : { email: address },
       redirect
     );
@@ -186,7 +186,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     // Retry without it rather than losing the whole sign-up over a password
     // the server won't take yet.
     if (error && password && /anonymous user|password/i.test(error.message)) {
-      ({ error } = await supabase.auth.updateUser({ email: address }, redirect));
+      ({ data, error } = await supabase.auth.updateUser({ email: address }, redirect));
       if (!error) {
         set({ busy: false, pendingEmail: address, passwordDeferred: true });
         return true;
@@ -197,7 +197,21 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       set({ busy: false, error: translate(error.message), errorCode: 'link_failed' });
       return false;
     }
-    set({ busy: false, pendingEmail: address, passwordDeferred: false });
+
+    // With confirmations turned off, Supabase applies the address on the spot
+    // and sends nothing. Telling someone to go and check an inbox that will
+    // stay empty is its own small betrayal, so this reads what the server
+    // actually did rather than assuming a mail is on its way.
+    const user = data?.user;
+    const confirmed = Boolean(user?.email === address && user?.email_confirmed_at);
+
+    set({
+      busy: false,
+      pendingEmail: confirmed ? null : address,
+      passwordDeferred: false,
+      // The account is already permanent, so the nag must stop immediately.
+      ...(confirmed ? { status: 'registered' as const, email: address } : {}),
+    });
     return true;
   },
 

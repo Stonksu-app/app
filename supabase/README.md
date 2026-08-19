@@ -147,6 +147,18 @@ Con [Resend](https://resend.com) (3.000 correos al mes gratis), en **Project Set
 
 El error real siempre está en **Logs → Auth Logs** del panel de Supabase. El mensaje que ve el usuario es genérico a propósito, así que ahí es donde se mira.
 
+### Entrar con correo sin haber resuelto el envío
+
+Si lo que quieres es que el registro con correo y contraseña funcione **ya**, y el envío te está bloqueando: **desactiva la confirmación**.
+
+**Authentication → Sign In / Providers → Email → Confirm email → OFF.**
+
+Con eso Supabase aplica la dirección en el acto y **no envía nada**, así que ningún problema de SMTP puede estorbar. La app lo detecta: en vez de mandarte a mirar un buzón que no va a recibir nada, dice "¡Cuenta guardada!" y te deja seguir.
+
+Lo que se pierde es real y conviene tenerlo claro: **cualquiera puede registrarse con un correo que no es suyo**. Para desarrollo da igual; antes de tener usuarios de verdad, vuelve a activarlo con el dominio ya verificado en Resend.
+
+> Si la contraseña se queda sin poner —Supabase la rechaza en cuentas anónimas que aún no tienen dirección—, se pone después desde **Perfil → Contraseña**. Sin ese paso tendrías una cuenta a la que solo se entra por Google.
+
 Cualquier otro proveedor sirve igual — Postmark, SendGrid, Amazon SES. Lo que desbloquea las plantillas es dejar de usar el SMTP compartido, no cuál elijas.
 
 La que usa el paso de cuenta anónima a registrada es **Change Email Address**, no *Confirm signup* — es fácil cambiar la equivocada y no entender por qué el correo sigue saliendo como antes.
