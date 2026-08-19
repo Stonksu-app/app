@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar';
 import NavRail from '../components/NavRail';
 import BottomNav from '../components/BottomNav';
@@ -218,12 +218,12 @@ export default function Home() {
               </h1>
             </div>
             {current && (
-              <button
-                onClick={() => setSelected(current.node)}
+              <Link
+                to={`/guia?tema=${current.node.id}`}
                 className="shrink-0 flex items-center gap-1.5 bg-carbon-900/15 hover:bg-carbon-900/25 text-carbon-900 font-black text-[13px] uppercase tracking-wide rounded-xl px-3 py-2.5 transition"
               >
                 <Icon name="clipboard" size={16} /> Guía
-              </button>
+              </Link>
             )}
           </div>
 

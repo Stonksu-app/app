@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import SplashScreen from './components/SplashScreen';
 import Landing from './pages/Landing';
+import Guide from './pages/Guide';
+import Shop from './pages/Shop';
 import Onboarding from './pages/Onboarding';
 import Home from './pages/Home';
 import LessonIntro from './pages/LessonIntro';
@@ -56,6 +58,22 @@ function App() {
         element={
           <RequireOnboarded>
             <LessonResults />
+          </RequireOnboarded>
+        }
+      />
+      <Route
+        path="/guia"
+        element={
+          <RequireOnboarded>
+            <Guide />
+          </RequireOnboarded>
+        }
+      />
+      <Route
+        path="/tienda"
+        element={
+          <RequireOnboarded>
+            <Shop />
           </RequireOnboarded>
         }
       />

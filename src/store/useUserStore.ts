@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { LessonAttempt, OnboardingAnswers, TradingExperience } from '../types';
 import { SKILL_TREE } from '../data/lessons';
 import { stagesForDifficulty } from '../utils/mastery';
+import { computeStreakUpdate } from '../utils/streak';
 
 const MAX_HEARTS = 5;
 const HEART_REGEN_MINUTES = 30;
@@ -24,6 +25,8 @@ interface UserState {
   seenIntroNodeIds: string[];
   nodeStageProgress: Record<string, number>;
   openedChestIds: string[];
+  coins: number;
+  streakProtectors: number;
   /** Set by onboarding as the name "test". Unlocks the whole tree and seeds
    *  every topic one stage short of platinum, so each can be finished in a
    *  single lesson to check the mastery and chest flows end to end. */
@@ -47,29 +50,22 @@ interface UserState {
   isNodePlatinum: (nodeId: string) => boolean;
   isChestOpened: (chestId: string) => boolean;
   openChest: (chestId: string, reward: number) => void;
+  buyHeartRefill: () => boolean;
+  buyStreakProtector: () => boolean;
   resetProgress: () => void;
 }
+
+export const COIN_PRICES = { heartRefill: 350, streakProtector: 200 } as const;
+/** Coins minted per correct answer, and per chest opened. */
+export const COINS_PER_CORRECT = 2;
+export const COINS_PER_CHEST = 50;
+/** Owning more than this many protectors at once isn't useful. */
+export const MAX_PROTECTORS = 2;
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function computeStreakUpdate(lastActiveDate: string | null, currentStreak: number): { streak: number; lastActiveDate: string } {
-  const today = todayStr();
-  if (lastActiveDate === today) {
-    return { streak: currentStreak, lastActiveDate: today };
-  }
-  if (!lastActiveDate) {
-    return { streak: 1, lastActiveDate: today };
-  }
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yStr = yesterday.toISOString().slice(0, 10);
-  if (lastActiveDate === yStr) {
-    return { streak: currentStreak + 1, lastActiveDate: today };
-  }
-  return { streak: 1, lastActiveDate: today };
-}
 
 export const useUserStore = create<UserState>()(
   persist(
@@ -89,6 +85,8 @@ export const useUserStore = create<UserState>()(
       seenIntroNodeIds: [],
       nodeStageProgress: {},
       openedChestIds: [],
+      coins: 0,
+      streakProtectors: 0,
       testMode: false,
 
       startOnboarding: () => set({ onboarded: false }),
@@ -141,7 +139,12 @@ export const useUserStore = create<UserState>()(
 
       completeLesson: (attempt) =>
         set((s) => {
-          const { streak, lastActiveDate } = computeStreakUpdate(s.lastActiveDate, s.streak);
+          const { streak, lastActiveDate, protectorsUsed } = computeStreakUpdate(
+            s.lastActiveDate,
+            s.streak,
+            s.streakProtectors,
+            todayStr()
+          );
           const completedLessonIds = s.completedLessonIds.includes(attempt.lessonId)
             ? s.completedLessonIds
             : [...s.completedLessonIds, attempt.lessonId];
@@ -156,6 +159,8 @@ export const useUserStore = create<UserState>()(
 
           return {
             xp: s.xp + attempt.xpEarned,
+            coins: s.coins + attempt.correctCount * COINS_PER_CORRECT,
+            streakProtectors: s.streakProtectors - protectorsUsed,
             attempts: [...s.attempts, attempt],
             completedLessonIds,
             streak,
@@ -214,8 +219,26 @@ export const useUserStore = create<UserState>()(
           // Guarded so a double tap can't pay out twice.
           s.openedChestIds.includes(chestId)
             ? s
-            : { openedChestIds: [...s.openedChestIds, chestId], xp: s.xp + reward }
+            : {
+                openedChestIds: [...s.openedChestIds, chestId],
+                xp: s.xp + reward,
+                coins: s.coins + COINS_PER_CHEST,
+              }
         ),
+
+      buyHeartRefill: () => {
+        const s = get();
+        if (s.hearts >= MAX_HEARTS || s.coins < COIN_PRICES.heartRefill) return false;
+        set({ coins: s.coins - COIN_PRICES.heartRefill, hearts: MAX_HEARTS, lastHeartLostAt: null });
+        return true;
+      },
+
+      buyStreakProtector: () => {
+        const s = get();
+        if (s.streakProtectors >= MAX_PROTECTORS || s.coins < COIN_PRICES.streakProtector) return false;
+        set({ coins: s.coins - COIN_PRICES.streakProtector, streakProtectors: s.streakProtectors + 1 });
+        return true;
+      },
 
       resetProgress: () =>
         set({
@@ -234,6 +257,8 @@ export const useUserStore = create<UserState>()(
           seenIntroNodeIds: [],
           nodeStageProgress: {},
           openedChestIds: [],
+          coins: 0,
+          streakProtectors: 0,
           testMode: false,
         }),
     }),

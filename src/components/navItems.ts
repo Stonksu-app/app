@@ -4,5 +4,7 @@ import type { IconName } from '../types';
  *  drift apart. Only real destinations belong here. */
 export const NAV_ITEMS: { to: string; label: string; icon: IconName }[] = [
   { to: '/home', label: 'Aprender', icon: 'map' },
+  { to: '/guia', label: 'Guía', icon: 'book' },
+  { to: '/tienda', label: 'Tienda', icon: 'coins' },
   { to: '/profile', label: 'Perfil', icon: 'user' },
 ];
