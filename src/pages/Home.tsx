@@ -1,15 +1,113 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar';
 import Mascot from '../components/Mascot';
 import Icon from '../components/Icon';
 import { Button } from '../components/Button';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import { SKILL_TREE } from '../data/lessons';
-import { useUserStore } from '../store/useUserStore';
-import type { SkillNode } from '../types';
+import { useUserStore, xpToLevel } from '../store/useUserStore';
+import type { IconName, SkillNode } from '../types';
 
-const ROW_HEIGHT = 132;
+/* Three-column learn layout, in the shape Duolingo uses: nav rail on the left,
+ * the lesson path down the middle, stat cards on the right. Below lg the rails
+ * drop away and the phone keeps the path plus the existing top bar. */
+
+/** Horizontal offsets, in px, that give the path its serpentine walk. Cycles. */
+const SWAY = [0, -44, -70, -44, 0, 44, 70, 44];
+const NODE_PITCH = 116;
+
+const NAV: { to: string; label: string; icon: IconName }[] = [
+  { to: '/home', label: 'Aprender', icon: 'map' },
+  { to: '/profile', label: 'Perfil', icon: 'user' },
+];
+
+function NavRail() {
+  const { pathname } = useLocation();
+  return (
+    <aside className="hidden lg:flex flex-col w-[256px] shrink-0 border-r-2 border-carbon-800 h-dvh sticky top-0 p-4">
+      <Link to="/home" className="flex items-center gap-2 px-3 py-4">
+        <Mascot size={32} mood="happy" />
+        <span className="text-2xl font-black text-lime-500 tracking-tight">Stonksu</span>
+      </Link>
+      <nav className="mt-4 flex flex-col gap-2">
+        {NAV.map((item) => {
+          const active = pathname === item.to;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={`h-[52px] flex items-center gap-3 px-4 rounded-xl border-2 text-[15px] font-black uppercase tracking-[0.8px] transition ${
+                active
+                  ? 'bg-lime-500/10 border-lime-500/50 text-lime-400'
+                  : 'border-transparent text-carbon-300 hover:bg-carbon-850'
+              }`}
+            >
+              <Icon name={item.icon} size={22} />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}
+
+function StatRail({
+  hearts,
+  msUntilNextHeart,
+  active,
+}: {
+  hearts: number;
+  msUntilNextHeart: number | null;
+  active: { node: SkillNode; stage: number; maxStage: number } | null;
+}) {
+  const { streak, xp } = useUserStore();
+  const { level } = xpToLevel(xp);
+
+  return (
+    <aside className="hidden xl:block w-[368px] shrink-0 p-6 space-y-4">
+      <div className="flex items-center justify-around bg-carbon-850 border-2 border-carbon-800 rounded-2xl py-3">
+        <span className="flex items-center gap-1.5 font-black text-carbon-50">
+          <Icon name="flame" size={20} className={streak > 0 ? 'text-lime-500 animate-flame-flicker' : 'text-carbon-600'} />
+          {streak}
+        </span>
+        <span className="flex items-center gap-1.5 font-black text-carbon-50">
+          <Icon name="star" size={20} className="text-lime-500" /> {xp}
+        </span>
+        <span className="flex items-center gap-1.5 font-black text-carbon-50">
+          <Icon name="heart" size={20} className="text-lime-500" /> {hearts}
+        </span>
+      </div>
+
+      {active && (
+        <div className="bg-carbon-850 border-2 border-carbon-800 rounded-2xl p-4">
+          <h2 className="text-[19px] font-black text-carbon-50">Tu etapa actual</h2>
+          <p className="text-sm text-carbon-400 mt-0.5">{active.node.title}</p>
+          <div className="flex items-center gap-1 mt-3">
+            {Array.from({ length: active.maxStage }).map((_, i) => (
+              <span key={i} className={`h-2 flex-1 rounded-full ${i < active.stage ? 'bg-lime-500' : 'bg-carbon-700'}`} />
+            ))}
+          </div>
+          <p className="text-xs font-bold text-carbon-400 mt-2">
+            {active.stage}/{active.maxStage} — te faltan {active.maxStage - active.stage} para PLATINO
+          </p>
+        </div>
+      )}
+
+      <div className="bg-carbon-850 border-2 border-carbon-800 rounded-2xl p-4">
+        <h2 className="text-[19px] font-black text-carbon-50">Nivel {level}</h2>
+        <p className="text-sm text-carbon-400 mt-0.5">
+          {hearts > 0
+            ? 'Sigue el camino y no sueltes la racha.'
+            : msUntilNextHeart !== null
+            ? `Próxima vida en ${formatCountdown(msUntilNextHeart)}`
+            : 'Sin vidas por ahora.'}
+        </p>
+      </div>
+    </aside>
+  );
+}
 
 export default function Home() {
   const navigate = useNavigate();
@@ -25,112 +123,114 @@ export default function Home() {
   const [selected, setSelected] = useState<SkillNode | null>(null);
   const { hearts, msUntilNextHeart } = useHeartRegen();
 
-  const nodesWithStatus = useMemo(
+  const nodes = useMemo(
     () =>
       SKILL_TREE.map((node) => {
         const unlocked = isNodeUnlocked(node.id);
-        const hasLessons = node.lessons.length > 0;
-        const completed = hasLessons && node.lessons.every((l) => isLessonCompleted(l.id));
+        const platinum = isNodePlatinum(node.id);
         const stage = getNodeStage(node.id);
         const maxStage = getNodeMaxStage(node.id);
-        const platinum = isNodePlatinum(node.id);
-        return { node, unlocked, hasLessons, completed, stage, maxStage, platinum };
+        return { node, unlocked, platinum, stage, maxStage, started: stage > 0 };
       }),
-    [isNodeUnlocked, isLessonCompleted, getNodeStage, getNodeMaxStage, isNodePlatinum]
+    [isNodeUnlocked, getNodeStage, getNodeMaxStage, isNodePlatinum]
   );
 
-  const totalHeight = SKILL_TREE.length * ROW_HEIGHT + 40;
-
-  const points = nodesWithStatus.map(({ node }) => ({
-    x: node.position.x,
-    y: node.position.y * ROW_HEIGHT + 60,
-  }));
-
-  const pathD = points
-    .map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`))
-    .join(' ');
+  /** The furthest node you can actually play — what the banner and the
+   *  "empezar" marker point at. */
+  const current = nodes.find((n) => n.unlocked && !n.platinum && n.node.lessons.length > 0) ?? null;
 
   return (
-    <div className="min-h-dvh bg-carbon-900">
-      <TopBar />
+    <div className="min-h-dvh bg-carbon-900 lg:flex">
+      <NavRail />
 
-      <div className="max-w-2xl mx-auto px-4 pt-6">
-        <div className="bg-carbon-850 rounded-2xl border border-carbon-800 p-4 flex items-center gap-3 mb-6">
-          <Mascot size={56} mood="happy" />
-          <div className="text-left">
-            <p className="font-black text-carbon-50">
-              ¡Qué tal, {name || 'trader'}!
-            </p>
-            <p className="text-sm text-carbon-400">Sigue el mapa y no sueltes tu racha.</p>
-          </div>
-        </div>
+      <div className="lg:hidden">
+        <TopBar />
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 pb-20 pb-safe">
-        <div className="relative" style={{ height: totalHeight }}>
-          <svg
-            className="absolute inset-0 w-full h-full pointer-events-none"
-            viewBox={`0 0 100 ${totalHeight}`}
-            preserveAspectRatio="none"
-          >
-            <path
-              d={pathD}
-              stroke="#333333"
-              strokeWidth={8}
-              strokeLinecap="round"
-              fill="none"
-              strokeDasharray="2 22"
-              vectorEffect="non-scaling-stroke"
-            />
-          </svg>
-
-          {nodesWithStatus.map(({ node, unlocked, completed, stage, maxStage, platinum }) => {
-            const top = node.position.y * ROW_HEIGHT + 60;
-            return (
-              <div
-                key={node.id}
-                className="absolute flex flex-col items-center -translate-x-1/2"
-                style={{ left: `${node.position.x}%`, top }}
+      <main className="flex-1 min-w-0 px-4 pb-24 pb-safe lg:py-6">
+        <div className="max-w-[600px] mx-auto">
+          {/* Section banner */}
+          <div className="mt-4 lg:mt-0 bg-lime-500 rounded-2xl px-5 py-4 flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[13px] font-black text-carbon-900/70 uppercase tracking-wide">
+                {current ? `Etapa ${current.stage + 1} de ${current.maxStage}` : 'Todo platinado'}
+              </p>
+              <h1 className="text-xl font-black text-carbon-900 truncate">
+                {current ? current.node.title : `¡Bien hecho, ${name || 'trader'}!`}
+              </h1>
+            </div>
+            {current && (
+              <button
+                onClick={() => setSelected(current.node)}
+                className="shrink-0 flex items-center gap-1.5 bg-carbon-900/15 hover:bg-carbon-900/25 text-carbon-900 font-black text-[13px] uppercase tracking-wide rounded-xl px-3 py-2.5 transition"
               >
-                <div className="relative">
+                <Icon name="clipboard" size={16} /> Guía
+              </button>
+            )}
+          </div>
+
+          {/* Lesson path */}
+          <div className="relative mt-10 flex flex-col items-center">
+            {nodes.map(({ node, unlocked, platinum, stage, maxStage }, i) => {
+              const isCurrent = current?.node.id === node.id;
+              return (
+                <div
+                  key={node.id}
+                  className="relative flex flex-col items-center"
+                  style={{ transform: `translateX(${SWAY[i % SWAY.length]}px)`, marginBottom: NODE_PITCH - 70 }}
+                >
+                  {isCurrent && (
+                    <span className="absolute -top-9 whitespace-nowrap bg-carbon-850 border-2 border-carbon-700 text-lime-400 text-[11px] font-black uppercase tracking-[0.8px] px-3 py-1.5 rounded-xl animate-float">
+                      Empezar
+                    </span>
+                  )}
+
                   <button
                     disabled={!unlocked}
                     onClick={() => setSelected(node)}
                     aria-label={node.title}
-                    className={`w-20 h-20 rounded-full flex items-center justify-center border-4 shadow-md transition active:scale-95 ${
-                      platinum
-                        ? 'bg-gradient-to-br from-carbon-100 to-carbon-300 border-carbon-50 text-carbon-900'
-                        : completed
-                        ? 'bg-lime-500 border-lime-400 text-carbon-900'
+                    style={{
+                      ['--btn-lip' as string]: platinum
+                        ? 'var(--color-carbon-500)'
                         : unlocked
-                        ? 'bg-carbon-800 border-lime-500 text-lime-500 animate-float'
-                        : 'bg-carbon-850 border-carbon-800 text-carbon-600 cursor-not-allowed'
+                        ? 'var(--color-lime-700)'
+                        : 'var(--color-carbon-950)',
+                    }}
+                    className={`btn-3d w-[70px] h-[70px] rounded-full flex items-center justify-center ${
+                      platinum
+                        ? 'bg-gradient-to-br from-carbon-100 to-carbon-300 text-carbon-900'
+                        : unlocked
+                        ? 'bg-lime-500 text-carbon-900'
+                        : 'bg-carbon-800 text-carbon-600 cursor-not-allowed'
+                    } ${isCurrent ? 'ring-4 ring-lime-500/25' : ''}`}
+                  >
+                    <Icon name={unlocked ? node.icon : 'lock'} size={30} strokeWidth={unlocked ? 1.9 : 2} />
+                  </button>
+
+                  <span
+                    className={`mt-2 text-[13px] font-black text-center w-32 leading-tight ${
+                      unlocked ? 'text-carbon-100' : 'text-carbon-600'
                     }`}
                   >
-                    <Icon name={unlocked ? node.icon : 'lock'} size={30} strokeWidth={unlocked ? 1.8 : 2} />
-                  </button>
+                    {node.title}
+                  </span>
                   {unlocked && maxStage > 0 && (
-                    <span
-                      className={`absolute -bottom-1 -right-1 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-black border-2 border-carbon-900 ${
-                        platinum ? 'bg-carbon-100 text-carbon-900' : 'bg-carbon-800 text-lime-400'
-                      }`}
-                    >
-                      {platinum ? (
-                        <Icon name="diamond" size={10} />
-                      ) : (
-                        `${stage}/${maxStage}`
-                      )}
+                    <span className="text-[11px] font-black text-carbon-500 mt-0.5">
+                      {platinum ? 'PLATINO' : `${stage}/${maxStage}`}
                     </span>
                   )}
                 </div>
-                <span className={`mt-1.5 text-xs font-extrabold text-center w-24 ${unlocked ? 'text-carbon-100' : 'text-carbon-600'}`}>
-                  {node.title}
-                </span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      </main>
+
+      <StatRail
+        hearts={hearts}
+        msUntilNextHeart={msUntilNextHeart}
+        active={current ? { node: current.node, stage: current.stage, maxStage: current.maxStage } : null}
+      />
 
       {selected && (
         <div
@@ -138,7 +238,7 @@ export default function Home() {
           onClick={() => setSelected(null)}
         >
           <div
-            className="bg-carbon-850 border border-carbon-800 rounded-3xl max-w-sm w-full p-6 text-center animate-pop-in"
+            className="bg-carbon-850 border-2 border-carbon-800 rounded-3xl max-w-sm w-full p-6 text-center animate-pop-in"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-16 h-16 rounded-full bg-lime-500/10 flex items-center justify-center mx-auto mb-3">
@@ -210,10 +310,7 @@ export default function Home() {
                 Próximamente — ¡seguimos construyendo este módulo!
               </p>
             )}
-            <button
-              onClick={() => setSelected(null)}
-              className="mt-3 w-full text-carbon-400 font-bold py-2"
-            >
+            <button onClick={() => setSelected(null)} className="mt-3 w-full text-carbon-400 font-bold py-2">
               Cerrar
             </button>
           </div>
