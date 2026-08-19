@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar';
 import NavRail from '../components/NavRail';
@@ -7,8 +7,9 @@ import Icon from '../components/Icon';
 import { Button } from '../components/Button';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import { SKILL_TREE } from '../data/lessons';
+import StatPanel, { type StatKey } from '../components/StatPanels';
 import { useUserStore, xpToLevel } from '../store/useUserStore';
-import type { SkillNode } from '../types';
+import type { IconName, SkillNode } from '../types';
 
 /* Three-column learn layout, in the shape Duolingo uses: nav rail on the left,
  * the lesson path down the middle, stat cards on the right. Below lg the rails
@@ -36,20 +37,74 @@ function StatRail({
 }) {
   const { streak, xp } = useUserStore();
   const { level } = xpToLevel(xp);
+  const [hovered, setHovered] = useState<StatKey | null>(null);
+  // Measured rather than derived from the index: the counters are laid out with
+  // justify-around, so their spacing depends on how wide each number renders.
+  const [arrowX, setArrowX] = useState(0);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  const STATS: { key: StatKey; icon: IconName; value: number; dim?: boolean }[] = [
+    { key: 'streak', icon: 'flame', value: streak, dim: streak === 0 },
+    { key: 'xp', icon: 'star', value: xp },
+    { key: 'hearts', icon: 'heart', value: hearts },
+  ];
+
+  const reveal = (key: StatKey, el: HTMLElement) => {
+    setHovered(key);
+    const row = rowRef.current;
+    if (!row) return;
+    const b = el.getBoundingClientRect();
+    setArrowX(b.left + b.width / 2 - row.getBoundingClientRect().left);
+  };
 
   return (
     <aside className="hidden xl:block w-[368px] shrink-0 p-6 space-y-4">
-      <div className="flex items-center justify-around bg-carbon-850 border-2 border-carbon-800 rounded-2xl py-3">
-        <span className="flex items-center gap-1.5 font-black text-carbon-50">
-          <Icon name="flame" size={20} className={streak > 0 ? 'text-lime-500 animate-flame-flicker' : 'text-carbon-600'} />
-          {streak}
-        </span>
-        <span className="flex items-center gap-1.5 font-black text-carbon-50">
-          <Icon name="star" size={20} className="text-lime-500" /> {xp}
-        </span>
-        <span className="flex items-center gap-1.5 font-black text-carbon-50">
-          <Icon name="heart" size={20} className="text-lime-500" /> {hearts}
-        </span>
+      {/* Hovering a counter reveals its panel, pointed at by a small arrow —
+          the desktop counterpart to tapping it open on a phone. */}
+      <div className="relative" onMouseLeave={() => setHovered(null)}>
+        <div
+          ref={rowRef}
+          className="flex items-center justify-around bg-carbon-850 border-2 border-carbon-800 rounded-2xl py-3"
+        >
+          {STATS.map((s) => (
+            <button
+              key={s.key}
+              onMouseEnter={(e) => reveal(s.key, e.currentTarget)}
+              onFocus={(e) => reveal(s.key, e.currentTarget)}
+              onBlur={() => setHovered(null)}
+              aria-expanded={hovered === s.key}
+              className={`flex items-center gap-1.5 font-black text-carbon-50 px-3 py-1 rounded-lg transition ${
+                hovered === s.key ? 'bg-carbon-800' : ''
+              }`}
+            >
+              <Icon
+                name={s.icon}
+                size={20}
+                className={
+                  s.dim ? 'text-carbon-600' : s.key === 'streak' ? 'text-lime-500 animate-flame-flicker' : 'text-lime-500'
+                }
+              />
+              {s.value}
+            </button>
+          ))}
+        </div>
+
+        {hovered && (
+          <>
+            {/* Deliberately a sibling of the animated card, not a child: pop-in
+                starts at scale(0.6), which would drag the arrow 64px inward
+                and leave it pointing at the wrong counter mid-animation. */}
+            <span
+              className="absolute top-full z-50 w-3.5 h-3.5 rotate-45 bg-carbon-850 border-l-2 border-t-2 border-carbon-800"
+              style={{ left: arrowX, marginLeft: -7, marginTop: 1 }}
+            />
+            <div className="absolute left-0 right-0 top-full pt-2 z-40 animate-pop-in">
+              <div className="bg-carbon-850 border-2 border-carbon-800 rounded-2xl p-4">
+                <StatPanel stat={hovered} compact />
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {active && (
