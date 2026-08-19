@@ -14,6 +14,7 @@ import Lesson from './pages/Lesson';
 import LessonResults from './pages/LessonResults';
 import Profile from './pages/Profile';
 import { useUserStore } from './store/useUserStore';
+import { useCloudSync } from './hooks/useCloudSync';
 
 function RequireOnboarded({ children }: { children: React.ReactNode }) {
   const onboarded = useUserStore((s) => s.onboarded);
@@ -25,6 +26,10 @@ function App() {
   // App mounts once per launch, so this runs on cold start only — not on
   // navigation between routes.
   const [booting, setBooting] = useState(true);
+  // Signs in anonymously and mirrors progress to Supabase. With no keys
+  // configured this is inert and the app stays purely local. The splash is
+  // already 10 seconds, which comfortably covers the first pull.
+  useCloudSync();
 
   return (
     <>
