@@ -1,4 +1,6 @@
 import TopBar from '../components/TopBar';
+import NavRail from '../components/NavRail';
+import BottomNav from '../components/BottomNav';
 import Mascot from '../components/Mascot';
 import XpBar from '../components/XpBar';
 import Icon from '../components/Icon';
@@ -24,10 +26,16 @@ export default function Profile() {
   );
 
   return (
-    <div className="min-h-dvh bg-carbon-900">
-      <TopBar />
+    <div className="min-h-dvh bg-carbon-900 lg:flex">
+      <NavRail />
+      <BottomNav />
 
-      <div className="max-w-2xl mx-auto px-4 py-6 pb-safe">
+      <div className="flex-1 min-w-0">
+        <div className="lg:hidden">
+          <TopBar />
+        </div>
+
+        <div className="max-w-2xl mx-auto px-4 py-6 pb-32 lg:pb-6">
         <div className="bg-carbon-850 rounded-3xl border border-carbon-800 p-6 flex flex-col sm:flex-row items-center gap-5">
           <Mascot size={90} mood="happy" />
           <div className="text-center sm:text-left flex-1">
@@ -120,6 +128,7 @@ export default function Profile() {
         >
           Reiniciar progreso
         </button>
+        </div>
       </div>
     </div>
   );

@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar';
-import Mascot from '../components/Mascot';
+import NavRail from '../components/NavRail';
+import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
 import { Button } from '../components/Button';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import { SKILL_TREE } from '../data/lessons';
 import { useUserStore, xpToLevel } from '../store/useUserStore';
-import type { IconName, SkillNode } from '../types';
+import type { SkillNode } from '../types';
 
 /* Three-column learn layout, in the shape Duolingo uses: nav rail on the left,
  * the lesson path down the middle, stat cards on the right. Below lg the rails
@@ -23,42 +24,6 @@ const NODE_PITCH = 116;
  *  at two, you'd have to platinum two whole subjects before seeing one. */
 const CHEST_EVERY = 1;
 const CHEST_XP = 100;
-
-const NAV: { to: string; label: string; icon: IconName }[] = [
-  { to: '/home', label: 'Aprender', icon: 'map' },
-  { to: '/profile', label: 'Perfil', icon: 'user' },
-];
-
-function NavRail() {
-  const { pathname } = useLocation();
-  return (
-    <aside className="hidden lg:flex flex-col w-[256px] shrink-0 border-r-2 border-carbon-800 h-dvh sticky top-0 p-4">
-      <Link to="/home" className="flex items-center gap-2 px-3 py-4">
-        <Mascot size={32} mood="happy" />
-        <span className="text-2xl font-black text-lime-500 tracking-tight">Stonksu</span>
-      </Link>
-      <nav className="mt-4 flex flex-col gap-2">
-        {NAV.map((item) => {
-          const active = pathname === item.to;
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={`h-[52px] flex items-center gap-3 px-4 rounded-xl border-2 text-[15px] font-black uppercase tracking-[0.8px] transition ${
-                active
-                  ? 'bg-lime-500/10 border-lime-500/50 text-lime-400'
-                  : 'border-transparent text-carbon-300 hover:bg-carbon-850'
-              }`}
-            >
-              <Icon name={item.icon} size={22} />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-    </aside>
-  );
-}
 
 function StatRail({
   hearts,
@@ -179,7 +144,8 @@ export default function Home() {
         <TopBar />
       </div>
 
-      <main className="flex-1 min-w-0 px-4 pb-24 pb-safe lg:py-6">
+      {/* pb-32 keeps the last node clear of the fixed BottomNav on phones. */}
+      <main className="flex-1 min-w-0 px-4 pb-32 lg:pb-6 lg:py-6">
         <div className="max-w-[600px] mx-auto">
           {/* Section banner */}
           <div className="mt-4 lg:mt-0 bg-lime-500 rounded-2xl px-5 py-4 flex items-center justify-between gap-4">
@@ -292,6 +258,8 @@ export default function Home() {
               path above rather than as a separate list. */}
         </div>
       </main>
+
+      <BottomNav />
 
       <StatRail
         hearts={hearts}
