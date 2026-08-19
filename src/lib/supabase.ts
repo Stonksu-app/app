@@ -49,7 +49,12 @@ export const supabase: SupabaseClient | null = isCloudEnabled
         // webview persists, so a phone stays signed in between launches.
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: false,
+        // Must stay true now that there is an OAuth provider. Google sends the
+        // player back with the new credentials in the URL, and if the client
+        // doesn't read them the link silently never completes: the session
+        // stays anonymous, so the "save your progress" nag reappears as if
+        // nothing had happened. This was false while email was the only route.
+        detectSessionInUrl: true,
       },
     })
   : null;

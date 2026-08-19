@@ -68,13 +68,22 @@ export default function RegisterGate() {
 
   return (
     <>
+      {/* In the document flow rather than fixed: as an overlay it sat on top of
+          the unit header on desktop and the bottom nav on the phone. Taking up
+          its own row means it can't cover anything, and scrolling away is fine
+          because the modal is what actually does the nagging. */}
       {!quiet && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed left-0 right-0 bottom-0 z-50 lg:bottom-auto lg:top-0 bg-[#FFC93C] text-carbon-950 px-4 py-2.5 pb-safe lg:pb-2.5 flex items-center justify-center gap-2 text-[13px] font-black text-center hover:bg-[#ffd45f] transition"
+          className="w-full bg-[#FFC93C] text-carbon-950 px-4 py-2.5 pt-safe flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[13px] font-black text-center hover:bg-[#ffd45f] transition"
         >
-          <Icon name="shield" size={16} strokeWidth={2.2} />
-          Tu progreso solo está en este dispositivo.
+          <span className="inline-flex items-center gap-2">
+            <Icon name="shield" size={16} strokeWidth={2.2} />
+            {/* The full sentence wraps to a second row on a 375px phone, which
+                doubles the height of a bar whose whole job is to be unobtrusive. */}
+            <span className="hidden sm:inline">Tu progreso solo está en este dispositivo.</span>
+            <span className="sm:hidden">Tu progreso no está guardado.</span>
+          </span>
           <span className="underline underline-offset-2">Guárdalo</span>
         </button>
       )}

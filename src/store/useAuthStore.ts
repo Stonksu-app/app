@@ -43,13 +43,20 @@ interface AuthState {
 function applySession(session: Session | null): Partial<AuthState> {
   if (!session) return { status: 'loading', email: null, pendingEmail: null };
   const user = session.user;
-  // is_anonymous is absent on older sessions; treat a linked identity or a
-  // confirmed email as registered either way.
-  const anonymous = user.is_anonymous === true;
+
+  // Three independent signals rather than trusting is_anonymous alone. The
+  // claim lives in the JWT, so it can lag a freshly linked identity until the
+  // token is refreshed — and a stale "still anonymous" would keep nagging
+  // someone who has just finished signing up, which is the worst moment to
+  // get it wrong. A linked provider or a confirmed address is proof enough.
+  const hasProvider = (user.identities ?? []).some((i) => i.provider !== 'anonymous');
+  const hasConfirmedEmail = Boolean(user.email && user.email_confirmed_at);
+  const registered = user.is_anonymous === false || hasProvider || hasConfirmedEmail;
+
   return {
-    status: anonymous ? 'anonymous' : 'registered',
-    email: user.email ?? null,
-    pendingEmail: user.new_email ?? null,
+    status: registered ? 'registered' : 'anonymous',
+    email: user.email || null,
+    pendingEmail: user.new_email || null,
   };
 }
 
@@ -57,6 +64,8 @@ function applySession(session: Session | null): Partial<AuthState> {
 function translate(message: string): string {
   const m = message.toLowerCase();
   if (m.includes('already') && m.includes('registered')) return 'Ese correo ya tiene cuenta. Inicia sesión con él.';
+  if (m.includes('identity') && (m.includes('already') || m.includes('linked')))
+    return 'Esa cuenta de Google ya está vinculada a otro perfil de Stonksu.';
   if (m.includes('invalid') && m.includes('email')) return 'Ese correo no parece válido.';
   if (m.includes('rate limit') || m.includes('too many')) return 'Demasiados intentos. Espera un momento y vuelve a probar.';
   if (m.includes('manual linking')) return 'Falta activar "Manual Linking" en Supabase (ver supabase/README.md).';
