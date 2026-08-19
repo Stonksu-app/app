@@ -90,12 +90,36 @@ Sin esto, `linkIdentity()` falla. Es lo que permite **añadir** una identidad a 
 
 Con esto activado, `updateUser({ email })` deja la dirección en `new_email` y no la confirma hasta que se pulsa el enlace. Es justo lo que quieres: hasta ese momento la cuenta sigue siendo anónima y no se ha perdido nada si el correo nunca llega.
 
-Y en **Authentication → URL Configuration**:
+Y en **Authentication → URL Configuration**, que son **dos campos distintos y no intercambiables**:
 
-- *Site URL*: la de producción.
-- *Redirect URLs*: añade `http://localhost:5173/**`, el dominio de preview de Vercel y el de producción.
+| Campo | Qué es | Comodines |
+| --- | --- | --- |
+| *Site URL* | El destino de reserva cuando ninguno de la lista encaja. **Un solo valor.** | **No admite.** El propio campo lo dice |
+| *Redirect URLs* | La lista blanca de destinos permitidos | Sí, con `**` |
 
-> **Esto no es opcional.** La app pide volver a `http://localhost:5173/home`, pero Supabase solo respeta esa petición si la URL está en la lista; si no, **te manda al Site URL**, que de fábrica es `http://localhost:3000`. El síntoma es un `ERR_CONNECTION_REFUSED` en el puerto 3000 con el token colgando de la barra de direcciones. La verificación en sí habrá funcionado — el token lo demuestra —, solo que el navegador aterriza donde no hay nada escuchando.
+Para el proyecto **dev**:
+
+```
+Site URL:       https://dev-stonksu.vercel.app
+```
+
+```
+Redirect URLs:  http://localhost:5173/**
+                https://dev-stonksu.vercel.app/**
+```
+
+Y para producción, lo mismo con su dominio.
+
+La app siempre pide volver a `<origen actual>/home` — las tres llamadas que redirigen (confirmar correo, vincular Google, iniciar sesión con Google) usan `window.location.origin`. Por eso hay que permitir **cada origen desde el que abras la app**, no solo uno.
+
+> **Los dos síntomas de tener esto mal:**
+>
+> - Un comodín en *Site URL*: no coincide con nada, así que **todo** cae en la reserva y acabas siempre en la misma URL, sea cual sea el sitio desde el que entraste.
+> - La lista de *Redirect URLs* vacía: da igual lo que pida la app, siempre irás al *Site URL*. Si además ese sigue siendo el `http://localhost:3000` de fábrica, verás un `ERR_CONNECTION_REFUSED` con el token colgando de la barra de direcciones.
+>
+> En ambos casos la autenticación **sí ha funcionado** — el token lo demuestra —, es solo que el navegador aterriza donde no hay nada escuchando.
+
+Si usas los despliegues de vista previa de Vercel, cada uno tiene su propio subdominio aleatorio. Añade también su patrón, por ejemplo `https://dev-stonksu-*.vercel.app/**`, o el login fallará justo en las previews.
 
 ## Plantillas de correo
 
