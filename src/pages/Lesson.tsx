@@ -108,6 +108,9 @@ export default function Lesson() {
   const activity = activities[index];
   const progressPct = Math.round((index / activities.length) * 100);
   const badge = ACTIVITY_BADGE[activity.type];
+  /** Coming back from an earlier miss. Flagged so it reads as a second chance
+   *  rather than as new material you're inexplicably seeing twice. */
+  const isRepeat = plan?.replayIds.includes(activity.id) ?? false;
 
   const isQuiz = activity.type === 'quiz';
   const isCorrect = isQuiz && checked && selectedId === activity.question.correctOptionId;
@@ -220,11 +223,18 @@ export default function Lesson() {
             <p className="text-xs font-black text-lime-400 uppercase tracking-wide truncate">
               {plan?.isReview ? `${node.title} · Repaso` : plan?.title ?? node.title}
             </p>
-            {badge && (
-              <span className="flex items-center gap-1 text-[10px] font-black text-carbon-300 bg-carbon-800 px-2 py-0.5 rounded-full uppercase">
-                <Icon name={badge.icon} size={11} />
-                {badge.label}
+            {isRepeat ? (
+              <span className="flex items-center gap-1 text-[10px] font-black text-[#FFC93C] bg-[#FFC93C]/15 border border-[#FFC93C]/30 px-2 py-0.5 rounded-full uppercase whitespace-nowrap">
+                <Icon name="refresh" size={11} />
+                Repetición
               </span>
+            ) : (
+              badge && (
+                <span className="flex items-center gap-1 text-[10px] font-black text-carbon-300 bg-carbon-800 px-2 py-0.5 rounded-full uppercase">
+                  <Icon name={badge.icon} size={11} />
+                  {badge.label}
+                </span>
+              )
             )}
             <StreakPill combo={combo} />
           </div>
@@ -234,6 +244,12 @@ export default function Lesson() {
             </span>
           )}
         </div>
+
+        {isRepeat && (
+          <p className="mb-3 text-sm font-bold text-[#FFC93C]">
+            Esta la fallaste la vez pasada. ¡Inténtalo otra vez!
+          </p>
+        )}
 
         {isQuiz && (
           <>

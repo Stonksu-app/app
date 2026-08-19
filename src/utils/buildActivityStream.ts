@@ -152,6 +152,9 @@ export interface StagePlan {
   title: string;
   isReview: boolean;
   activities: Activity[];
+  /** Ids pulled in from an earlier miss, so the lesson can flag them as repeats
+   *  instead of letting them look like new material. */
+  replayIds: string[];
   /** Only the terms this stage introduces, so the intro stays short too. */
   flashcards: Flashcard[];
 }
@@ -207,6 +210,7 @@ export function buildStage(
       title: 'Repaso',
       isReview: true,
       activities: withReplay(interleave(spread(quizPool, REVIEW_QUIZ), spread(gamePool, REVIEW_GAMES))),
+      replayIds: [...replayIds],
       flashcards: [],
     };
   }
@@ -222,6 +226,7 @@ export function buildStage(
     title,
     isReview: false,
     activities: withReplay(interleave(quizSlice.slice(0, TARGET_QUIZ), gameSlice.slice(0, TARGET_GAMES))),
+    replayIds: [...replayIds],
     flashcards: cardSlice,
   };
 }

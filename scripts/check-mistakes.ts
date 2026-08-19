@@ -49,6 +49,15 @@ check(
   `first was ${withOne.activities[0].id}`
 );
 
+// ------------------------------------------------------- flagged as a repeat
+check(
+  'the replayed item is flagged so the lesson can label it',
+  withOne.replayIds.includes(questions[questions.length - 1].id),
+  withOne.replayIds.join(', ')
+);
+check('nothing else is flagged', withOne.replayIds.length === 1, withOne.replayIds.join(', '));
+check('a clean run flags nothing', clean.replayIds.length === 0, clean.replayIds.join(', '));
+
 // ------------------------------------------------------------- no duplicates
 const ids = idsOf(withOne.activities);
 check('no activity appears twice', new Set(ids).size === ids.length, ids.join(', '));
