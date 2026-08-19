@@ -318,6 +318,20 @@ from auth.identities
 where provider = 'google';
 ```
 
+### Empezar de cero en dev
+
+Cuando las cuentas de prueba se enredan y ninguna tiene progreso que merezca la pena, sale más barato vaciar que operar. **Solo en dev**, obviamente:
+
+```sql
+delete from auth.users;
+```
+
+El `on delete cascade` se lleva perfiles, intentos, amistades y toques. Después, borra el `localStorage` de cada navegador con el que hayas probado (o abre una ventana nueva), porque si no seguirán presentando un token de una cuenta que ya no existe.
+
+Tras eso, el primer registro con Google o con correo se vincula limpiamente a la cuenta anónima con la que empieces.
+
+### Barrido periódico
+
 Borrar anónimas viejas que nunca llegaron a jugar. El `on delete cascade` se lleva por delante su perfil y su historial:
 
 ```sql
