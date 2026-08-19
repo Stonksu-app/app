@@ -108,6 +108,11 @@ function translate(message: string): string {
   if (m.includes('email not confirmed')) return 'Aún no has confirmado ese correo. Mira tu bandeja.';
   if (m.includes('password') && m.includes('should be at least')) return 'La contraseña es demasiado corta.';
   if (m.includes('invalid') && m.includes('email')) return 'Ese correo no parece válido.';
+  // The server refused to send. Naming the likely cause matters here: the raw
+  // message says only "error sending email", and the answer is almost always
+  // in the SMTP settings rather than anything the player did.
+  if (m.includes('error sending') || m.includes('smtp'))
+    return 'No pudimos enviar el correo. Es un problema de configuración nuestro, no tuyo — prueba con Google mientras tanto.';
   if (m.includes('rate limit') || m.includes('too many')) return 'Demasiados intentos. Espera un momento y vuelve a probar.';
   if (m.includes('manual linking')) return 'Falta activar "Manual Linking" en Supabase (ver supabase/README.md).';
   if (m.includes('provider') && m.includes('not enabled')) return 'Ese proveedor aún no está activado en Supabase.';

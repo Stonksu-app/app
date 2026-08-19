@@ -141,7 +141,11 @@ Con [Resend](https://resend.com) (3.000 correos al mes gratis), en **Project Set
 | Contraseña | tu API key de Resend |
 | Sender email | una dirección de tu dominio verificado |
 
-> El remitente es el matiz que hace perder una tarde: mientras no verifiques un dominio en Resend, solo puedes usar `onboarding@resend.dev`, **y solo envía a la dirección con la que te registraste en Resend**. Para probar tú mismo vale; en cuanto quieras que se registre otra persona, necesitas el dominio.
+> **El remitente es lo que falla primero.** Mientras no verifiques un dominio, Resend solo te deja usar `onboarding@resend.dev`, **y solo entrega a la dirección con la que te diste de alta en Resend**. Es un sandbox anti-abuso. Cualquier otro destinatario se rechaza y Supabase lo muestra como `Error sending email change email`, que no dice nada de la causa real.
+>
+> Es decir: si te registraste en Resend con `a@gmail.com` y pruebas la app con `b@gmail.com`, **no llega y el error no te lo explica**. Para probar tú, usa la misma dirección; para que se registre cualquier otra persona, verifica un dominio.
+
+El error real siempre está en **Logs → Auth Logs** del panel de Supabase. El mensaje que ve el usuario es genérico a propósito, así que ahí es donde se mira.
 
 Cualquier otro proveedor sirve igual — Postmark, SendGrid, Amazon SES. Lo que desbloquea las plantillas es dejar de usar el SMTP compartido, no cuál elijas.
 
