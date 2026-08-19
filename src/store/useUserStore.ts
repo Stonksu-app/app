@@ -6,6 +6,7 @@ import { DEFAULT_LOOK } from '../components/Mascot';
 import { SKILL_TREE } from '../data/lessons';
 import { stagesForDifficulty } from '../utils/mastery';
 import { computeStreakUpdate } from '../utils/streak';
+import { DEFAULT_REMINDER_HOUR } from '../lib/notifications';
 
 const MAX_HEARTS = 5;
 const HEART_REGEN_MINUTES = 30;
@@ -40,6 +41,13 @@ interface UserState {
    *  every topic one stage short of platinum, so each can be finished in a
    *  single lesson to check the mastery and chest flows end to end. */
   testMode: boolean;
+  /** Streak reminders. Kept off the cloud on purpose: the notification
+   *  permission that makes them work is granted per device, so a preference
+   *  synced from a phone would read as "on" in a browser that can't deliver
+   *  anything. */
+  reminderEnabled: boolean;
+  /** Hour of the day, 0-23, in local time. */
+  reminderHour: number;
 
   startOnboarding: () => void;
   setOnboardingAnswer: (key: keyof OnboardingAnswers, value: string) => void;
@@ -66,6 +74,7 @@ interface UserState {
   clearMistake: (key: string) => void;
   claimMission: (missionId: string) => void;
   isAccessoryUnlocked: (style: AccessoryStyle) => boolean;
+  setReminder: (patch: { enabled?: boolean; hour?: number }) => void;
   resetProgress: () => void;
 }
 
@@ -108,6 +117,8 @@ export const useUserStore = create<UserState>()(
       claimedMissionIds: [],
       unlockedAccessories: ['ninguno'],
       testMode: false,
+      reminderEnabled: false,
+      reminderHour: DEFAULT_REMINDER_HOUR,
 
       startOnboarding: () => set({ onboarded: false }),
 
@@ -302,6 +313,12 @@ export const useUserStore = create<UserState>()(
 
       isAccessoryUnlocked: (style) => style === 'ninguno' || get().unlockedAccessories.includes(style),
 
+      setReminder: (patch) =>
+        set((s) => ({
+          reminderEnabled: patch.enabled ?? s.reminderEnabled,
+          reminderHour: patch.hour ?? s.reminderHour,
+        })),
+
       resetProgress: () =>
         set({
           name: '',
@@ -326,6 +343,8 @@ export const useUserStore = create<UserState>()(
           claimedMissionIds: [],
           unlockedAccessories: ['ninguno'],
           testMode: false,
+          reminderEnabled: false,
+          reminderHour: DEFAULT_REMINDER_HOUR,
         }),
     }),
     { name: 'stonksu-storage' }

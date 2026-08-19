@@ -7,6 +7,7 @@ import Shop from './pages/Shop';
 import Achievements from './pages/Achievements';
 import AvatarEditor from './pages/AvatarEditor';
 import Missions from './pages/Missions';
+import Friends from './pages/Friends';
 import Onboarding from './pages/Onboarding';
 import Home from './pages/Home';
 import LessonIntro from './pages/LessonIntro';
@@ -14,12 +15,22 @@ import Lesson from './pages/Lesson';
 import LessonResults from './pages/LessonResults';
 import Profile from './pages/Profile';
 import { useUserStore } from './store/useUserStore';
+import { useSyncStore } from './store/useSyncStore';
 import { useCloudSync } from './hooks/useCloudSync';
+import { useStreakReminders } from './hooks/useStreakReminders';
 import RegisterGate from './components/RegisterGate';
+import PingBanner from './components/PingBanner';
 import { useAuthStore } from './store/useAuthStore';
 
 function RequireOnboarded({ children }: { children: React.ReactNode }) {
   const onboarded = useUserStore((s) => s.onboarded);
+  const settled = useSyncStore((s) => s.status !== 'connecting');
+
+  // Nothing is known yet on a device that has never run the app, so deciding
+  // now would bounce a perfectly good account to the landing page a moment
+  // before its profile arrives. The splash is covering this anyway.
+  if (!settled && !onboarded) return null;
+
   if (!onboarded) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
@@ -32,6 +43,7 @@ function App() {
   // configured this is inert and the app stays purely local. The splash is
   // already 10 seconds, which comfortably covers the first pull.
   useCloudSync();
+  useStreakReminders();
 
   // Watches the session so the nag knows whether this account is anonymous.
   const initAuth = useAuthStore((s) => s.init);
@@ -41,6 +53,7 @@ function App() {
     <>
       {booting && <SplashScreen onDone={() => setBooting(false)} />}
       {!booting && <RegisterGate />}
+      {!booting && <PingBanner />}
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/onboarding" element={<Onboarding />} />
@@ -105,6 +118,14 @@ function App() {
         element={
           <RequireOnboarded>
             <AvatarEditor />
+          </RequireOnboarded>
+        }
+      />
+      <Route
+        path="/amigos"
+        element={
+          <RequireOnboarded>
+            <Friends />
           </RequireOnboarded>
         }
       />

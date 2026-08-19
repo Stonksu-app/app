@@ -46,6 +46,14 @@ const ICON_PATHS: Record<IconName, React.ReactNode> = {
       <path d="M16 6.5V21" />
     </>
   ),
+  users: (
+    <>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5" />
+      <path d="M16 5.2a3.2 3.2 0 0 1 0 5.6" />
+      <path d="M18 13.9c2.1.8 3.5 2.8 3.5 5.1" />
+    </>
+  ),
   user: (
     <>
       <circle cx="12" cy="8" r="3.5" />

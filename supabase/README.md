@@ -122,6 +122,7 @@ Ejecútalas en orden desde el **SQL Editor**. Las dos son re-ejecutables.
 | [`0001_init.sql`](migrations/0001_init.sql) | `profiles`, `attempts`, RLS y restricciones |
 | [`0002_account_status.sql`](migrations/0002_account_status.sql) | refleja `email` / `is_anonymous` / `registered_at` desde `auth.users`, más la vista `account_summary` |
 | [`0003_unique_names.sql`](migrations/0003_unique_names.sql) | apodos únicos e insensibles a mayúsculas, más la función `name_available` |
+| [`0004_friends.sql`](migrations/0004_friends.sql) | amistades mutuas, toques, y las funciones para gestionarlas |
 
 `auth.users` no se puede leer desde el cliente, así que sin la 0002 no hay forma de saber por consulta qué cuentas son reales, y el Table Editor te muestra un muro de perfiles sin distinguir personas de sesiones anónimas que morirán con la caché de un navegador.
 
@@ -180,6 +181,26 @@ RLS impide al cliente leer perfiles ajenos, así que tampoco puede comprobar si 
 Si la migración no está aplicada, la llamada falla, la app lo trata como "no se pudo comprobar" y deja continuar. Nunca bloquea a nadie por un fallo de red.
 
 Para la carrera que sí queda abierta —dos confirmaciones simultáneas— el índice rechaza a uno, y el cliente prueba `pollo2`, `pollo3`… hasta encontrar hueco. Se pierde el apodo exacto, pero no la sincronización, que es lo caro.
+
+## Amigos y toques
+
+La amistad es **mutua**: uno la pide por apodo y el otro acepta. No es por gusto — un toque pone una notificación en el móvil de alguien, y eso necesita permiso de las dos partes. Con un modelo de "seguir", un desconocido podría seguirte solo para poder darte toques.
+
+Un par nunca tiene dos filas: si pides amistad a quien ya te la había pedido, se acepta la suya en vez de crear otra.
+
+Toda la escritura pasa por funciones `security definer` y las tablas solo tienen políticas de lectura. Así las reglas sobre quién puede aceptar o pinguear a quién viven en un sitio, en vez de repartidas por políticas que el cliente pueda intentar rodear.
+
+RLS impide leer perfiles ajenos, así que la lista de amigos la monta `friend_list()`, que devuelve **solo** apodo, toro, racha y XP, y **solo** de gente con la que tienes relación.
+
+Los toques están limitados a **uno por amigo y hora**. Un aviso que se puede repetir sin límite deja de ser un aviso y pasa a ser acoso.
+
+## Notificaciones
+
+El recordatorio de racha es una **notificación local**, programada por el propio móvil. No necesita servidor, funciona sin cobertura y —lo que decide el asunto— **no necesita el Apple Developer Program**: una cuenta gratuita no puede llevar el entitlement `aps-environment`, así que un `.ipa` firmado con AltStore no puede recibir push remoto de ninguna forma.
+
+Se programan los próximos 7 días por separado, no una repetición diaria, porque una repetición no puede saltarse un día — te avisaría precisamente los días que sí practicaste. Se reprograman al terminar una lección, al cambiar el ajuste y al abrir la app.
+
+El **toque de un amigo sí es push remoto**, porque lo dispara otra persona. Hasta que haya cuenta de pago, el toque espera en la bandeja y se muestra dentro de la app al abrirla. En Android, cuando exista el proyecto, Firebase lo permite gratis.
 
 ## Cuentas duplicadas
 

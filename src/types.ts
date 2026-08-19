@@ -2,6 +2,7 @@ export type IconName =
   | 'bull'
   | 'map'
   | 'user'
+  | 'users'
   | 'flame'
   | 'star'
   | 'heart'

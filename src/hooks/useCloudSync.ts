@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { isCloudEnabled } from '../lib/supabase';
 import { ensureSession, hasProgress, pullState, pushState, type CloudState } from '../lib/cloud';
 import { suffixName } from '../lib/names';
 import { useUserStore } from '../store/useUserStore';
+import { useSyncStore } from '../store/useSyncStore';
 
 /**
  * Keeps the local game state and the Supabase profile in step.
@@ -18,8 +19,6 @@ import { useUserStore } from '../store/useUserStore';
  * this is; proper merging would need per-field timestamps and isn't worth it
  * until people actually play on a phone and a laptop in the same minute.
  */
-
-export type SyncStatus = 'off' | 'connecting' | 'ready' | 'error';
 
 const DEBOUNCE_MS = 2000;
 
@@ -51,8 +50,8 @@ function snapshot(): CloudState {
   };
 }
 
-export function useCloudSync(): SyncStatus {
-  const [status, setStatus] = useState<SyncStatus>(isCloudEnabled ? 'connecting' : 'off');
+export function useCloudSync(): void {
+  const setStatus = useSyncStore((s) => s.setStatus);
   // Set while a pull is being written into the store, so the subscription it
   // triggers doesn't immediately push the same data straight back up.
   const applying = useRef(false);
@@ -156,5 +155,4 @@ export function useCloudSync(): SyncStatus {
     };
   }, []);
 
-  return status;
 }

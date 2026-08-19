@@ -96,7 +96,7 @@ const persistedKeys = Object.keys(storeState).filter(
 );
 const cloudKeys = new Set(Object.keys(sample));
 /** Local-only by design: a debugging switch, not progress. */
-const LOCAL_ONLY = new Set(['testMode']);
+const LOCAL_ONLY = new Set(['testMode', 'reminderEnabled', 'reminderHour']);
 
 for (const key of persistedKeys) {
   if (LOCAL_ONLY.has(key)) {

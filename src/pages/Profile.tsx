@@ -5,6 +5,7 @@ import BottomNav from '../components/BottomNav';
 import Mascot from '../components/Mascot';
 import Icon from '../components/Icon';
 import AchievementRow from '../components/AchievementRow';
+import ReminderSetting from '../components/ReminderSetting';
 import { byRelevance, computeAchievements } from '../data/achievements';
 import { getLessonById } from '../data/lessons';
 import { useUserStore, xpToLevel } from '../store/useUserStore';
@@ -163,6 +164,8 @@ export default function Profile() {
               })}
             </div>
           )}
+
+          <ReminderSetting />
 
           <button
             onClick={() => {
