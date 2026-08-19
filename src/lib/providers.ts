@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { AppleMark, DiscordMark, FacebookMark, GoogleMark, TwitchMark } from '../components/ProviderMarks';
+import { AppleMark, GoogleMark } from '../components/ProviderMarks';
 
 /**
  * The external accounts you can sign in with.
@@ -14,7 +14,7 @@ import { AppleMark, DiscordMark, FacebookMark, GoogleMark, TwitchMark } from '..
  * "provider is not enabled", which is a worse experience than not offering it.
  */
 
-export type ProviderId = 'google' | 'apple' | 'discord' | 'facebook' | 'twitch';
+export type ProviderId = 'google' | 'apple';
 
 export interface Provider {
   id: ProviderId;
@@ -39,36 +39,6 @@ export const PROVIDERS: Provider[] = [
     background: '#ffffff',
     lip: '#b8b8b8',
     text: '#171717',
-  },
-  {
-    id: 'discord',
-    label: 'Discord',
-    enabled: false,
-    Mark: DiscordMark,
-    background: '#5865F2',
-    lip: '#3c47c4',
-    text: '#ffffff',
-    note: 'Discord Developer Portal → New Application → OAuth2. Sin revisión, gratis, y es donde vive la gente que opera.',
-  },
-  {
-    id: 'twitch',
-    label: 'Twitch',
-    enabled: false,
-    Mark: TwitchMark,
-    background: '#9146FF',
-    lip: '#6f31cc',
-    text: '#ffffff',
-    note: 'dev.twitch.tv → Register Your Application. Gratis y sin revisión.',
-  },
-  {
-    id: 'facebook',
-    label: 'Facebook',
-    enabled: false,
-    Mark: FacebookMark,
-    background: '#1877F2',
-    lip: '#1259ba',
-    text: '#ffffff',
-    note: 'Meta for Developers. Pide revisión de la app antes de salir de modo desarrollo.',
   },
   {
     id: 'apple',

@@ -147,6 +147,40 @@ Con [Resend](https://resend.com) (3.000 correos al mes gratis), en **Project Set
 
 El error real siempre está en **Logs → Auth Logs** del panel de Supabase. El mensaje que ve el usuario es genérico a propósito, así que ahí es donde se mira.
 
+### Enviar a cualquier dirección (verificar dominio en Resend)
+
+Mientras el remitente sea `onboarding@resend.dev`, Resend solo entrega a la dirección con la que te diste de alta. **Para escribir a cualquiera hace falta un dominio propio.** No hay atajo: es el requisito, no una recomendación.
+
+**1. Ten un dominio.** Si aún no tienes ninguno, cómpralo donde prefieras — Vercel lo vende y gestiona el DNS en el mismo panel, que ahorra un salto.
+
+**2. Resend → Domains → Add Domain.** Pon un **subdominio**, no el dominio raíz:
+
+```
+send.tudominio.com
+```
+
+Resend lo [recomienda](https://resend.com/docs/dashboard/domains/introduction) para aislar la reputación de envío: si algún día algo sale mal con los correos, no arrastra al dominio principal ni a tu correo personal.
+
+**3. Copia los registros DNS que te da.** Resend genera los valores exactos; tú solo los pegas donde tengas el DNS:
+
+| Tipo | Para qué |
+| --- | --- |
+| **MX** en el subdominio | Recibir los rebotes |
+| **TXT** (SPF) en el subdominio | Declarar que Resend puede enviar en tu nombre |
+| **TXT** (DKIM), en `resend._domainkey` | Firmar los correos para que no se puedan falsificar |
+
+**4. Pulsa "Check DNS".** La propagación puede tardar hasta 24 horas; mientras tanto verás avisos de SPF o DKIM que desaparecen solos al resolverse.
+
+**5. Añade DMARC** cuando lo anterior esté verde. Un TXT en `_dmarc.tudominio.com` empezando por `p=none`, que solo pide informes sin bloquear nada. Es opcional para que funcione, pero sin él Gmail te manda a spam con más facilidad.
+
+**6. En Supabase**, cambia el *Sender email address* a una dirección de ese dominio:
+
+```
+hola@send.tudominio.com
+```
+
+A partir de ahí puedes escribir a cualquier correo, y las plantillas de [`templates/`](templates/) son editables. Si habías desactivado *Confirm email* para salir del paso, vuelve a activarlo.
+
 ### Entrar con correo sin haber resuelto el envío
 
 Si lo que quieres es que el registro con correo y contraseña funcione **ya**, y el envío te está bloqueando: **desactiva la confirmación**.
@@ -184,32 +218,17 @@ https://<tu-proyecto>.supabase.co/auth/v1/callback
 
 Copia el *Client ID* y el *Client secret* en **Authentication → Sign In / Providers → Google**.
 
-### 4. Otros proveedores
+### 4. Añadir otro proveedor más adelante
 
-La app soporta **Google, Discord, Twitch, Facebook y Apple**. Todos funcionan ya en el código; lo que decide cuáles se ven es [`src/lib/providers.ts`](../src/lib/providers.ts):
+Los que se ofrecen viven en [`src/lib/providers.ts`](../src/lib/providers.ts). Ahora mismo solo Google, más Apple apagado.
 
-```ts
-{ id: 'discord', label: 'Discord', enabled: false, … }
-```
+`enabled` describe lo que está configurado en Supabase, no lo que el código sabe hacer: un botón para un proveedor sin dar de alta falla con "provider is not enabled", que es peor que no ofrecerlo.
 
-Pon `enabled: true` **solo después** de activarlo en Supabase. Un botón para un proveedor sin configurar falla con "provider is not enabled", que es peor que no ofrecerlo.
-
-El procedimiento es el mismo para todos: creas una aplicación OAuth en el proveedor, pones el `callback` de Supabase como URI de redirección, y pegas el Client ID y el Secret en **Authentication → Sign In / Providers**.
+Para sumar uno nuevo —Discord, Twitch, LinkedIn, lo que sea de [los que soporta Supabase](https://supabase.com/docs/guides/auth/social-login)— hacen falta tres cosas: su logotipo en `ProviderMarks.tsx`, una entrada en ese array, y la app OAuth creada en el proveedor con este callback:
 
 ```
 https://<tu-proyecto>.supabase.co/auth/v1/callback
 ```
-
-| Proveedor | Dónde se crea la app | Fricción |
-| --- | --- | --- |
-| **Discord** | [Developer Portal](https://discord.com/developers/applications) → New Application → OAuth2 | Ninguna. Gratis, sin revisión, cinco minutos |
-| **Twitch** | [dev.twitch.tv](https://dev.twitch.tv/console/apps) → Register Your Application | Ninguna. Gratis, sin revisión |
-| **Facebook** | [Meta for Developers](https://developers.facebook.com) | Pide revisión de la app antes de salir de modo desarrollo |
-| **Apple** | Services ID + clave | 99 €/año del Developer Program |
-
-> Si tuviera que elegir el siguiente, **Discord**: no cuesta nada, no hay revisión, y es donde está la gente que ya sigue mercados. Twitch es igual de barato y el público se solapa.
-
-Añadir uno que no esté en la lista —LinkedIn, Spotify, GitHub…— es una entrada más en ese array y su logotipo en `ProviderMarks.tsx`. Supabase soporta bastantes más.
 
 ### 5. Apple
 
