@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { MAX_HEARTS, useUserStore, xpToLevel } from '../store/useUserStore';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import Icon from './Icon';
@@ -6,7 +7,7 @@ import Icon from './Icon';
  * (which taps them open) and the desktop rail (which reveals them on hover),
  * so the two can't drift apart. */
 
-export type StatKey = 'streak' | 'xp' | 'hearts';
+export type StatKey = 'streak' | 'xp' | 'coins' | 'hearts';
 
 const DAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const MONTHS = [
@@ -114,7 +115,7 @@ function MonthGrid({ activeDays }: { activeDays: Set<string> }) {
 }
 
 export default function StatPanel({ stat, compact = false }: { stat: StatKey; compact?: boolean }) {
-  const { streak, xp } = useUserStore();
+  const { streak, xp, coins } = useUserStore();
   const { hearts, msUntilNextHeart } = useHeartRegen();
   const activeDays = useActiveDays();
   const { level, xpIntoLevel, xpForNext } = xpToLevel(xp);
@@ -129,6 +130,23 @@ export default function StatPanel({ stat, compact = false }: { stat: StatKey; co
           {streak === 0 ? 'Haz una lección hoy y empieza tu racha.' : 'No la sueltes.'}
         </p>
         {compact ? <WeekStrip activeDays={activeDays} /> : <MonthGrid activeDays={activeDays} />}
+      </>
+    );
+  }
+
+  if (stat === 'coins') {
+    return (
+      <>
+        <p className="text-xl font-black text-carbon-50">Monedas</p>
+        <p className="text-sm text-carbon-400 mt-0.5">
+          Tienes {coins} {coins === 1 ? 'moneda' : 'monedas'}
+        </p>
+        <Link
+          to="/tienda"
+          className="inline-block mt-3 text-[13px] font-black uppercase tracking-[0.8px] text-lime-400 hover:text-lime-300"
+        >
+          Ir a la tienda
+        </Link>
       </>
     );
   }

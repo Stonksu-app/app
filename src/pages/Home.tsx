@@ -35,7 +35,7 @@ function StatRail({
   msUntilNextHeart: number | null;
   active: { node: SkillNode; stage: number; maxStage: number } | null;
 }) {
-  const { streak, xp } = useUserStore();
+  const { streak, xp, coins } = useUserStore();
   const { level } = xpToLevel(xp);
   const [hovered, setHovered] = useState<StatKey | null>(null);
   // Measured rather than derived from the index: the counters are laid out with
@@ -46,6 +46,7 @@ function StatRail({
   const STATS: { key: StatKey; icon: IconName; value: number; dim?: boolean }[] = [
     { key: 'streak', icon: 'flame', value: streak, dim: streak === 0 },
     { key: 'xp', icon: 'star', value: xp },
+    { key: 'coins', icon: 'coins', value: coins },
     { key: 'hearts', icon: 'heart', value: hearts },
   ];
 

@@ -52,15 +52,7 @@ export default function TopBar() {
             streak
           )}
           {stat('xp', <Icon name="star" size={20} className="text-lime-500" />, xp)}
-          {/* Coins go straight to the shop rather than opening a panel — there's
-              nothing to explain about them that the shop doesn't say better. */}
-          <Link
-            to="/tienda"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-carbon-50 hover:bg-carbon-850 transition"
-          >
-            <Icon name="coins" size={20} className="text-lime-500" />
-            {coins}
-          </Link>
+          {stat('coins', <Icon name="coins" size={20} className="text-lime-500" />, coins)}
           {stat('hearts', <Icon name="heart" size={20} className="text-lime-500" />, hearts)}
         </div>
       </div>
