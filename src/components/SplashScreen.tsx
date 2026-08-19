@@ -31,14 +31,18 @@ const TICKERS = [
   { dir: 'short', side: 'right', offset: 5, delay: 2.0, duration: 3.3 },
 ] as const;
 
+/** Total lifetime of the splash. The progress bar reads from this too, so the
+ * two can't drift apart. FADE_MS is how long the cross-fade out takes. */
+const SPLASH_MS = 10000;
+const FADE_MS = 400;
+
 export default function SplashScreen({ onDone }: { onDone: () => void }) {
   const [leaving, setLeaving] = useState(false);
   const tip = useMemo(() => shuffle([...TIPS])[0], []);
 
   useEffect(() => {
-    // Hold long enough to read the tip, then fade out before unmounting.
-    const fade = setTimeout(() => setLeaving(true), 2100);
-    const done = setTimeout(onDone, 2500);
+    const fade = setTimeout(() => setLeaving(true), SPLASH_MS - FADE_MS);
+    const done = setTimeout(onDone, SPLASH_MS);
     return () => {
       clearTimeout(fade);
       clearTimeout(done);
@@ -83,7 +87,10 @@ export default function SplashScreen({ onDone }: { onDone: () => void }) {
         <p className="mt-1 text-sm font-bold text-lime-400 animate-pulse-soft">Preparando el mercado…</p>
 
         <div className="mt-6 h-1.5 w-44 rounded-full bg-carbon-800 overflow-hidden">
-          <div className="h-full rounded-full bg-lime-500 animate-splash-progress" />
+          <div
+            className="h-full rounded-full bg-lime-500 animate-splash-progress"
+            style={{ animationDuration: `${SPLASH_MS - FADE_MS}ms` }}
+          />
         </div>
       </div>
 
