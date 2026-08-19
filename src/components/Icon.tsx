@@ -271,4 +271,12 @@ const ICON_PATHS: Record<IconName, React.ReactNode> = {
       <path d="M14 7.5 16.5 10" />
     </>
   ),
+  chest: (
+    <>
+      <path d="M3 10.5a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5v1H3v-1Z" />
+      <rect x="3" y="11.5" width="18" height="7.5" rx="1.5" />
+      <path d="M10 11.5h4v3h-4z" />
+      <path d="M12 8.5v3" />
+    </>
+  ),
 };

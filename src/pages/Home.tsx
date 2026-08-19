@@ -17,6 +17,13 @@ import type { IconName, SkillNode } from '../types';
 const SWAY = [0, -44, -70, -44, 0, 44, 70, 44];
 const NODE_PITCH = 116;
 
+/** A chest sits after every CHEST_EVERY topics and opens once the topic before
+ *  it is platinum, so it pays out for mastering a subject rather than for
+ *  merely walking past it. One per topic keeps the first reward reachable —
+ *  at two, you'd have to platinum two whole subjects before seeing one. */
+const CHEST_EVERY = 1;
+const CHEST_XP = 100;
+
 const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: '/home', label: 'Aprender', icon: 'map' },
   { to: '/profile', label: 'Perfil', icon: 'user' },
@@ -120,7 +127,12 @@ export default function Home() {
     getNodeMaxStage,
     isNodePlatinum,
   } = useUserStore();
+  // Depend on the raw state slices, not on the store's getter functions: those
+  // keep a stable identity, so a memo keyed on them never recomputes and the
+  // path would keep rendering a chest as unopened after you claimed it.
+  const { openedChestIds, nodeStageProgress, openChest } = useUserStore();
   const [selected, setSelected] = useState<SkillNode | null>(null);
+  const [reward, setReward] = useState<number | null>(null);
   const { hearts, msUntilNextHeart } = useHeartRegen();
 
   const nodes = useMemo(
@@ -132,12 +144,32 @@ export default function Home() {
         const maxStage = getNodeMaxStage(node.id);
         return { node, unlocked, platinum, stage, maxStage, started: stage > 0 };
       }),
-    [isNodeUnlocked, getNodeStage, getNodeMaxStage, isNodePlatinum]
+    // Same reasoning as the chests: key this on the progress record itself so
+    // stage counts refresh, rather than on the stable getter identities.
+    [isNodeUnlocked, getNodeStage, getNodeMaxStage, isNodePlatinum, nodeStageProgress]
   );
 
   /** The furthest node you can actually play — what the banner and the
    *  "empezar" marker point at. */
   const current = nodes.find((n) => n.unlocked && !n.platinum && n.node.lessons.length > 0) ?? null;
+
+  /** Topics and chests woven into a single walkable list, so the sway offset
+   *  applies to both and the chest genuinely sits on the path. */
+  const pathItems = useMemo(() => {
+    type Item =
+      | { kind: 'node'; key: string; data: (typeof nodes)[number] }
+      | { kind: 'chest'; key: string; unlocked: boolean; opened: boolean };
+    const items: Item[] = [];
+    nodes.forEach((n, i) => {
+      items.push({ kind: 'node', key: n.node.id, data: n });
+      const lastOne = i === nodes.length - 1;
+      if (!lastOne && (i + 1) % CHEST_EVERY === 0) {
+        const key = `chest-${n.node.id}`;
+        items.push({ kind: 'chest', key, unlocked: n.platinum, opened: openedChestIds.includes(key) });
+      }
+    });
+    return items;
+  }, [nodes, openedChestIds]);
 
   return (
     <div className="min-h-dvh bg-carbon-900 lg:flex">
@@ -169,16 +201,48 @@ export default function Home() {
             )}
           </div>
 
-          {/* Lesson path */}
-          <div className="relative mt-10 flex flex-col items-center">
-            {nodes.map(({ node, unlocked, platinum, stage, maxStage }, i) => {
+          {/* Lesson path. The top margin has to clear the "empezar" marker,
+              which floats 36px above the first node plus its own height. */}
+          <div className="relative mt-20 flex flex-col items-center">
+            {pathItems.map((item, i) => {
+              const sway = { transform: `translateX(${SWAY[i % SWAY.length]}px)`, marginBottom: NODE_PITCH - 70 };
+
+              if (item.kind === 'chest') {
+                return (
+                  <div key={item.key} className="relative flex flex-col items-center" style={sway}>
+                    <button
+                      disabled={!item.unlocked || item.opened}
+                      onClick={() => {
+                        openChest(item.key, CHEST_XP);
+                        setReward(CHEST_XP);
+                      }}
+                      aria-label={item.opened ? 'Cofre abierto' : 'Abrir cofre'}
+                      style={{
+                        ['--btn-lip' as string]: item.unlocked && !item.opened
+                          ? '#8a6a12'
+                          : 'var(--color-carbon-950)',
+                      }}
+                      className={`btn-3d w-[70px] h-[70px] rounded-2xl flex items-center justify-center ${
+                        item.opened
+                          ? 'bg-carbon-800 text-carbon-600'
+                          : item.unlocked
+                          ? 'bg-[#FFC93C] text-carbon-900 animate-float'
+                          : 'bg-carbon-800 text-carbon-600 cursor-not-allowed'
+                      }`}
+                    >
+                      <Icon name="chest" size={32} strokeWidth={1.9} />
+                    </button>
+                    <span className="mt-2 text-[11px] font-black text-carbon-500">
+                      {item.opened ? 'ABIERTO' : item.unlocked ? `+${CHEST_XP} XP` : 'PLATINA PARA ABRIR'}
+                    </span>
+                  </div>
+                );
+              }
+
+              const { node, unlocked, platinum, stage, maxStage } = item.data;
               const isCurrent = current?.node.id === node.id;
               return (
-                <div
-                  key={node.id}
-                  className="relative flex flex-col items-center"
-                  style={{ transform: `translateX(${SWAY[i % SWAY.length]}px)`, marginBottom: NODE_PITCH - 70 }}
-                >
+                <div key={item.key} className="relative flex flex-col items-center" style={sway}>
                   {isCurrent && (
                     <span className="absolute -top-9 whitespace-nowrap bg-carbon-850 border-2 border-carbon-700 text-lime-400 text-[11px] font-black uppercase tracking-[0.8px] px-3 py-1.5 rounded-xl animate-float">
                       Empezar
@@ -223,6 +287,9 @@ export default function Home() {
               );
             })}
           </div>
+
+          {/* Chests live between topics, so they're rendered by splicing the
+              path above rather than as a separate list. */}
         </div>
       </main>
 
@@ -231,6 +298,24 @@ export default function Home() {
         msUntilNextHeart={msUntilNextHeart}
         active={current ? { node: current.node, stage: current.stage, maxStage: current.maxStage } : null}
       />
+
+      {reward !== null && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          onClick={() => setReward(null)}
+        >
+          <div className="text-center animate-pop-in" onClick={(e) => e.stopPropagation()}>
+            <div className="w-24 h-24 rounded-3xl bg-[#FFC93C] text-carbon-900 flex items-center justify-center mx-auto animate-bounce-in">
+              <Icon name="chest" size={48} strokeWidth={1.8} />
+            </div>
+            <p className="mt-5 text-3xl font-black text-[#FFC93C]">+{reward} XP</p>
+            <p className="mt-1 text-carbon-300 font-bold">¡Cofre reclamado!</p>
+            <div className="mt-6 w-[240px] mx-auto">
+              <Button onClick={() => setReward(null)}>Genial</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selected && (
         <div

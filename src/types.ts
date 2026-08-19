@@ -34,7 +34,8 @@ export type IconName =
   | 'shuffle'
   | 'chevron-up'
   | 'chevron-down'
-  | 'pencil';
+  | 'pencil'
+  | 'chest';
 
 export type QuestionType = 'mcq' | 'true-false' | 'match-pattern';
 

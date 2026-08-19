@@ -23,6 +23,7 @@ interface UserState {
   virtualBalance: number;
   seenIntroNodeIds: string[];
   nodeStageProgress: Record<string, number>;
+  openedChestIds: string[];
 
   startOnboarding: () => void;
   setOnboardingAnswer: (key: keyof OnboardingAnswers, value: string) => void;
@@ -40,6 +41,8 @@ interface UserState {
   getNodeStage: (nodeId: string) => number;
   getNodeMaxStage: (nodeId: string) => number;
   isNodePlatinum: (nodeId: string) => boolean;
+  isChestOpened: (chestId: string) => boolean;
+  openChest: (chestId: string, reward: number) => void;
   resetProgress: () => void;
 }
 
@@ -81,6 +84,7 @@ export const useUserStore = create<UserState>()(
       virtualBalance: 10000,
       seenIntroNodeIds: [],
       nodeStageProgress: {},
+      openedChestIds: [],
 
       startOnboarding: () => set({ onboarded: false }),
 
@@ -183,6 +187,16 @@ export const useUserStore = create<UserState>()(
         return max > 0 && getNodeStage(nodeId) >= max;
       },
 
+      isChestOpened: (chestId) => get().openedChestIds.includes(chestId),
+
+      openChest: (chestId, reward) =>
+        set((s) =>
+          // Guarded so a double tap can't pay out twice.
+          s.openedChestIds.includes(chestId)
+            ? s
+            : { openedChestIds: [...s.openedChestIds, chestId], xp: s.xp + reward }
+        ),
+
       resetProgress: () =>
         set({
           name: '',
@@ -199,6 +213,7 @@ export const useUserStore = create<UserState>()(
           virtualBalance: 10000,
           seenIntroNodeIds: [],
           nodeStageProgress: {},
+          openedChestIds: [],
         }),
     }),
     { name: 'stonksu-storage' }
