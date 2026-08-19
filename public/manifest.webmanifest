@@ -1,0 +1,25 @@
+{
+  "name": "Stonksu — Aprende trading jugando",
+  "short_name": "Stonksu",
+  "description": "Aprende trading e inversión jugando: lecciones cortas, XP y rachas.",
+  "lang": "es",
+  "start_url": "/home",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#171717",
+  "theme_color": "#171717",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

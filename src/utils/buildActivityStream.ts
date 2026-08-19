@@ -1,7 +1,15 @@
-import type { Activity, IntroGame, QuizQuestion } from '../types';
+import type { Activity, Flashcard, IntroGame, QuizQuestion, SkillNode } from '../types';
 import { chunk, shuffle } from './shuffle';
 
 const BATCH_SIZE = 5;
+
+/** How much a single stage serves up. Short on purpose: a topic is covered
+ *  across several stages rather than repeated whole every time. */
+const TARGET_QUIZ = 4;
+const TARGET_GAMES = 3;
+/** The review pulls from everything, so it earns a little more length. */
+const REVIEW_QUIZ = 5;
+const REVIEW_GAMES = 4;
 
 function nonBatchedActivities(game: IntroGame, gameIndex: number): Activity[] {
   if (game.type === 'sequence') {
@@ -105,9 +113,120 @@ function interleave(primary: Activity[], secondary: Activity[]): Activity[] {
   return result;
 }
 
-export function buildActivityStream(baseQuestions: QuizQuestion[], games: IntroGame[] = []): Activity[] {
-  const quizPool: Activity[] = baseQuestions.map((q) => ({ type: 'quiz', id: q.id, question: q }));
-  const gamePool: Activity[] = [...batchedActivities(games), ...games.flatMap((g, i) => nonBatchedActivities(g, i))];
+/** Contiguous, balanced split — contiguous so each group keeps the thematic
+ *  ordering the content was authored in, balanced so no group is left tiny. */
+function splitInto<T>(arr: T[], groups: number): T[][] {
+  if (groups <= 1) return [arr];
+  const out: T[][] = [];
+  const base = Math.floor(arr.length / groups);
+  let extra = arr.length % groups;
+  let at = 0;
+  for (let g = 0; g < groups; g++) {
+    const take = base + (extra > 0 ? 1 : 0);
+    if (extra > 0) extra--;
+    out.push(arr.slice(at, at + take));
+    at += take;
+  }
+  return out;
+}
 
-  return interleave(quizPool, gamePool);
+/** An even spread across the whole array rather than the first n, so a review
+ *  touches every part of the topic instead of only its opening. */
+function spread<T>(arr: T[], n: number): T[] {
+  if (arr.length <= n) return [...arr];
+  const step = arr.length / n;
+  return Array.from({ length: n }, (_, i) => arr[Math.floor(i * step)]);
+}
+
+/** Namespaced by node so two topics can't collide on a shared question id, and
+ *  so a stage only ever replays mistakes it actually knows how to rebuild. */
+export function mistakeKey(nodeId: string, activityId: string): string {
+  return `${nodeId}::${activityId}`;
+}
+
+/** Enough to make the misses sting, few enough that a bad run doesn't turn the
+ *  next lesson into a wall of repeats. */
+const MAX_REPLAY = 5;
+
+export interface StagePlan {
+  title: string;
+  isReview: boolean;
+  activities: Activity[];
+  /** Ids pulled in from an earlier miss, so the lesson can flag them as repeats
+   *  instead of letting them look like new material. */
+  replayIds: string[];
+  /** Only the terms this stage introduces, so the intro stays short too. */
+  flashcards: Flashcard[];
+}
+
+/**
+ * Builds the run for one stage of a topic.
+ *
+ * Stages before the last each teach a different slice of the topic; the last
+ * one reviews the whole thing. Replaying the same full lesson every stage is
+ * what made mastery a grind.
+ *
+ * Anything missed in an earlier run comes back at the very front, before this
+ * stage's own content — that's the point of dropping the in-place retry.
+ *
+ * @param stage 0-based index of the stage about to be played.
+ * @param pendingMistakes keys from the store; ones belonging to other nodes are ignored here.
+ */
+export function buildStage(
+  node: SkillNode,
+  questions: QuizQuestion[],
+  stage: number,
+  maxStage: number,
+  pendingMistakes: string[] = []
+): StagePlan {
+  const games = node.intro?.games ?? [];
+  const cards = node.intro?.flashcards ?? [];
+
+  const quizPool: Activity[] = questions.map((q) => ({ type: 'quiz', id: q.id, question: q }));
+  const gamePool: Activity[] = [
+    ...batchedActivities(games),
+    ...games.flatMap((g, i) => nonBatchedActivities(g, i)),
+  ];
+
+  // Only single-answer activities can be pinned to one specific miss; a pooled
+  // match/classify batch is graded item by item, so it isn't replayable as a unit.
+  const replayable = new Map<string, Activity>();
+  for (const a of quizPool) replayable.set(mistakeKey(node.id, a.id), a);
+  for (const a of gamePool) if (a.type === 'sentence') replayable.set(mistakeKey(node.id, a.id), a);
+
+  const replay = pendingMistakes
+    .map((key) => replayable.get(key))
+    .filter((a): a is Activity => a !== undefined)
+    .slice(0, MAX_REPLAY);
+  const replayIds = new Set(replay.map((a) => a.id));
+  /** Keeps a replayed item from also showing up again inside the stage itself. */
+  const withReplay = (rest: Activity[]) => [...replay, ...rest.filter((a) => !replayIds.has(a.id))];
+
+  const teachingStages = Math.max(1, maxStage - 1);
+  const isReview = stage >= teachingStages;
+
+  if (isReview) {
+    return {
+      title: 'Repaso',
+      isReview: true,
+      activities: withReplay(interleave(spread(quizPool, REVIEW_QUIZ), spread(gamePool, REVIEW_GAMES))),
+      replayIds: [...replayIds],
+      flashcards: [],
+    };
+  }
+
+  const quizSlice = splitInto(quizPool, teachingStages)[stage] ?? [];
+  const gameSlice = splitInto(gamePool, teachingStages)[stage] ?? [];
+  const cardSlice = splitInto(cards, teachingStages)[stage] ?? [];
+
+  const named = cardSlice.slice(0, 2).map((c) => c.term);
+  const title = named.length ? named.join(' y ') : `Parte ${stage + 1}`;
+
+  return {
+    title,
+    isReview: false,
+    activities: withReplay(interleave(quizSlice.slice(0, TARGET_QUIZ), gameSlice.slice(0, TARGET_GAMES))),
+    replayIds: [...replayIds],
+    flashcards: cardSlice,
+  };
 }

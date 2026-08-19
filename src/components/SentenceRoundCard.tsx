@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { SentenceRound } from '../types';
+import { Button, optionLip } from './Button';
 import Icon from './Icon';
 import { shuffle } from '../utils/shuffle';
 
@@ -40,13 +41,11 @@ export default function SentenceRoundCard({
     onResult?.(correct);
   };
 
+  // No retry: the correct word is already highlighted once you've answered, so
+  // a second attempt would only be copying it. Missed rounds come back at the
+  // start of the next lesson instead.
   const handleContinue = () => {
     if (!checked) return;
-    if (!isCorrect) {
-      setChecked(false);
-      setSelectedId(null);
-      return;
-    }
     onDone();
   };
 
@@ -67,7 +66,8 @@ export default function SentenceRoundCard({
               key={opt.id}
               onClick={() => handleSelect(opt.id)}
               disabled={checked}
-              className={`text-left px-4 py-3.5 rounded-2xl border-2 font-bold transition flex items-center gap-3 ${
+              style={{ ['--btn-lip' as string]: optionLip(showCorrect, showIncorrect) }}
+              className={`btn-3d text-left px-4 py-3.5 rounded-2xl border-2 font-bold flex items-center gap-3 ${
                 showCorrect
                   ? 'border-lime-500 bg-lime-500/10 text-lime-300'
                   : showIncorrect
@@ -86,20 +86,15 @@ export default function SentenceRoundCard({
       </div>
 
       {checked && !isCorrect && (
-        <p className="text-center text-danger-400 text-sm font-bold mb-3">No es la palabra correcta, ¡inténtalo de nuevo!</p>
+        <p className="text-center text-danger-400 text-sm font-bold mb-3">
+          No era esa. Te la volveremos a preguntar en la próxima lección.
+        </p>
       )}
 
       {checked && (
-        <button
-          onClick={handleContinue}
-          className={`w-full font-black text-lg py-3.5 rounded-2xl transition active:scale-95 ${
-            isCorrect
-              ? 'bg-lime-500 hover:bg-lime-400 text-carbon-900'
-              : 'bg-danger-500 hover:bg-danger-600 text-white'
-          }`}
-        >
-          {isCorrect ? 'Continuar' : 'Reintentar'}
-        </button>
+        <Button onClick={handleContinue} variant={isCorrect ? 'primary' : 'danger'}>
+          Continuar
+        </Button>
       )}
     </div>
   );

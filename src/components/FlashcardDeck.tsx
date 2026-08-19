@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Flashcard } from '../types';
+import { Button } from './Button';
 import Icon from './Icon';
 
 export default function FlashcardDeck({ cards, onDone }: { cards: Flashcard[]; onDone: () => void }) {
@@ -22,8 +23,10 @@ export default function FlashcardDeck({ cards, onDone }: { cards: Flashcard[]; o
   };
 
   return (
-    <div className="w-full flex flex-col items-center">
-      <div className="flex gap-1.5 mb-5">
+    // Fills whatever height the parent gives it: the card flexes so the button
+    // below is always on screen, instead of a fixed aspect ratio pushing it off.
+    <div className="w-full h-full flex flex-col items-center">
+      <div className="shrink-0 flex gap-1.5 mb-4">
         {cards.map((_, i) => (
           <span
             key={i}
@@ -39,7 +42,7 @@ export default function FlashcardDeck({ cards, onDone }: { cards: Flashcard[]; o
           if (!flipped) setFlipped(true);
         }}
         disabled={flipped}
-        className="w-full max-w-xs aspect-[4/5] [perspective:1000px]"
+        className="flex-1 min-h-0 w-full max-w-xs [perspective:1000px]"
         aria-label={flipped ? 'Definición visible' : 'Voltear para ver la definición'}
       >
         <div
@@ -58,16 +61,13 @@ export default function FlashcardDeck({ cards, onDone }: { cards: Flashcard[]; o
         </div>
       </button>
 
-      <p className="text-xs text-carbon-500 font-bold mt-4">
+      <p className="shrink-0 text-xs text-carbon-500 font-bold mt-3">
         {index + 1} / {cards.length}
       </p>
 
-      <button
-        onClick={handleNext}
-        className="mt-6 w-full max-w-xs bg-lime-500 hover:bg-lime-400 text-carbon-900 font-black text-lg py-3.5 rounded-2xl transition active:scale-95"
-      >
-        {!flipped ? 'Voltear' : isLast ? 'Continuar' : 'Siguiente'}
-      </button>
+      <div className="shrink-0 mt-4 w-full max-w-xs">
+        <Button onClick={handleNext}>{!flipped ? 'Voltear' : isLast ? 'Continuar' : 'Siguiente'}</Button>
+      </div>
     </div>
   );
 }

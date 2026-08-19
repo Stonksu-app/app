@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Button } from '../components/Button';
 import Confetti from '../components/Confetti';
 import Icon from '../components/Icon';
-import Mascot, { randomLine } from '../components/Mascot';
+import Avatar from '../components/Avatar';
+import { randomLine } from '../components/Mascot';
 import { BADGES } from '../data/badges';
 import { useCountUp } from '../hooks/useCountUp';
 
@@ -41,10 +43,11 @@ export default function LessonResults() {
   const justPlatinumed = maxStage > 0 && stage >= maxStage;
 
   return (
-    <div className="min-h-screen bg-carbon-900 flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
+    <div className="screen-safe bg-carbon-900 flex flex-col px-6 text-center relative">
       <Confetti count={perfect ? 90 : 50} />
 
-      <Mascot size={130} mood="hype" />
+      <div className="m-auto py-6 w-full flex flex-col items-center">
+      <Avatar size={130} mood="hype" glow />
       <div className="flex items-center gap-2 mt-4">
         <Icon name={perfect ? 'trophy' : 'sparkles'} size={30} className="text-lime-500" />
         <h1 className="text-3xl sm:text-4xl font-black text-carbon-50">
@@ -112,12 +115,8 @@ export default function LessonResults() {
       </div>
 
       <div className="mt-8 w-full max-w-sm flex flex-col gap-3">
-        <button
-          onClick={() => navigate('/home')}
-          className="w-full bg-lime-500 hover:bg-lime-400 text-carbon-900 font-black text-lg py-4 rounded-2xl transition active:scale-95"
-        >
-          Continuar
-        </button>
+        <Button onClick={() => navigate('/home')}>Continuar</Button>
+      </div>
       </div>
     </div>
   );

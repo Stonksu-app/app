@@ -1,8 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { LessonAttempt, OnboardingAnswers, TradingExperience } from '../types';
+import type { AccessoryStyle, LessonAttempt, MascotLook, OnboardingAnswers, TradingExperience } from '../types';
+import { findMission } from '../data/missions';
+import { DEFAULT_LOOK } from '../components/Mascot';
 import { SKILL_TREE } from '../data/lessons';
 import { stagesForDifficulty } from '../utils/mastery';
+import { computeStreakUpdate } from '../utils/streak';
 
 const MAX_HEARTS = 5;
 const HEART_REGEN_MINUTES = 30;
@@ -23,6 +26,20 @@ interface UserState {
   virtualBalance: number;
   seenIntroNodeIds: string[];
   nodeStageProgress: Record<string, number>;
+  openedChestIds: string[];
+  coins: number;
+  streakProtectors: number;
+  avatar: MascotLook;
+  /** Activities answered wrong, queued to reappear at the start of the next
+   *  lesson. Keys look like "quiz:<id>" or "sentence:<id>". */
+  pendingMistakes: string[];
+  claimedMissionIds: string[];
+  /** Cosmetics earned from missions. Everything not listed stays locked. */
+  unlockedAccessories: AccessoryStyle[];
+  /** Set by onboarding as the name "test". Unlocks the whole tree and seeds
+   *  every topic one stage short of platinum, so each can be finished in a
+   *  single lesson to check the mastery and chest flows end to end. */
+  testMode: boolean;
 
   startOnboarding: () => void;
   setOnboardingAnswer: (key: keyof OnboardingAnswers, value: string) => void;
@@ -40,29 +57,31 @@ interface UserState {
   getNodeStage: (nodeId: string) => number;
   getNodeMaxStage: (nodeId: string) => number;
   isNodePlatinum: (nodeId: string) => boolean;
+  isChestOpened: (chestId: string) => boolean;
+  openChest: (chestId: string) => void;
+  buyHeartRefill: () => boolean;
+  buyStreakProtector: () => boolean;
+  setAvatar: (look: MascotLook) => void;
+  recordMistake: (key: string) => void;
+  clearMistake: (key: string) => void;
+  claimMission: (missionId: string) => void;
+  isAccessoryUnlocked: (style: AccessoryStyle) => boolean;
   resetProgress: () => void;
 }
+
+export const COIN_PRICES = { heartRefill: 350, streakProtector: 200 } as const;
+/** Coins minted per correct answer. */
+export const COINS_PER_CORRECT = 2;
+/** What a chest pays out. Kept here so the amounts the path advertises and the
+ *  amounts actually granted can't drift apart. */
+export const CHEST_REWARD = { xp: 100, coins: 50 } as const;
+/** Owning more than this many protectors at once isn't useful. */
+export const MAX_PROTECTORS = 2;
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function computeStreakUpdate(lastActiveDate: string | null, currentStreak: number): { streak: number; lastActiveDate: string } {
-  const today = todayStr();
-  if (lastActiveDate === today) {
-    return { streak: currentStreak, lastActiveDate: today };
-  }
-  if (!lastActiveDate) {
-    return { streak: 1, lastActiveDate: today };
-  }
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yStr = yesterday.toISOString().slice(0, 10);
-  if (lastActiveDate === yStr) {
-    return { streak: currentStreak + 1, lastActiveDate: today };
-  }
-  return { streak: 1, lastActiveDate: today };
-}
 
 export const useUserStore = create<UserState>()(
   persist(
@@ -81,6 +100,14 @@ export const useUserStore = create<UserState>()(
       virtualBalance: 10000,
       seenIntroNodeIds: [],
       nodeStageProgress: {},
+      openedChestIds: [],
+      coins: 0,
+      streakProtectors: 0,
+      avatar: DEFAULT_LOOK,
+      pendingMistakes: [],
+      claimedMissionIds: [],
+      unlockedAccessories: ['ninguno'],
+      testMode: false,
 
       startOnboarding: () => set({ onboarded: false }),
 
@@ -89,7 +116,21 @@ export const useUserStore = create<UserState>()(
           onboardingAnswers: { ...s.onboardingAnswers, [key]: value as TradingExperience },
         })),
 
-      finishOnboarding: (name) => set({ onboarded: true, name: name || 'Trader' }),
+      finishOnboarding: (name) =>
+        set(() => {
+          const testMode = name.trim().toLowerCase() === 'test';
+          const base = { onboarded: true, name: name || 'Trader', testMode };
+          if (!testMode) return base;
+
+          // Seed each topic one stage short of platinum so a single lesson
+          // tips it over, and hand back a full set of hearts to play with.
+          const nodeStageProgress: Record<string, number> = {};
+          SKILL_TREE.forEach((node) => {
+            const max = stagesForDifficulty(node.difficulty);
+            if (max > 0) nodeStageProgress[node.id] = max - 1;
+          });
+          return { ...base, nodeStageProgress, openedChestIds: [], hearts: MAX_HEARTS };
+        }),
 
       loseHeart: () =>
         set((s) => ({
@@ -118,7 +159,12 @@ export const useUserStore = create<UserState>()(
 
       completeLesson: (attempt) =>
         set((s) => {
-          const { streak, lastActiveDate } = computeStreakUpdate(s.lastActiveDate, s.streak);
+          const { streak, lastActiveDate, protectorsUsed } = computeStreakUpdate(
+            s.lastActiveDate,
+            s.streak,
+            s.streakProtectors,
+            todayStr()
+          );
           const completedLessonIds = s.completedLessonIds.includes(attempt.lessonId)
             ? s.completedLessonIds
             : [...s.completedLessonIds, attempt.lessonId];
@@ -133,6 +179,8 @@ export const useUserStore = create<UserState>()(
 
           return {
             xp: s.xp + attempt.xpEarned,
+            coins: s.coins + attempt.correctCount * COINS_PER_CORRECT,
+            streakProtectors: s.streakProtectors - protectorsUsed,
             attempts: [...s.attempts, attempt],
             completedLessonIds,
             streak,
@@ -142,6 +190,7 @@ export const useUserStore = create<UserState>()(
         }),
 
       isNodeUnlocked: (nodeId) => {
+        if (get().testMode) return true;
         const node = SKILL_TREE.find((n) => n.id === nodeId);
         if (!node) return false;
         if (node.requires.length === 0) return true;
@@ -183,6 +232,76 @@ export const useUserStore = create<UserState>()(
         return max > 0 && getNodeStage(nodeId) >= max;
       },
 
+      isChestOpened: (chestId) => get().openedChestIds.includes(chestId),
+
+      openChest: (chestId) =>
+        set((s) =>
+          // Guarded so a double tap can't pay out twice.
+          s.openedChestIds.includes(chestId)
+            ? s
+            : {
+                openedChestIds: [...s.openedChestIds, chestId],
+                xp: s.xp + CHEST_REWARD.xp,
+                coins: s.coins + CHEST_REWARD.coins,
+              }
+        ),
+
+      buyHeartRefill: () => {
+        const s = get();
+        if (s.hearts >= MAX_HEARTS || s.coins < COIN_PRICES.heartRefill) return false;
+        set({ coins: s.coins - COIN_PRICES.heartRefill, hearts: MAX_HEARTS, lastHeartLostAt: null });
+        return true;
+      },
+
+      buyStreakProtector: () => {
+        const s = get();
+        if (s.streakProtectors >= MAX_PROTECTORS || s.coins < COIN_PRICES.streakProtector) return false;
+        set({ coins: s.coins - COIN_PRICES.streakProtector, streakProtectors: s.streakProtectors + 1 });
+        return true;
+      },
+
+      setAvatar: (avatar) => set({ avatar }),
+
+      // A missed activity is queued once; answering it right anywhere (including
+      // when it comes back) takes it off the queue.
+      recordMistake: (key) =>
+        set((s) => (s.pendingMistakes.includes(key) ? s : { pendingMistakes: [...s.pendingMistakes, key] })),
+
+      clearMistake: (key) =>
+        set((s) =>
+          s.pendingMistakes.includes(key)
+            ? { pendingMistakes: s.pendingMistakes.filter((k) => k !== key) }
+            : s
+        ),
+
+      claimMission: (missionId) =>
+        set((s) => {
+          // Guarded so a double tap can't pay out twice, and re-checked against
+          // the mission's own condition rather than trusting the caller.
+          if (s.claimedMissionIds.includes(missionId)) return s;
+          const mission = findMission(missionId);
+          if (!mission) return s;
+          const done =
+            mission.progress({
+              streak: s.streak,
+              xp: s.xp,
+              attempts: s.attempts,
+              nodeStageProgress: s.nodeStageProgress,
+              openedChestIds: s.openedChestIds,
+            }) >= mission.target;
+          if (!done) return s;
+
+          return {
+            claimedMissionIds: [...s.claimedMissionIds, missionId],
+            coins: s.coins + (mission.reward.coins ?? 0),
+            unlockedAccessories: mission.reward.accessory
+              ? [...new Set([...s.unlockedAccessories, mission.reward.accessory])]
+              : s.unlockedAccessories,
+          };
+        }),
+
+      isAccessoryUnlocked: (style) => style === 'ninguno' || get().unlockedAccessories.includes(style),
+
       resetProgress: () =>
         set({
           name: '',
@@ -199,6 +318,14 @@ export const useUserStore = create<UserState>()(
           virtualBalance: 10000,
           seenIntroNodeIds: [],
           nodeStageProgress: {},
+          openedChestIds: [],
+          coins: 0,
+          streakProtectors: 0,
+          avatar: DEFAULT_LOOK,
+          pendingMistakes: [],
+          claimedMissionIds: [],
+          unlockedAccessories: ['ninguno'],
+          testMode: false,
         }),
     }),
     { name: 'stonksu-storage' }

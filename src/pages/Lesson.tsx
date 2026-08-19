@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { Button, optionLip } from '../components/Button';
 import CandleChart from '../components/CandleChart';
 import ComboCelebration from '../components/ComboCelebration';
 import DirectionBadge from '../components/DirectionBadge';
 import Icon from '../components/Icon';
 import LessonHeader from '../components/LessonHeader';
-import Mascot, { randomLine } from '../components/Mascot';
+import Avatar from '../components/Avatar';
+import { randomLine } from '../components/Mascot';
 import MatchPairsGame from '../components/MatchPairsGame';
 import OutOfHeartsScreen from '../components/OutOfHeartsScreen';
 import ParticleBurst from '../components/ParticleBurst';
@@ -16,7 +18,7 @@ import StreakPill from '../components/StreakPill';
 import { getLessonById, getNodeById } from '../data/lessons';
 import { useComboFeedback } from '../hooks/useComboFeedback';
 import { useUserStore } from '../store/useUserStore';
-import { buildActivityStream } from '../utils/buildActivityStream';
+import { buildStage, mistakeKey } from '../utils/buildActivityStream';
 import type { Activity, IconName } from '../types';
 
 const XP_PER_CORRECT = 10;
@@ -32,8 +34,17 @@ export default function Lesson() {
   useUserStore.getState().tickHeartRegen();
   const { lessonId } = useParams<{ lessonId: string }>();
   const navigate = useNavigate();
-  const { completeLesson, unlockBadge, attempts, streak, isLessonCompleted, getNodeStage, getNodeMaxStage } =
-    useUserStore();
+  const {
+    completeLesson,
+    unlockBadge,
+    attempts,
+    streak,
+    isLessonCompleted,
+    getNodeStage,
+    getNodeMaxStage,
+    recordMistake,
+    clearMistake,
+  } = useUserStore();
   const {
     hearts,
     combo,
@@ -48,10 +59,28 @@ export default function Lesson() {
   } = useComboFeedback();
 
   const data = useMemo(() => (lessonId ? getLessonById(lessonId) : undefined), [lessonId]);
-  const activities = useMemo(
-    () => (data ? buildActivityStream(data.lesson.questions, data.node.intro?.games) : []),
-    [data]
+
+  // The stage you're about to play is the one after what you've cleared, so
+  // each attempt serves different content instead of replaying the whole topic.
+  const [stageAtEntry] = useState(() => (data ? getNodeStage(data.node.id) : 0));
+  // Frozen at entry: misses made during this run belong to the NEXT lesson, and
+  // a live subscription would rebuild the plan mid-run.
+  const [mistakesAtEntry] = useState(() => useUserStore.getState().pendingMistakes);
+  const plan = useMemo(
+    () =>
+      data
+        ? buildStage(
+            data.node,
+            data.lesson.questions,
+            stageAtEntry,
+            getNodeMaxStage(data.node.id),
+            mistakesAtEntry
+          )
+        : null,
+    // getNodeMaxStage is a stable store getter; stageAtEntry is frozen for the run.
+    [data, stageAtEntry, getNodeMaxStage, mistakesAtEntry]
   );
+  const activities = plan?.activities ?? [];
 
   const [index, setIndex] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -62,7 +91,7 @@ export default function Lesson() {
 
   if (!data || activities.length === 0) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-carbon-900 p-6 text-center">
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-carbon-900 p-6 text-center">
         <p className="font-bold text-carbon-50">No encontramos esa lección.</p>
         <button onClick={() => navigate('/home')} className="text-lime-400 font-bold">
           Volver al mapa
@@ -79,6 +108,9 @@ export default function Lesson() {
   const activity = activities[index];
   const progressPct = Math.round((index / activities.length) * 100);
   const badge = ACTIVITY_BADGE[activity.type];
+  /** Coming back from an earlier miss. Flagged so it reads as a second chance
+   *  rather than as new material you're inexplicably seeing twice. */
+  const isRepeat = plan?.replayIds.includes(activity.id) ?? false;
 
   const isQuiz = activity.type === 'quiz';
   const isCorrect = isQuiz && checked && selectedId === activity.question.correctOptionId;
@@ -137,13 +169,26 @@ export default function Lesson() {
     setChecked(false);
   };
 
+  /** Wraps the combo tracker so a missed question also gets queued for the next
+   *  lesson — and so getting it right retires it from that queue. Only quiz and
+   *  fill-in-the-blank rounds are one answer apiece; pooled match/classify
+   *  batches report per item, so there's no single activity to bring back. */
+  const trackResult = (correct: boolean) => {
+    registerResult(correct);
+    if (!data) return;
+    if (activity.type !== 'quiz' && activity.type !== 'sentence') return;
+    const key = mistakeKey(data.node.id, activity.id);
+    if (correct) clearMistake(key);
+    else recordMistake(key);
+  };
+
   const handleSelect = (optionId: string) => {
     if (!isQuiz || checked) return;
     const correct = optionId === activity.question.correctOptionId;
     setSelectedId(optionId);
     setChecked(true);
     setMascotLine(randomLine(correct ? 'correct' : 'incorrect'));
-    registerResult(correct);
+    trackResult(correct);
   };
 
   useEffect(() => {
@@ -155,7 +200,7 @@ export default function Lesson() {
   if (showOutOfHearts) return <OutOfHeartsScreen />;
 
   return (
-    <div className={`min-h-screen bg-carbon-900 flex flex-col relative overflow-hidden ${zoomPulse} ${shakeClass}`}>
+    <div className={`h-dvh bg-carbon-900 flex flex-col relative overflow-hidden ${zoomPulse} ${shakeClass}`}>
       {celebration && <ComboCelebration tier={celebration} />}
 
       {lastResult && (
@@ -169,15 +214,27 @@ export default function Lesson() {
 
       <LessonHeader progressPct={progressPct} hearts={hearts} />
 
-      <div className="flex-1 max-w-xl w-full mx-auto px-4 py-6 flex flex-col relative">
+      {/* min-h-0 lets this flex child actually shrink so it scrolls instead of
+          pushing the footer button off-screen on short phone viewports. */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="max-w-xl w-full mx-auto px-4 py-5 flex flex-col relative">
         <div className="flex items-center justify-between mb-1 gap-2">
-          <div className="flex items-center gap-2">
-            <p className="text-xs font-black text-lime-400 uppercase tracking-wide">{node.title}</p>
-            {badge && (
-              <span className="flex items-center gap-1 text-[10px] font-black text-carbon-300 bg-carbon-800 px-2 py-0.5 rounded-full uppercase">
-                <Icon name={badge.icon} size={11} />
-                {badge.label}
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="text-xs font-black text-lime-400 uppercase tracking-wide truncate">
+              {plan?.isReview ? `${node.title} · Repaso` : plan?.title ?? node.title}
+            </p>
+            {isRepeat ? (
+              <span className="flex items-center gap-1 text-[10px] font-black text-[#FFC93C] bg-[#FFC93C]/15 border border-[#FFC93C]/30 px-2 py-0.5 rounded-full uppercase whitespace-nowrap">
+                <Icon name="refresh" size={11} />
+                Repetición
               </span>
+            ) : (
+              badge && (
+                <span className="flex items-center gap-1 text-[10px] font-black text-carbon-300 bg-carbon-800 px-2 py-0.5 rounded-full uppercase">
+                  <Icon name={badge.icon} size={11} />
+                  {badge.label}
+                </span>
+              )
             )}
             <StreakPill combo={combo} />
           </div>
@@ -187,6 +244,12 @@ export default function Lesson() {
             </span>
           )}
         </div>
+
+        {isRepeat && (
+          <p className="mb-3 text-sm font-bold text-[#FFC93C]">
+            Esta la fallaste la vez pasada. ¡Inténtalo otra vez!
+          </p>
+        )}
 
         {isQuiz && (
           <>
@@ -209,7 +272,8 @@ export default function Lesson() {
                     key={opt.id}
                     onClick={() => handleSelect(opt.id)}
                     disabled={checked}
-                    className={`text-left px-4 py-3.5 rounded-2xl border-2 font-bold transition flex items-center gap-3 ${
+                    style={{ ['--btn-lip' as string]: optionLip(showCorrect, showIncorrect) }}
+                    className={`btn-3d text-left px-4 py-3.5 rounded-2xl border-2 font-bold flex items-center gap-3 ${
                       showCorrect
                         ? 'border-lime-500 bg-lime-500/10 text-lime-300'
                         : showIncorrect
@@ -234,7 +298,7 @@ export default function Lesson() {
             <MatchPairsGame
               pairs={activity.pairs}
               instructions={activity.instructions}
-              onResult={registerResult}
+              onResult={trackResult}
               onDone={advance}
             />
           </div>
@@ -247,7 +311,7 @@ export default function Lesson() {
               instructions={activity.instructions}
               bucketALabel={activity.bucketALabel}
               bucketBLabel={activity.bucketBLabel}
-              onResult={registerResult}
+              onResult={trackResult}
               onDone={advance}
             />
           </div>
@@ -258,7 +322,7 @@ export default function Lesson() {
             <SequenceGame
               steps={activity.steps}
               instructions={activity.instructions}
-              onResult={registerResult}
+              onResult={trackResult}
               onDone={advance}
             />
           </div>
@@ -269,16 +333,17 @@ export default function Lesson() {
             <SentenceRoundCard
               round={activity.round}
               instructions={activity.instructions}
-              onResult={registerResult}
+              onResult={trackResult}
               onDone={advance}
             />
           </div>
         )}
+        </div>
       </div>
 
       {isQuiz && checked && (
         <div
-          className={`w-full border-t-2 transition-colors ${
+          className={`shrink-0 w-full border-t-2 transition-colors pb-safe ${
             isCorrect ? 'bg-lime-500/5 border-lime-500/20' : 'bg-danger-950 border-danger-500/20'
           }`}
         >
@@ -286,7 +351,7 @@ export default function Lesson() {
             <div className="flex items-center gap-3 mb-3 animate-pop-in">
               <div className="relative shrink-0 flex items-center justify-center">
                 <DirectionBadge direction={isCorrect ? 'long' : 'short'} />
-                <Mascot size={44} mood={isCorrect ? 'hype' : 'sad'} className={isWrong ? 'animate-shake' : ''} />
+                <Avatar size={44} mood={isCorrect ? 'hype' : 'sad'} className={isWrong ? 'animate-shake' : ''} />
                 <ParticleBurst show={isCorrect} />
               </div>
               <div>
@@ -297,16 +362,13 @@ export default function Lesson() {
                 <p className="text-sm text-carbon-400">{activity.question.explanation}</p>
               </div>
             </div>
-            <button
+            <Button
               onClick={advance}
-              className={`w-full font-black text-lg py-4 rounded-2xl transition active:scale-95 ${
-                isCorrect
-                  ? 'bg-lime-500 hover:bg-lime-400 text-carbon-900 animate-pulse-ring'
-                  : 'bg-danger-500 hover:bg-danger-600 text-white'
-              }`}
+              variant={isCorrect ? 'primary' : 'danger'}
+              className={isCorrect ? 'animate-pulse-ring' : ''}
             >
               Continuar
-            </button>
+            </Button>
           </div>
         </div>
       )}

@@ -1,5 +1,12 @@
+import { useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import SplashScreen from './components/SplashScreen';
 import Landing from './pages/Landing';
+import Guide from './pages/Guide';
+import Shop from './pages/Shop';
+import Achievements from './pages/Achievements';
+import AvatarEditor from './pages/AvatarEditor';
+import Missions from './pages/Missions';
 import Onboarding from './pages/Onboarding';
 import Home from './pages/Home';
 import LessonIntro from './pages/LessonIntro';
@@ -15,7 +22,13 @@ function RequireOnboarded({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  // App mounts once per launch, so this runs on cold start only — not on
+  // navigation between routes.
+  const [booting, setBooting] = useState(true);
+
   return (
+    <>
+      {booting && <SplashScreen onDone={() => setBooting(false)} />}
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/onboarding" element={<Onboarding />} />
@@ -52,6 +65,46 @@ function App() {
         }
       />
       <Route
+        path="/guia"
+        element={
+          <RequireOnboarded>
+            <Guide />
+          </RequireOnboarded>
+        }
+      />
+      <Route
+        path="/tienda"
+        element={
+          <RequireOnboarded>
+            <Shop />
+          </RequireOnboarded>
+        }
+      />
+      <Route
+        path="/logros"
+        element={
+          <RequireOnboarded>
+            <Achievements />
+          </RequireOnboarded>
+        }
+      />
+      <Route
+        path="/avatar"
+        element={
+          <RequireOnboarded>
+            <AvatarEditor />
+          </RequireOnboarded>
+        }
+      />
+      <Route
+        path="/misiones"
+        element={
+          <RequireOnboarded>
+            <Missions />
+          </RequireOnboarded>
+        }
+      />
+      <Route
         path="/profile"
         element={
           <RequireOnboarded>
@@ -61,6 +114,7 @@ function App() {
       />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 }
 

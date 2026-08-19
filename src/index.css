@@ -38,16 +38,59 @@
 html {
   font-family: var(--font-sans);
   color-scheme: dark;
+  /* Stops iOS from inflating text when the phone is rotated. */
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
   background: var(--color-carbon-900);
   color: var(--color-carbon-50);
+  /* App-like touch behaviour: no grey flash on tap, no rubber-band bounce. */
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* Interactive game/quiz surfaces shouldn't show a text cursor or let a
+   long-press start a text selection — they behave like native controls. */
+button {
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+/* Duolingo's signature chunky button: a solid slab of colour sitting on a
+   darker lip, which the press animation squashes down into. */
+.btn-3d {
+  box-shadow: 0 4px 0 var(--btn-lip);
+  transition: transform 0.06s ease-out, box-shadow 0.06s ease-out, background-color 0.15s;
+}
+.btn-3d:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 var(--btn-lip);
+}
+
+/* Padding helpers for the notch and the home indicator. */
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* A full-height screen that keeps its content clear of the notch and the home
+   indicator. Centre the child with `m-auto` rather than `justify-center` on
+   this element: flex centring clips overflow at BOTH ends and the top of a
+   tall card becomes unreachable, whereas auto margins still allow scrolling. */
+.screen-safe {
+  min-height: 100dvh;
+  overflow-y: auto;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 @keyframes float {
@@ -56,6 +99,60 @@ body {
 }
 .animate-float {
   animation: float 3s ease-in-out infinite;
+}
+
+/* --- Splash screen ------------------------------------------------------ */
+
+/* Idle bob for the mascot, with a slight tilt so it reads as hovering
+   rather than sliding straight up and down. */
+@keyframes splash-bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-10px) rotate(2deg); }
+}
+.animate-splash-bob {
+  animation: splash-bob 1.8s ease-in-out infinite;
+}
+
+/* LONG chips float up and fade; SHORT chips do the reverse. */
+@keyframes tape-up {
+  0% { transform: translateY(78vh) scale(0.85); opacity: 0; }
+  20% { transform: translateY(78vh) scale(1); opacity: 1; }
+  80% { transform: translateY(6vh) scale(1); opacity: 1; }
+  100% { transform: translateY(6vh) scale(0.85); opacity: 0; }
+}
+/* `both` matters: without a fill mode the chip renders with no keyframe styles
+   during its animation-delay, so it sits visible and motionless at the top
+   until its turn comes. `both` holds the 0% frame (off-screen, transparent). */
+.animate-tape-up {
+  animation: tape-up 3.5s linear infinite both;
+}
+
+@keyframes tape-down {
+  0% { transform: translateY(6vh) scale(0.85); opacity: 0; }
+  20% { transform: translateY(6vh) scale(1); opacity: 1; }
+  80% { transform: translateY(78vh) scale(1); opacity: 1; }
+  100% { transform: translateY(78vh) scale(0.85); opacity: 0; }
+}
+.animate-tape-down {
+  animation: tape-down 3.5s linear infinite both;
+}
+
+/* Duolingo pulses its status line instead of counting up a percentage. */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.animate-pulse-soft {
+  animation: pulse-soft 1.3s ease-in-out infinite;
+}
+
+@keyframes splash-progress {
+  0% { width: 8%; }
+  60% { width: 72%; }
+  100% { width: 100%; }
+}
+.animate-splash-progress {
+  animation: splash-progress 2.1s ease-out forwards;
 }
 
 @keyframes pop-in {

@@ -1,14 +1,141 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar';
-import Mascot from '../components/Mascot';
+import NavRail from '../components/NavRail';
+import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
+import { Button } from '../components/Button';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import { SKILL_TREE } from '../data/lessons';
-import { useUserStore } from '../store/useUserStore';
-import type { SkillNode } from '../types';
+import StatPanel, { type StatKey } from '../components/StatPanels';
+import { CHEST_REWARD, useUserStore, xpToLevel } from '../store/useUserStore';
+import type { IconName, SkillNode } from '../types';
 
-const ROW_HEIGHT = 132;
+/* Three-column learn layout, in the shape Duolingo uses: nav rail on the left,
+ * the lesson path down the middle, stat cards on the right. Below lg the rails
+ * drop away and the phone keeps the path plus the existing top bar. */
+
+/** Horizontal offsets, in px, that give the path its serpentine walk. Cycles. */
+const SWAY = [0, -44, -70, -44, 0, 44, 70, 44];
+const NODE_PITCH = 116;
+
+/** A chest sits after every CHEST_EVERY topics and opens once the topic before
+ *  it is platinum, so it pays out for mastering a subject rather than for
+ *  merely walking past it. One per topic keeps the first reward reachable —
+ *  at two, you'd have to platinum two whole subjects before seeing one.
+ *  The payout itself lives in the store as CHEST_REWARD. */
+const CHEST_EVERY = 1;
+
+function StatRail({
+  hearts,
+  msUntilNextHeart,
+  active,
+}: {
+  hearts: number;
+  msUntilNextHeart: number | null;
+  active: { node: SkillNode; stage: number; maxStage: number } | null;
+}) {
+  const { streak, xp, coins } = useUserStore();
+  const { level } = xpToLevel(xp);
+  const [hovered, setHovered] = useState<StatKey | null>(null);
+  // Measured rather than derived from the index: the counters are laid out with
+  // justify-around, so their spacing depends on how wide each number renders.
+  const [arrowX, setArrowX] = useState(0);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  const STATS: { key: StatKey; icon: IconName; value: number; dim?: boolean }[] = [
+    { key: 'streak', icon: 'flame', value: streak, dim: streak === 0 },
+    { key: 'xp', icon: 'star', value: xp },
+    { key: 'coins', icon: 'coins', value: coins },
+    { key: 'hearts', icon: 'heart', value: hearts },
+  ];
+
+  const reveal = (key: StatKey, el: HTMLElement) => {
+    setHovered(key);
+    const row = rowRef.current;
+    if (!row) return;
+    const b = el.getBoundingClientRect();
+    setArrowX(b.left + b.width / 2 - row.getBoundingClientRect().left);
+  };
+
+  return (
+    <aside className="hidden xl:block w-[368px] shrink-0 p-6 space-y-4">
+      {/* Hovering a counter reveals its panel, pointed at by a small arrow —
+          the desktop counterpart to tapping it open on a phone. */}
+      <div className="relative" onMouseLeave={() => setHovered(null)}>
+        <div
+          ref={rowRef}
+          className="flex items-center justify-around bg-carbon-850 border-2 border-carbon-800 rounded-2xl py-3"
+        >
+          {STATS.map((s) => (
+            <button
+              key={s.key}
+              onMouseEnter={(e) => reveal(s.key, e.currentTarget)}
+              onFocus={(e) => reveal(s.key, e.currentTarget)}
+              onBlur={() => setHovered(null)}
+              aria-expanded={hovered === s.key}
+              className={`flex items-center gap-1.5 font-black text-carbon-50 px-3 py-1 rounded-lg transition ${
+                hovered === s.key ? 'bg-carbon-800' : ''
+              }`}
+            >
+              <Icon
+                name={s.icon}
+                size={20}
+                className={
+                  s.dim ? 'text-carbon-600' : s.key === 'streak' ? 'text-lime-500 animate-flame-flicker' : 'text-lime-500'
+                }
+              />
+              {s.value}
+            </button>
+          ))}
+        </div>
+
+        {hovered && (
+          <>
+            {/* Deliberately a sibling of the animated card, not a child: pop-in
+                starts at scale(0.6), which would drag the arrow 64px inward
+                and leave it pointing at the wrong counter mid-animation. */}
+            <span
+              className="absolute top-full z-50 w-3.5 h-3.5 rotate-45 bg-carbon-850 border-l-2 border-t-2 border-carbon-800"
+              style={{ left: arrowX, marginLeft: -7, marginTop: 1 }}
+            />
+            <div className="absolute left-0 right-0 top-full pt-2 z-40 animate-pop-in">
+              <div className="bg-carbon-850 border-2 border-carbon-800 rounded-2xl p-4">
+                <StatPanel stat={hovered} compact />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {active && (
+        <div className="bg-carbon-850 border-2 border-carbon-800 rounded-2xl p-4">
+          <h2 className="text-[19px] font-black text-carbon-50">Tu etapa actual</h2>
+          <p className="text-sm text-carbon-400 mt-0.5">{active.node.title}</p>
+          <div className="flex items-center gap-1 mt-3">
+            {Array.from({ length: active.maxStage }).map((_, i) => (
+              <span key={i} className={`h-2 flex-1 rounded-full ${i < active.stage ? 'bg-lime-500' : 'bg-carbon-700'}`} />
+            ))}
+          </div>
+          <p className="text-xs font-bold text-carbon-400 mt-2">
+            {active.stage}/{active.maxStage} — te faltan {active.maxStage - active.stage} para PLATINO
+          </p>
+        </div>
+      )}
+
+      <div className="bg-carbon-850 border-2 border-carbon-800 rounded-2xl p-4">
+        <h2 className="text-[19px] font-black text-carbon-50">Nivel {level}</h2>
+        <p className="text-sm text-carbon-400 mt-0.5">
+          {hearts > 0
+            ? 'Sigue el camino y no sueltes la racha.'
+            : msUntilNextHeart !== null
+            ? `Próxima vida en ${formatCountdown(msUntilNextHeart)}`
+            : 'Sin vidas por ahora.'}
+        </p>
+      </div>
+    </aside>
+  );
+}
 
 export default function Home() {
   const navigate = useNavigate();
@@ -21,115 +148,225 @@ export default function Home() {
     getNodeMaxStage,
     isNodePlatinum,
   } = useUserStore();
+  // Depend on the raw state slices, not on the store's getter functions: those
+  // keep a stable identity, so a memo keyed on them never recomputes and the
+  // path would keep rendering a chest as unopened after you claimed it.
+  const { openedChestIds, nodeStageProgress, openChest, testMode } = useUserStore();
   const [selected, setSelected] = useState<SkillNode | null>(null);
+  const [reward, setReward] = useState(false);
   const { hearts, msUntilNextHeart } = useHeartRegen();
 
-  const nodesWithStatus = useMemo(
+  const nodes = useMemo(
     () =>
       SKILL_TREE.map((node) => {
         const unlocked = isNodeUnlocked(node.id);
-        const hasLessons = node.lessons.length > 0;
-        const completed = hasLessons && node.lessons.every((l) => isLessonCompleted(l.id));
+        const platinum = isNodePlatinum(node.id);
         const stage = getNodeStage(node.id);
         const maxStage = getNodeMaxStage(node.id);
-        const platinum = isNodePlatinum(node.id);
-        return { node, unlocked, hasLessons, completed, stage, maxStage, platinum };
+        return { node, unlocked, platinum, stage, maxStage, started: stage > 0 };
       }),
-    [isNodeUnlocked, isLessonCompleted, getNodeStage, getNodeMaxStage, isNodePlatinum]
+    // Same reasoning as the chests: key this on the progress record itself so
+    // stage counts refresh, rather than on the stable getter identities.
+    [isNodeUnlocked, getNodeStage, getNodeMaxStage, isNodePlatinum, nodeStageProgress]
   );
 
-  const totalHeight = SKILL_TREE.length * ROW_HEIGHT + 40;
+  /** The furthest node you can actually play — what the banner and the
+   *  "empezar" marker point at. */
+  const current = nodes.find((n) => n.unlocked && !n.platinum && n.node.lessons.length > 0) ?? null;
 
-  const points = nodesWithStatus.map(({ node }) => ({
-    x: node.position.x,
-    y: node.position.y * ROW_HEIGHT + 60,
-  }));
-
-  const pathD = points
-    .map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`))
-    .join(' ');
+  /** Topics and chests woven into a single walkable list, so the sway offset
+   *  applies to both and the chest genuinely sits on the path. */
+  const pathItems = useMemo(() => {
+    type Item =
+      | { kind: 'node'; key: string; data: (typeof nodes)[number] }
+      | { kind: 'chest'; key: string; unlocked: boolean; opened: boolean };
+    const items: Item[] = [];
+    nodes.forEach((n, i) => {
+      items.push({ kind: 'node', key: n.node.id, data: n });
+      const lastOne = i === nodes.length - 1;
+      if (!lastOne && (i + 1) % CHEST_EVERY === 0) {
+        const key = `chest-${n.node.id}`;
+        items.push({
+          kind: 'chest',
+          key,
+          unlocked: n.platinum || testMode,
+          opened: openedChestIds.includes(key),
+        });
+      }
+    });
+    return items;
+  }, [nodes, openedChestIds, testMode]);
 
   return (
-    <div className="min-h-screen bg-carbon-900">
-      <TopBar />
+    <div className="min-h-dvh bg-carbon-900 lg:flex">
+      <NavRail />
 
-      <div className="max-w-2xl mx-auto px-4 pt-6">
-        <div className="bg-carbon-850 rounded-2xl border border-carbon-800 p-4 flex items-center gap-3 mb-6">
-          <Mascot size={56} mood="happy" />
-          <div className="text-left">
-            <p className="font-black text-carbon-50">
-              ¡Qué tal, {name || 'trader'}!
-            </p>
-            <p className="text-sm text-carbon-400">Sigue el mapa y no sueltes tu racha.</p>
-          </div>
-        </div>
+      <div className="lg:hidden">
+        <TopBar />
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 pb-20">
-        <div className="relative" style={{ height: totalHeight }}>
-          <svg
-            className="absolute inset-0 w-full h-full pointer-events-none"
-            viewBox={`0 0 100 ${totalHeight}`}
-            preserveAspectRatio="none"
-          >
-            <path
-              d={pathD}
-              stroke="#333333"
-              strokeWidth={8}
-              strokeLinecap="round"
-              fill="none"
-              strokeDasharray="2 22"
-              vectorEffect="non-scaling-stroke"
-            />
-          </svg>
-
-          {nodesWithStatus.map(({ node, unlocked, completed, stage, maxStage, platinum }) => {
-            const top = node.position.y * ROW_HEIGHT + 60;
-            return (
-              <div
-                key={node.id}
-                className="absolute flex flex-col items-center -translate-x-1/2"
-                style={{ left: `${node.position.x}%`, top }}
+      {/* pb-32 keeps the last node clear of the fixed BottomNav on phones. */}
+      <main className="flex-1 min-w-0 px-4 pb-32 lg:pb-6 lg:py-6">
+        <div className="max-w-[600px] mx-auto">
+          {/* Section banner */}
+          <div className="mt-4 lg:mt-0 bg-lime-500 rounded-2xl px-5 py-4 flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[13px] font-black text-carbon-900/70 uppercase tracking-wide">
+                {current ? `Etapa ${current.stage + 1} de ${current.maxStage}` : 'Todo platinado'}
+              </p>
+              <h1 className="text-xl font-black text-carbon-900 truncate">
+                {current ? current.node.title : `¡Bien hecho, ${name || 'trader'}!`}
+              </h1>
+            </div>
+            {current && (
+              <Link
+                to={`/guia?tema=${current.node.id}`}
+                className="shrink-0 flex items-center gap-1.5 bg-carbon-900/15 hover:bg-carbon-900/25 text-carbon-900 font-black text-[13px] uppercase tracking-wide rounded-xl px-3 py-2.5 transition"
               >
-                <div className="relative">
+                <Icon name="clipboard" size={16} /> Guía
+              </Link>
+            )}
+          </div>
+
+          {/* Lesson path. The top margin has to clear the "empezar" marker,
+              which floats 36px above the first node plus its own height. */}
+          <div className="relative mt-20 flex flex-col items-center">
+            {pathItems.map((item, i) => {
+              const sway = { transform: `translateX(${SWAY[i % SWAY.length]}px)`, marginBottom: NODE_PITCH - 70 };
+
+              if (item.kind === 'chest') {
+                return (
+                  <div key={item.key} className="relative flex flex-col items-center" style={sway}>
+                    <button
+                      disabled={!item.unlocked || item.opened}
+                      onClick={() => {
+                        openChest(item.key);
+                        setReward(true);
+                      }}
+                      aria-label={item.opened ? 'Cofre abierto' : 'Abrir cofre'}
+                      style={{
+                        ['--btn-lip' as string]: item.unlocked && !item.opened
+                          ? '#8a6a12'
+                          : 'var(--color-carbon-950)',
+                      }}
+                      className={`btn-3d w-[70px] h-[70px] rounded-2xl flex items-center justify-center ${
+                        item.opened
+                          ? 'bg-carbon-800 text-carbon-600'
+                          : item.unlocked
+                          ? 'bg-[#FFC93C] text-carbon-900 animate-float'
+                          : 'bg-carbon-800 text-carbon-600 cursor-not-allowed'
+                      }`}
+                    >
+                      <Icon name="chest" size={32} strokeWidth={1.9} />
+                    </button>
+                    <span className="mt-2 text-[11px] font-black text-carbon-500 flex items-center gap-1.5">
+                      {item.opened ? (
+                        'ABIERTO'
+                      ) : item.unlocked ? (
+                        <>
+                          <span className="flex items-center gap-0.5">
+                            <Icon name="star" size={11} className="text-lime-500" />
+                            {CHEST_REWARD.xp}
+                          </span>
+                          <span className="flex items-center gap-0.5">
+                            <Icon name="coins" size={11} className="text-lime-500" />
+                            {CHEST_REWARD.coins}
+                          </span>
+                        </>
+                      ) : (
+                        'PLATINA PARA ABRIR'
+                      )}
+                    </span>
+                  </div>
+                );
+              }
+
+              const { node, unlocked, platinum, stage, maxStage } = item.data;
+              const isCurrent = current?.node.id === node.id;
+              return (
+                <div key={item.key} className="relative flex flex-col items-center" style={sway}>
+                  {isCurrent && (
+                    <span className="absolute -top-9 whitespace-nowrap bg-carbon-850 border-2 border-carbon-700 text-lime-400 text-[11px] font-black uppercase tracking-[0.8px] px-3 py-1.5 rounded-xl animate-float">
+                      Empezar
+                    </span>
+                  )}
+
                   <button
                     disabled={!unlocked}
                     onClick={() => setSelected(node)}
                     aria-label={node.title}
-                    className={`w-20 h-20 rounded-full flex items-center justify-center border-4 shadow-md transition active:scale-95 ${
-                      platinum
-                        ? 'bg-gradient-to-br from-carbon-100 to-carbon-300 border-carbon-50 text-carbon-900'
-                        : completed
-                        ? 'bg-lime-500 border-lime-400 text-carbon-900'
+                    style={{
+                      ['--btn-lip' as string]: platinum
+                        ? 'var(--color-carbon-500)'
                         : unlocked
-                        ? 'bg-carbon-800 border-lime-500 text-lime-500 animate-float'
-                        : 'bg-carbon-850 border-carbon-800 text-carbon-600 cursor-not-allowed'
+                        ? 'var(--color-lime-700)'
+                        : 'var(--color-carbon-950)',
+                    }}
+                    className={`btn-3d w-[70px] h-[70px] rounded-full flex items-center justify-center ${
+                      platinum
+                        ? 'bg-gradient-to-br from-carbon-100 to-carbon-300 text-carbon-900'
+                        : unlocked
+                        ? 'bg-lime-500 text-carbon-900'
+                        : 'bg-carbon-800 text-carbon-600 cursor-not-allowed'
+                    } ${isCurrent ? 'ring-4 ring-lime-500/25' : ''}`}
+                  >
+                    <Icon name={unlocked ? node.icon : 'lock'} size={30} strokeWidth={unlocked ? 1.9 : 2} />
+                  </button>
+
+                  <span
+                    className={`mt-2 text-[13px] font-black text-center w-32 leading-tight ${
+                      unlocked ? 'text-carbon-100' : 'text-carbon-600'
                     }`}
                   >
-                    <Icon name={unlocked ? node.icon : 'lock'} size={30} strokeWidth={unlocked ? 1.8 : 2} />
-                  </button>
+                    {node.title}
+                  </span>
                   {unlocked && maxStage > 0 && (
-                    <span
-                      className={`absolute -bottom-1 -right-1 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-black border-2 border-carbon-900 ${
-                        platinum ? 'bg-carbon-100 text-carbon-900' : 'bg-carbon-800 text-lime-400'
-                      }`}
-                    >
-                      {platinum ? (
-                        <Icon name="diamond" size={10} />
-                      ) : (
-                        `${stage}/${maxStage}`
-                      )}
+                    <span className="text-[11px] font-black text-carbon-500 mt-0.5">
+                      {platinum ? 'PLATINO' : `${stage}/${maxStage}`}
                     </span>
                   )}
                 </div>
-                <span className={`mt-1.5 text-xs font-extrabold text-center w-24 ${unlocked ? 'text-carbon-100' : 'text-carbon-600'}`}>
-                  {node.title}
-                </span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+
+          {/* Chests live between topics, so they're rendered by splicing the
+              path above rather than as a separate list. */}
         </div>
-      </div>
+      </main>
+
+      <BottomNav />
+
+      <StatRail
+        hearts={hearts}
+        msUntilNextHeart={msUntilNextHeart}
+        active={current ? { node: current.node, stage: current.stage, maxStage: current.maxStage } : null}
+      />
+
+      {reward && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          onClick={() => setReward(false)}
+        >
+          <div className="text-center animate-pop-in" onClick={(e) => e.stopPropagation()}>
+            <div className="w-24 h-24 rounded-3xl bg-[#FFC93C] text-carbon-900 flex items-center justify-center mx-auto animate-bounce-in">
+              <Icon name="chest" size={48} strokeWidth={1.8} />
+            </div>
+            <p className="mt-4 text-carbon-100 font-black text-lg">¡Cofre reclamado!</p>
+            <div className="mt-4 flex items-center justify-center gap-4">
+              <span className="flex items-center gap-1.5 text-2xl font-black text-lime-400">
+                <Icon name="star" size={24} /> +{CHEST_REWARD.xp}
+              </span>
+              <span className="flex items-center gap-1.5 text-2xl font-black text-[#FFC93C]">
+                <Icon name="coins" size={24} /> +{CHEST_REWARD.coins}
+              </span>
+            </div>
+            <div className="mt-6 w-[240px] mx-auto">
+              <Button onClick={() => setReward(false)}>Genial</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selected && (
         <div
@@ -137,7 +374,7 @@ export default function Home() {
           onClick={() => setSelected(null)}
         >
           <div
-            className="bg-carbon-850 border border-carbon-800 rounded-3xl max-w-sm w-full p-6 text-center animate-pop-in"
+            className="bg-carbon-850 border-2 border-carbon-800 rounded-3xl max-w-sm w-full p-6 text-center animate-pop-in"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-16 h-16 rounded-full bg-lime-500/10 flex items-center justify-center mx-auto mb-3">
@@ -186,32 +423,30 @@ export default function Home() {
                   )}
                 </div>
               ) : (
-                <button
-                  onClick={() => {
-                    const lessonId = selected.lessons[0].id;
-                    const needsIntro = !!selected.intro && !hasSeenIntro(selected.id);
-                    navigate(needsIntro ? `/lesson/${lessonId}/intro` : `/lesson/${lessonId}`);
-                  }}
-                  className="mt-4 w-full bg-lime-500 hover:bg-lime-400 text-carbon-900 font-black py-3.5 rounded-2xl transition active:scale-95 flex items-center justify-center gap-2"
-                >
-                  {isLessonCompleted(selected.lessons[0].id) ? (
-                    <>
-                      <Icon name="refresh" size={20} /> Repasar lección
-                    </>
-                  ) : (
-                    'Empezar lección'
-                  )}
-                </button>
+                <div className="mt-4">
+                  <Button
+                    onClick={() => {
+                      const lessonId = selected.lessons[0].id;
+                      const needsIntro = !!selected.intro && !hasSeenIntro(selected.id);
+                      navigate(needsIntro ? `/lesson/${lessonId}/intro` : `/lesson/${lessonId}`);
+                    }}
+                  >
+                    {isLessonCompleted(selected.lessons[0].id) ? (
+                      <>
+                        <Icon name="refresh" size={18} /> Repasar lección
+                      </>
+                    ) : (
+                      'Empezar lección'
+                    )}
+                  </Button>
+                </div>
               )
             ) : (
               <p className="mt-6 text-sm font-bold text-carbon-400 bg-carbon-800 rounded-xl py-3">
                 Próximamente — ¡seguimos construyendo este módulo!
               </p>
             )}
-            <button
-              onClick={() => setSelected(null)}
-              className="mt-3 w-full text-carbon-400 font-bold py-2"
-            >
+            <button onClick={() => setSelected(null)} className="mt-3 w-full text-carbon-400 font-bold py-2">
               Cerrar
             </button>
           </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { SortClassifyGame as SortClassifyGameType } from '../types';
+import { Button } from './Button';
 import Icon from './Icon';
 
 export default function SortClassifyGame({
@@ -101,12 +102,9 @@ export default function SortClassifyGame({
       {allDone && (
         <div className="mt-6 flex flex-col items-center gap-3 animate-pop-in">
           <Icon name="check" size={28} className="text-lime-500" />
-          <button
-            onClick={onDone}
-            className="w-full max-w-xs bg-lime-500 hover:bg-lime-400 text-carbon-900 font-black text-lg py-3.5 rounded-2xl transition active:scale-95"
-          >
-            Continuar
-          </button>
+          <div className="w-full max-w-xs">
+            <Button onClick={onDone}>Continuar</Button>
+          </div>
         </div>
       )}
     </div>
