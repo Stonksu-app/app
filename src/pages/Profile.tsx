@@ -1,13 +1,17 @@
+import { Link } from 'react-router-dom';
 import TopBar from '../components/TopBar';
 import NavRail from '../components/NavRail';
 import BottomNav from '../components/BottomNav';
 import Mascot from '../components/Mascot';
-import XpBar from '../components/XpBar';
 import Icon from '../components/Icon';
-import { BADGES } from '../data/badges';
+import AchievementRow from '../components/AchievementRow';
+import { byRelevance, computeAchievements } from '../data/achievements';
 import { getLessonById } from '../data/lessons';
 import { useUserStore, xpToLevel } from '../store/useUserStore';
 import type { IconName } from '../types';
+
+/* Section headings are 24px/700 and stat tiles sit in a 2x2 grid, matching the
+ * measurements taken from the reference profile. */
 
 const EXPERIENCE_LABELS: Record<string, string> = {
   none: 'Principiante total',
@@ -16,14 +20,53 @@ const EXPERIENCE_LABELS: Record<string, string> = {
   experienced: 'Trader experimentado',
 };
 
+function StatTile({
+  icon,
+  iconClass,
+  value,
+  label,
+}: {
+  icon: IconName;
+  iconClass?: string;
+  value: string | number;
+  label: string;
+}) {
+  return (
+    <div className="bg-carbon-850 border-2 border-carbon-800 rounded-2xl px-4 py-3 flex items-center gap-3">
+      <Icon name={icon} size={26} className={`shrink-0 ${iconClass ?? 'text-lime-500'}`} />
+      <div className="min-w-0">
+        <p className="text-xl font-black text-carbon-50 leading-tight tabular-nums">{value}</p>
+        <p className="text-sm text-carbon-400 leading-tight truncate">{label}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function Profile() {
-  const { name, xp, streak, attempts, unlockedBadgeIds, virtualBalance, onboardingAnswers, resetProgress } =
-    useUserStore();
+  const {
+    name,
+    xp,
+    streak,
+    attempts,
+    onboardingAnswers,
+    nodeStageProgress,
+    openedChestIds,
+    resetProgress,
+  } = useUserStore();
   const { level } = xpToLevel(xp);
+
+  const achievements = computeAchievements({ streak, xp, attempts, nodeStageProgress, openedChestIds });
+  const preview = [...achievements].sort(byRelevance).slice(0, 3);
 
   const sortedAttempts = [...attempts].sort(
     (a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()
   );
+
+  // No account, no signup date — the first lesson is the honest starting point.
+  const since = sortedAttempts.length
+    ? new Date(sortedAttempts[sortedAttempts.length - 1].completedAt)
+    : null;
+  const flawless = attempts.filter((a) => a.totalQuestions > 0 && a.correctCount === a.totalQuestions).length;
 
   return (
     <div className="min-h-dvh bg-carbon-900 lg:flex">
@@ -36,120 +79,92 @@ export default function Profile() {
         </div>
 
         <div className="max-w-2xl mx-auto px-4 py-6 pb-32 lg:pb-6">
-        <div className="bg-carbon-850 rounded-3xl border border-carbon-800 p-6 flex flex-col sm:flex-row items-center gap-5">
-          <Mascot size={90} mood="happy" />
-          <div className="text-center sm:text-left flex-1">
-            <h1 className="text-2xl font-black text-carbon-50">{name || 'Trader'}</h1>
+          {/* Identity */}
+          <div className="bg-carbon-850 border-2 border-carbon-800 rounded-3xl p-6 flex flex-col items-center text-center">
+            <Mascot size={110} mood="happy" />
+            <h1 className="mt-3 text-[25px] sm:text-[28px] font-black text-carbon-50">{name || 'Trader'}</h1>
             <p className="text-carbon-400 text-sm font-medium">
               {EXPERIENCE_LABELS[onboardingAnswers.experience ?? ''] ?? 'Explorando el mercado'}
             </p>
-            <div className="mt-3">
-              <XpBar xp={xp} />
-            </div>
+            {since && (
+              <p className="text-carbon-500 text-sm mt-0.5">
+                Empezó en {since.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+              </p>
+            )}
           </div>
-        </div>
 
-        <div className="grid grid-cols-3 gap-3 mt-4">
-          <StatCard icon="star" value={xp} label="XP total" />
-          <StatCard icon="flame" value={streak} label="Racha (días)" iconClassName={streak > 0 ? 'animate-flame-flicker' : ''} />
-          <StatCard icon="medal" value={level} label="Nivel" />
-        </div>
-
-        <div className="mt-4 bg-carbon-850 rounded-2xl border border-carbon-800 p-5 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-black text-carbon-400 uppercase">Saldo virtual del simulador</p>
-            <p className="text-2xl font-black text-lime-400">${virtualBalance.toLocaleString('es-ES')}</p>
+          {/* Statistics */}
+          <h2 className="mt-8 text-2xl font-black text-carbon-50">Estadísticas</h2>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <StatTile
+              icon="flame"
+              iconClass={streak > 0 ? 'text-lime-500 animate-flame-flicker' : 'text-carbon-600'}
+              value={streak}
+              label="Días de racha"
+            />
+            <StatTile icon="star" value={xp} label="XP total" />
+            <StatTile icon="medal" value={level} label="Nivel actual" />
+            <StatTile icon="target" value={flawless} label="Lecciones perfectas" />
           </div>
-          <Icon name="wallet" size={34} className="text-lime-500" />
-        </div>
 
-        <section className="mt-6">
-          <h2 className="font-black text-carbon-100 mb-3">Logros</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {BADGES.map((badge) => {
-              const unlocked = unlockedBadgeIds.includes(badge.id);
-              return (
-                <div
-                  key={badge.id}
-                  className={`rounded-2xl p-4 border text-center ${
-                    unlocked ? 'bg-carbon-850 border-lime-500/40' : 'bg-carbon-850/50 border-carbon-800'
-                  }`}
-                >
-                  <Icon
-                    name={badge.icon}
-                    size={28}
-                    className={`mx-auto mb-1 ${unlocked ? 'text-lime-500' : 'text-carbon-700'}`}
-                  />
-                  <p className={`text-xs font-extrabold leading-tight ${unlocked ? 'text-carbon-100' : 'text-carbon-600'}`}>
-                    {badge.title}
-                  </p>
-                  {!unlocked && <p className="text-[10px] text-carbon-600 mt-1">Bloqueado</p>}
-                </div>
-              );
-            })}
+          {/* Achievements */}
+          <div className="mt-8 flex items-center justify-between gap-3">
+            <h2 className="text-2xl font-black text-carbon-50">Logros</h2>
+            <Link
+              to="/logros"
+              className="text-[15px] font-black uppercase tracking-[0.8px] text-lime-400 hover:text-lime-300"
+            >
+              Ver todos
+            </Link>
           </div>
-        </section>
+          <div className="mt-2 bg-carbon-850 border-2 border-carbon-800 rounded-2xl px-4">
+            {preview.map((a) => (
+              <AchievementRow key={a.id} a={a} />
+            ))}
+          </div>
 
-        <section className="mt-6 mb-10">
-          <h2 className="font-black text-carbon-100 mb-3">Historial de lecciones</h2>
+          {/* History */}
+          <h2 className="mt-8 text-2xl font-black text-carbon-50">Historial</h2>
           {sortedAttempts.length === 0 ? (
-            <p className="text-sm text-carbon-400 bg-carbon-850 rounded-2xl border border-carbon-800 p-5 text-center">
+            <p className="mt-3 text-sm text-carbon-400 bg-carbon-850 border-2 border-carbon-800 rounded-2xl p-5 text-center">
               Aún no completas ninguna lección. ¡Ve al mapa y empieza!
             </p>
           ) : (
-            <div className="flex flex-col gap-2">
-              {sortedAttempts.map((a, i) => {
+            <div className="mt-3 flex flex-col gap-2">
+              {sortedAttempts.slice(0, 8).map((a, i) => {
                 const info = getLessonById(a.lessonId);
                 const date = new Date(a.completedAt);
                 return (
-                  <div key={i} className="bg-carbon-850 rounded-2xl border border-carbon-800 p-4 flex items-center gap-3">
+                  <div
+                    key={i}
+                    className="bg-carbon-850 border-2 border-carbon-800 rounded-2xl p-4 flex items-center gap-3"
+                  >
                     <Icon name={info?.lesson.icon ?? 'book'} size={22} className="text-lime-500 shrink-0" />
-                    <div className="flex-1 text-left">
-                      <p className="font-bold text-carbon-100 text-sm">{info?.lesson.title ?? a.lessonId}</p>
+                    <div className="flex-1 text-left min-w-0">
+                      <p className="font-bold text-carbon-100 text-sm truncate">{info?.lesson.title ?? a.lessonId}</p>
                       <p className="text-xs text-carbon-400">
                         {date.toLocaleDateString('es-ES')} · {a.correctCount}/{a.totalQuestions} correctas
                       </p>
                     </div>
-                    <span className="text-sm font-black text-lime-400">+{a.xpEarned} XP</span>
+                    <span className="text-sm font-black text-lime-400 shrink-0">+{a.xpEarned} XP</span>
                   </div>
                 );
               })}
             </div>
           )}
-        </section>
 
-        <button
-          onClick={() => {
-            if (confirm('¿Reiniciar todo tu progreso? Esta acción no se puede deshacer.')) {
-              resetProgress();
-            }
-          }}
-          className="text-xs text-carbon-500 hover:text-danger-400 font-bold mb-8"
-        >
-          Reiniciar progreso
-        </button>
+          <button
+            onClick={() => {
+              if (confirm('¿Reiniciar todo tu progreso? Esta acción no se puede deshacer.')) {
+                resetProgress();
+              }
+            }}
+            className="mt-8 text-xs text-carbon-500 hover:text-danger-400 font-bold"
+          >
+            Reiniciar progreso
+          </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function StatCard({
-  icon,
-  value,
-  label,
-  iconClassName = '',
-}: {
-  icon: IconName;
-  value: number;
-  label: string;
-  iconClassName?: string;
-}) {
-  return (
-    <div className="bg-carbon-850 rounded-2xl border border-carbon-800 p-4 text-center">
-      <Icon name={icon} size={22} className={`text-lime-500 mx-auto ${iconClassName}`} />
-      <p className="text-xl font-black text-carbon-50 mt-1">{value}</p>
-      <p className="text-[10px] font-bold text-carbon-400 uppercase">{label}</p>
     </div>
   );
 }
