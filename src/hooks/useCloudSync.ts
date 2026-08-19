@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { isCloudEnabled } from '../lib/supabase';
-import { ensureSession, hasProgress, pullState, pushState, type CloudState } from '../lib/cloud';
+import { ensureSession, hasProgress, pullState, pushState, restartSession, type CloudState } from '../lib/cloud';
 import { suffixName } from '../lib/names';
 import { useUserStore } from '../store/useUserStore';
 import { useSyncStore } from '../store/useSyncStore';
@@ -82,7 +82,21 @@ export function useCloudSync(): void {
      * and spin.
      */
     const save = async (id: string) => {
-      if ((await pushState(id, snapshot())) !== 'name-taken') return;
+      const result = await pushState(id, snapshot());
+
+      // The account behind this session is gone. Rather than keep failing
+      // silently — which also leaves a "registered" token telling the rest of
+      // the app not to ask anyone to sign up — take a fresh anonymous one and
+      // put this device's progress on it.
+      if (result === 'no-account') {
+        const fresh = await restartSession();
+        if (!fresh) return;
+        userId.current = fresh;
+        await pushState(fresh, snapshot());
+        return;
+      }
+
+      if (result !== 'name-taken') return;
 
       applying.current = true;
       try {

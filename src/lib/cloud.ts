@@ -152,6 +152,19 @@ export async function ensureSession(): Promise<string | null> {
   return data.user?.id ?? null;
 }
 
+/**
+ * Throws away a session whose account no longer exists, and starts over.
+ *
+ * Returns the new anonymous user id, so play can carry on rather than the app
+ * sitting there pretending to save.
+ */
+export async function restartSession(): Promise<string | null> {
+  if (!supabase) return null;
+  console.warn('[cloud] this session belongs to a deleted account; starting a new one');
+  await supabase.auth.signOut();
+  return ensureSession();
+}
+
 /** Whether the current URL looks like a provider or email callback. */
 function hasAuthCallbackInUrl(): boolean {
   if (typeof window === 'undefined') return false;
@@ -227,19 +240,46 @@ export type PushResult =
   /** The nickname was claimed between the availability check and the save.
    *  Called out separately because it is the one failure the caller can fix. */
   | 'name-taken'
+  /** The session is signed by a user that no longer exists — the row was
+   *  deleted while the token was still valid. Recoverable, but only by
+   *  throwing the session away. */
+  | 'no-account'
   | 'failed';
+
+/**
+ * Turns a Postgres error code into something the caller can act on.
+ *
+ * Both of these would otherwise fail identically forever — every later push
+ * hits the same wall — so progress would stop syncing with nothing on screen
+ * to say so. Pulled out as a pure function so the mapping can be tested
+ * without a server that is willing to break on demand.
+ */
+export function classifyWriteError(code: string | undefined): PushResult {
+  switch (code) {
+    // Unique violation. The only unique constraint on profiles is the nickname
+    // index, so someone claimed the name in the last few seconds.
+    case '23505':
+      return 'name-taken';
+
+    // Foreign key violation. profiles.id references auth.users, so the account
+    // this session belongs to has been deleted — while its JWT stays valid for
+    // the rest of its hour, leaving the app convinced it is signed in.
+    case '23503':
+      return 'no-account';
+
+    default:
+      return 'failed';
+  }
+}
 
 export async function pushState(userId: string, state: CloudState): Promise<PushResult> {
   if (!supabase) return 'failed';
 
   const { error: profileError } = await supabase.from('profiles').upsert(toRow(state, userId));
   if (profileError) {
-    // 23505 is a unique violation, and the only unique constraint on the table
-    // is the nickname index. Left unhandled it would poison every later push
-    // too, so progress would quietly stop syncing over a name clash.
-    if (profileError.code === '23505') return 'name-taken';
-    console.warn('[cloud] could not save profile:', profileError.message);
-    return 'failed';
+    const result = classifyWriteError(profileError.code);
+    if (result === 'failed') console.warn('[cloud] could not save profile:', profileError.message);
+    return result;
   }
 
   if (state.attempts.length) {

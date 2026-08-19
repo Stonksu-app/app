@@ -12,7 +12,7 @@
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { toRow, fromRow, hasProgress, type CloudState, type ProfileRow } from '../src/lib/cloud';
+import { toRow, fromRow, hasProgress, classifyWriteError, type CloudState, type ProfileRow } from '../src/lib/cloud';
 import { useUserStore } from '../src/store/useUserStore';
 
 let failures = 0;
@@ -147,6 +147,14 @@ check('the superseded trigger from 0001 is dropped, not left duplicating work', 
 
 check('the account summary view cannot leak other players', /security_invoker = true/.test(sql));
 check('the migrations never mention the service_role key', !/service_role/.test(sql));
+
+// ------------------------------------------ how a failed write is classified
+// Both of these fail identically on every later attempt too, so getting the
+// mapping wrong means progress stops syncing with nothing on screen saying so.
+check('a unique violation is read as a taken nickname', classifyWriteError('23505') === 'name-taken');
+check('a foreign key violation is read as a deleted account', classifyWriteError('23503') === 'no-account');
+check('anything else is just a failure', classifyWriteError('42501') === 'failed');
+check('a missing code is a failure, not a guess', classifyWriteError(undefined) === 'failed');
 
 // -------------------------------------------- which side wins on first sync
 check('a fresh cloud profile does not count as progress', !hasProgress({ onboarded: false, xp: 0, attempts: [] }));
