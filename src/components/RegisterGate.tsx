@@ -80,7 +80,12 @@ export default function RegisterGate() {
           // lands on the same axis as the path itself. Centred on the raw
           // window it sits 56px right of everything else on a wide screen,
           // which reads as a mistake even though it is technically centred.
-          className="w-full bg-[#FFC93C] text-carbon-950 px-4 lg:pl-[256px] xl:pr-[368px] py-2.5 pt-safe flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[13px] font-black text-center hover:bg-[#ffd45f] transition"
+          // The notch inset has to be added to the padding, not swapped for it:
+          // .pt-safe sets padding-top outright, so on any screen without a
+          // notch it resolves to 0 and the text ends up flush against the top
+          // edge with all ten pixels below it.
+          style={{ paddingTop: 'calc(0.625rem + env(safe-area-inset-top))' }}
+          className="w-full bg-[#FFC93C] text-carbon-950 px-4 lg:pl-[256px] xl:pr-[368px] py-2.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[13px] font-black text-center hover:bg-[#ffd45f] transition"
         >
           <span className="inline-flex items-center gap-2">
             <Icon name="shield" size={16} strokeWidth={2.2} />

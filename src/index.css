@@ -74,7 +74,11 @@ button {
   box-shadow: 0 0 0 var(--btn-lip);
 }
 
-/* Padding helpers for the notch and the home indicator. */
+/* Padding helpers for the notch and the home indicator.
+   These SET the padding rather than adding to it, so they only belong on an
+   element whose padding on that side is theirs alone. Combined with py-* they
+   silently win and zero it out on any screen without an inset — if you need
+   both, write calc(<your padding> + env(safe-area-inset-*)) instead. */
 .pt-safe {
   padding-top: env(safe-area-inset-top);
 }
