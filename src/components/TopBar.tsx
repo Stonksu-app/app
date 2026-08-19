@@ -79,7 +79,7 @@ function StreakCalendar({ activeDays }: { activeDays: Set<string> }) {
 }
 
 export default function TopBar() {
-  const { streak, xp, attempts } = useUserStore();
+  const { streak, xp, attempts, testMode } = useUserStore();
   const { hearts, msUntilNextHeart } = useHeartRegen();
   const [open, setOpen] = useState<Panel | null>(null);
   const { level, xpIntoLevel, xpForNext } = xpToLevel(xp);
@@ -103,8 +103,13 @@ export default function TopBar() {
   return (
     <header className="sticky top-0 z-30 bg-carbon-900/95 backdrop-blur border-b-2 border-carbon-800 pt-safe">
       <div className="max-w-2xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
-        <Link to="/home" className="shrink-0" aria-label="Stonksu">
+        <Link to="/home" className="shrink-0 flex items-center gap-2" aria-label="Stonksu">
           <Mascot size={32} mood="happy" />
+          {testMode && (
+            <span className="text-[10px] font-black uppercase tracking-[0.8px] text-carbon-900 bg-[#FFC93C] rounded-md px-1.5 py-0.5">
+              Test
+            </span>
+          )}
         </Link>
 
         <div className="flex items-center gap-1">

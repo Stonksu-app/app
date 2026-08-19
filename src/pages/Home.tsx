@@ -95,7 +95,7 @@ export default function Home() {
   // Depend on the raw state slices, not on the store's getter functions: those
   // keep a stable identity, so a memo keyed on them never recomputes and the
   // path would keep rendering a chest as unopened after you claimed it.
-  const { openedChestIds, nodeStageProgress, openChest } = useUserStore();
+  const { openedChestIds, nodeStageProgress, openChest, testMode } = useUserStore();
   const [selected, setSelected] = useState<SkillNode | null>(null);
   const [reward, setReward] = useState<number | null>(null);
   const { hearts, msUntilNextHeart } = useHeartRegen();
@@ -130,11 +130,16 @@ export default function Home() {
       const lastOne = i === nodes.length - 1;
       if (!lastOne && (i + 1) % CHEST_EVERY === 0) {
         const key = `chest-${n.node.id}`;
-        items.push({ kind: 'chest', key, unlocked: n.platinum, opened: openedChestIds.includes(key) });
+        items.push({
+          kind: 'chest',
+          key,
+          unlocked: n.platinum || testMode,
+          opened: openedChestIds.includes(key),
+        });
       }
     });
     return items;
-  }, [nodes, openedChestIds]);
+  }, [nodes, openedChestIds, testMode]);
 
   return (
     <div className="min-h-dvh bg-carbon-900 lg:flex">

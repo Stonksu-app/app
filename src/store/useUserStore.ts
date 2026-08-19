@@ -24,6 +24,10 @@ interface UserState {
   seenIntroNodeIds: string[];
   nodeStageProgress: Record<string, number>;
   openedChestIds: string[];
+  /** Set by onboarding as the name "test". Unlocks the whole tree and seeds
+   *  every topic one stage short of platinum, so each can be finished in a
+   *  single lesson to check the mastery and chest flows end to end. */
+  testMode: boolean;
 
   startOnboarding: () => void;
   setOnboardingAnswer: (key: keyof OnboardingAnswers, value: string) => void;
@@ -85,6 +89,7 @@ export const useUserStore = create<UserState>()(
       seenIntroNodeIds: [],
       nodeStageProgress: {},
       openedChestIds: [],
+      testMode: false,
 
       startOnboarding: () => set({ onboarded: false }),
 
@@ -93,7 +98,21 @@ export const useUserStore = create<UserState>()(
           onboardingAnswers: { ...s.onboardingAnswers, [key]: value as TradingExperience },
         })),
 
-      finishOnboarding: (name) => set({ onboarded: true, name: name || 'Trader' }),
+      finishOnboarding: (name) =>
+        set(() => {
+          const testMode = name.trim().toLowerCase() === 'test';
+          const base = { onboarded: true, name: name || 'Trader', testMode };
+          if (!testMode) return base;
+
+          // Seed each topic one stage short of platinum so a single lesson
+          // tips it over, and hand back a full set of hearts to play with.
+          const nodeStageProgress: Record<string, number> = {};
+          SKILL_TREE.forEach((node) => {
+            const max = stagesForDifficulty(node.difficulty);
+            if (max > 0) nodeStageProgress[node.id] = max - 1;
+          });
+          return { ...base, nodeStageProgress, openedChestIds: [], hearts: MAX_HEARTS };
+        }),
 
       loseHeart: () =>
         set((s) => ({
@@ -146,6 +165,7 @@ export const useUserStore = create<UserState>()(
         }),
 
       isNodeUnlocked: (nodeId) => {
+        if (get().testMode) return true;
         const node = SKILL_TREE.find((n) => n.id === nodeId);
         if (!node) return false;
         if (node.requires.length === 0) return true;
@@ -214,6 +234,7 @@ export const useUserStore = create<UserState>()(
           seenIntroNodeIds: [],
           nodeStageProgress: {},
           openedChestIds: [],
+          testMode: false,
         }),
     }),
     { name: 'stonksu-storage' }
