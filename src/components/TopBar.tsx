@@ -20,7 +20,9 @@ export default function TopBar() {
     <button
       onClick={() => toggle(key)}
       aria-expanded={open === key}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-carbon-50 transition ${
+      // Tighter padding below sm: four counters at px-3 overflow a 375px
+      // viewport once the numbers reach three digits.
+      className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl font-black text-carbon-50 tabular-nums transition ${
         open === key ? 'bg-carbon-800' : 'hover:bg-carbon-850'
       }`}
     >
@@ -41,7 +43,7 @@ export default function TopBar() {
           )}
         </Link>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 sm:gap-1 min-w-0">
           {stat(
             'streak',
             <Icon

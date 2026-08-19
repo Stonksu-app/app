@@ -4,6 +4,7 @@ import TopBar from '../components/TopBar';
 import NavRail from '../components/NavRail';
 import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
+import NodeRing from '../components/NodeRing';
 import { Button } from '../components/Button';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import { SKILL_TREE } from '../data/lessons';
@@ -286,35 +287,42 @@ export default function Home() {
               return (
                 <div key={item.key} className="relative flex flex-col items-center" style={sway}>
                   {isCurrent && (
-                    <span className="absolute -top-9 whitespace-nowrap bg-carbon-850 border-2 border-carbon-700 text-lime-400 text-[11px] font-black uppercase tracking-[0.8px] px-3 py-1.5 rounded-xl animate-float">
+                    <span className="absolute -top-12 whitespace-nowrap bg-carbon-850 border-2 border-carbon-700 text-lime-400 text-[11px] font-black uppercase tracking-[0.8px] px-3 py-1.5 rounded-xl animate-float">
                       Empezar
                     </span>
                   )}
 
-                  <button
-                    disabled={!unlocked}
-                    onClick={() => setSelected(node)}
-                    aria-label={node.title}
-                    style={{
-                      ['--btn-lip' as string]: platinum
-                        ? 'var(--color-carbon-500)'
-                        : unlocked
-                        ? 'var(--color-lime-700)'
-                        : 'var(--color-carbon-950)',
-                    }}
-                    className={`btn-3d w-[70px] h-[70px] rounded-full flex items-center justify-center ${
-                      platinum
-                        ? 'bg-gradient-to-br from-carbon-100 to-carbon-300 text-carbon-900'
-                        : unlocked
-                        ? 'bg-lime-500 text-carbon-900'
-                        : 'bg-carbon-800 text-carbon-600 cursor-not-allowed'
-                    } ${isCurrent ? 'ring-4 ring-lime-500/25' : ''}`}
-                  >
-                    <Icon name={unlocked ? node.icon : 'lock'} size={30} strokeWidth={unlocked ? 1.9 : 2} />
-                  </button>
+                  {/* The ring wraps the button only, so it stays centred on the
+                      node instead of on the whole column with its caption. */}
+                  <div className="relative flex items-center justify-center">
+                    {unlocked && !platinum && maxStage > 0 && (
+                      <NodeRing progress={stage / maxStage} />
+                    )}
+                    <button
+                      disabled={!unlocked}
+                      onClick={() => setSelected(node)}
+                      aria-label={node.title}
+                      style={{
+                        ['--btn-lip' as string]: platinum
+                          ? 'var(--color-carbon-500)'
+                          : unlocked
+                          ? 'var(--color-lime-700)'
+                          : 'var(--color-carbon-950)',
+                      }}
+                      className={`btn-3d w-[70px] h-[70px] rounded-full flex items-center justify-center ${
+                        platinum
+                          ? 'bg-gradient-to-br from-carbon-100 to-carbon-300 text-carbon-900'
+                          : unlocked
+                          ? 'bg-lime-500 text-carbon-900'
+                          : 'bg-carbon-800 text-carbon-600 cursor-not-allowed'
+                      }`}
+                    >
+                      <Icon name={unlocked ? node.icon : 'lock'} size={30} strokeWidth={unlocked ? 1.9 : 2} />
+                    </button>
+                  </div>
 
                   <span
-                    className={`mt-2 text-[13px] font-black text-center w-32 leading-tight ${
+                    className={`mt-4 text-[13px] font-black text-center w-32 leading-tight ${
                       unlocked ? 'text-carbon-100' : 'text-carbon-600'
                     }`}
                   >
