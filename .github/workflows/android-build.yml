@@ -50,7 +50,7 @@ jobs:
           cache: npm
 
       # Capacitor 8 needs a JDK for Gradle; 21 is what its template targets.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
@@ -59,6 +59,28 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Names each candidate as present or missing. Repository variables and
+      # secrets are invisible from outside the run, so without this the only
+      # signal is a build that quietly ships with no backend — which is exactly
+      # what happened.
+      - name: Check the Supabase configuration
+        env:
+          SUFFIXED_URL: ${{ vars[format('VITE_SUPABASE_URL_{0}', steps.target.outputs.suffix)] }}
+          SUFFIXED_KEY: ${{ secrets[format('VITE_SUPABASE_ANON_KEY_{0}', steps.target.outputs.suffix)] }}
+          PLAIN_URL: ${{ vars.VITE_SUPABASE_URL }}
+          PLAIN_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUFFIX: ${{ steps.target.outputs.suffix }}
+        run: |
+          say() { [ -n "$2" ] && echo "  presente  $1" || echo "  FALTA     $1"; }
+          echo "Variables de repositorio (Settings > Secrets and variables > Actions):"
+          say "VITE_SUPABASE_URL_$SUFFIX  (variable)" "$SUFFIXED_URL"
+          say "VITE_SUPABASE_ANON_KEY_$SUFFIX  (secret)" "$SUFFIXED_KEY"
+          say "VITE_SUPABASE_URL  (variable, respaldo solo para dev)" "$PLAIN_URL"
+          say "VITE_SUPABASE_ANON_KEY  (secret, respaldo solo para dev)" "$PLAIN_KEY"
+          echo
+          echo "Deben ser de repositorio, no de un Environment: los de Environment"
+          echo "no se ven a menos que el job declare 'environment:', y este no lo hace."
 
       - name: Build web assets
         env:
