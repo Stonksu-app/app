@@ -1,0 +1,27 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+
+  "//": [
+    "Single-page app: the router owns every path, but Vercel serves static",
+    "files, so only / exists on disk. Without this rewrite, opening /home or",
+    "/amigos directly — or just refreshing — returns 404, which is also where",
+    "every auth redirect lands. Vite's dev server does this fallback on its",
+    "own, so the bug only ever shows up once deployed.",
+    "",
+    "Real files win before rewrites are consulted, so /assets/* is unaffected."
+  ],
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+
+  "headers": [
+    {
+      "//": "Vite fingerprints these filenames, so a changed file is a changed URL and this can never serve something stale.",
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "//": "index.html is the one file whose name never changes; caching it would pin people to an old build.",
+      "source": "/index.html",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }]
+    }
+  ]
+}
