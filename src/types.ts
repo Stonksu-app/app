@@ -128,6 +128,18 @@ export interface NodeIntro {
 
 export type NodeDifficulty = 'easy' | 'medium' | 'hard';
 
+export type HornStyle = 'curvos' | 'rectos' | 'cortos';
+export type EyeStyle = 'arco' | 'puntos' | 'decididos';
+
+/** How the player has dressed up their bull. The logo keeps the brand look;
+ *  only the profile avatar follows this. */
+export interface MascotLook {
+  body: string;
+  mask: string;
+  horns: HornStyle;
+  eyes: EyeStyle;
+}
+
 export interface SkillNode {
   id: string;
   title: string;

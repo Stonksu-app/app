@@ -5,6 +5,7 @@ import Landing from './pages/Landing';
 import Guide from './pages/Guide';
 import Shop from './pages/Shop';
 import Achievements from './pages/Achievements';
+import AvatarEditor from './pages/AvatarEditor';
 import Onboarding from './pages/Onboarding';
 import Home from './pages/Home';
 import LessonIntro from './pages/LessonIntro';
@@ -83,6 +84,14 @@ function App() {
         element={
           <RequireOnboarded>
             <Achievements />
+          </RequireOnboarded>
+        }
+      />
+      <Route
+        path="/avatar"
+        element={
+          <RequireOnboarded>
+            <AvatarEditor />
           </RequireOnboarded>
         }
       />

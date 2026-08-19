@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { LessonAttempt, OnboardingAnswers, TradingExperience } from '../types';
+import type { LessonAttempt, MascotLook, OnboardingAnswers, TradingExperience } from '../types';
+import { DEFAULT_LOOK } from '../components/Mascot';
 import { SKILL_TREE } from '../data/lessons';
 import { stagesForDifficulty } from '../utils/mastery';
 import { computeStreakUpdate } from '../utils/streak';
@@ -27,6 +28,7 @@ interface UserState {
   openedChestIds: string[];
   coins: number;
   streakProtectors: number;
+  avatar: MascotLook;
   /** Set by onboarding as the name "test". Unlocks the whole tree and seeds
    *  every topic one stage short of platinum, so each can be finished in a
    *  single lesson to check the mastery and chest flows end to end. */
@@ -52,6 +54,7 @@ interface UserState {
   openChest: (chestId: string) => void;
   buyHeartRefill: () => boolean;
   buyStreakProtector: () => boolean;
+  setAvatar: (look: MascotLook) => void;
   resetProgress: () => void;
 }
 
@@ -89,6 +92,7 @@ export const useUserStore = create<UserState>()(
       openedChestIds: [],
       coins: 0,
       streakProtectors: 0,
+      avatar: DEFAULT_LOOK,
       testMode: false,
 
       startOnboarding: () => set({ onboarded: false }),
@@ -242,6 +246,8 @@ export const useUserStore = create<UserState>()(
         return true;
       },
 
+      setAvatar: (avatar) => set({ avatar }),
+
       resetProgress: () =>
         set({
           name: '',
@@ -261,6 +267,7 @@ export const useUserStore = create<UserState>()(
           openedChestIds: [],
           coins: 0,
           streakProtectors: 0,
+          avatar: DEFAULT_LOOK,
           testMode: false,
         }),
     }),

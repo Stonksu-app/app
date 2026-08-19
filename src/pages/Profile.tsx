@@ -51,6 +51,7 @@ export default function Profile() {
     onboardingAnswers,
     nodeStageProgress,
     openedChestIds,
+    avatar,
     resetProgress,
   } = useUserStore();
   const { level } = xpToLevel(xp);
@@ -80,8 +81,15 @@ export default function Profile() {
 
         <div className="max-w-2xl mx-auto px-4 py-6 pb-32 lg:pb-6">
           {/* Identity */}
-          <div className="bg-carbon-850 border-2 border-carbon-800 rounded-3xl p-6 flex flex-col items-center text-center">
-            <Mascot size={110} mood="happy" />
+          <div className="relative bg-carbon-850 border-2 border-carbon-800 rounded-3xl p-6 flex flex-col items-center text-center">
+            <Link
+              to="/avatar"
+              aria-label="Editar avatar"
+              className="absolute top-4 right-4 w-10 h-10 rounded-full border-2 border-carbon-700 hover:border-lime-500/60 text-carbon-400 hover:text-lime-400 flex items-center justify-center transition"
+            >
+              <Icon name="pencil" size={18} />
+            </Link>
+            <Mascot size={110} mood="happy" look={avatar} />
             <h1 className="mt-3 text-[25px] sm:text-[28px] font-black text-carbon-50">{name || 'Trader'}</h1>
             <p className="text-carbon-400 text-sm font-medium">
               {EXPERIENCE_LABELS[onboardingAnswers.experience ?? ''] ?? 'Explorando el mercado'}
