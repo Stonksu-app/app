@@ -9,10 +9,12 @@
     "lint": "oxlint",
     "check": "node scripts/check-all.mjs",
     "preview": "vite preview",
-    "icons": "node scripts/make-app-icons.mjs && capacitor-assets generate --ios",
-    "ios:sync": "npm run build && cap sync ios"
+    "icons": "node scripts/make-app-icons.mjs && capacitor-assets generate --ios --android",
+    "ios:sync": "npm run build && cap sync ios",
+    "android:sync": "npm run build && cap sync android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.0",
     "@capacitor/core": "^8.5.0",
     "@capacitor/ios": "^8.5.0",
     "@capacitor/local-notifications": "^8.3.1",

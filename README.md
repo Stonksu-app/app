@@ -50,22 +50,36 @@ clavada en un build viejo.
 > valida contra un esquema y el despliegue falla con *should NOT have additional
 > property*. Por eso esta explicación está aquí y no en el fichero.
 
-## La app de iPhone
+## Las apps de móvil
 
-Se compila en GitHub Actions al crear un tag, y sale sin firmar para que
-AltStore la firme con tu Apple ID. El tag decide contra qué base de datos
-apunta: `v0.8.0-dev` usa la de pruebas, `v0.8.0` la de producción.
+Un tag `v*` compila **las dos a la vez** en GitHub Actions, y el propio tag
+decide contra qué base de datos apuntan:
 
 ```bash
-git tag v0.8.0-dev && git push origin v0.8.0-dev
+git tag v0.8.0-dev && git push origin v0.8.0-dev   # base de datos de pruebas
+git tag v0.8.0     && git push origin v0.8.0       # producción
 ```
 
-El pie de **Perfil** muestra el `git describe` del build, que es la única forma
-de saber qué versión lleva realmente el móvil.
+Salen como artefactos del workflow, `Stonksu-ios-…` y `Stonksu-android-…`.
+
+| | Cómo se instala | Qué hace falta |
+| --- | --- | --- |
+| **iPhone** | `.ipa` sin firmar, AltStore la firma con tu Apple ID | Nada |
+| **Android** | `.apk` firmado en modo depuración, se instala directamente | Permitir "orígenes desconocidos" |
+
+Android es el camino corto: no hay firma que gestionar ni caducidad de siete
+días. Ese APK no vale para Play Store — eso necesita un `.aab` firmado con un
+keystore propio — pero para pasarle la app a alguien va de sobra.
+
+El pie de **Perfil** muestra el `git describe` del build y el id de la cuenta,
+que es la única forma de saber qué versión y qué usuario lleva realmente el
+móvil.
 
 Dos límites de Apple que conviene tener presentes: una cuenta gratuita **no
 puede recibir notificaciones push** ni usar *Sign in with Apple*. Por eso los
-recordatorios de racha son notificaciones locales, que sí funcionan.
+recordatorios de racha son notificaciones locales, que sí funcionan — y en
+Android además sobreviven a reiniciar el teléfono, porque el plugin declara
+`RECEIVE_BOOT_COMPLETED`.
 
 ## Cómo está organizado
 
