@@ -25,14 +25,24 @@ import { useAuthStore } from './store/useAuthStore';
 
 function RequireOnboarded({ children }: { children: React.ReactNode }) {
   const onboarded = useUserStore((s) => s.onboarded);
-  const settled = useSyncStore((s) => s.status !== 'connecting');
+  const syncSettled = useSyncStore((s) => s.status !== 'connecting');
+  const authStatus = useAuthStore((s) => s.status);
+  const registered = authStatus === 'registered';
 
-  // Nothing is known yet on a device that has never run the app, so deciding
-  // now would bounce a perfectly good account to the landing page a moment
-  // before its profile arrives. The splash is covering this anyway.
+  // Both have to have answered. Nothing is known yet on a device that has
+  // never run the app, so deciding early would bounce a perfectly good account
+  // to the landing page a moment before its profile arrives — and deciding
+  // before the session resolves would send a signed-in player to the marketing
+  // page instead of to onboarding. The splash is covering this anyway.
+  const settled = syncSettled && authStatus !== 'loading';
   if (!settled && !onboarded) return null;
 
-  if (!onboarded) return <Navigate to="/" replace />;
+  // Signed in, but this account never picked a nickname — a fresh one from
+  // Google, or an old one that never finished. Sending it to the marketing
+  // page is a dead end: they are already through the door and it offers them
+  // no way forward. Onboarding is the thing they are actually missing.
+  if (!onboarded) return <Navigate to={registered ? '/onboarding' : '/'} replace />;
+
   return <>{children}</>;
 }
 

@@ -114,6 +114,9 @@ function translate(message: string): string {
   return message;
 }
 
+/** Guards against a second subscription; effects run twice in development. */
+let initialised = false;
+
 export const useAuthStore = create<AuthState>()((set, get) => ({
   status: isCloudEnabled ? 'loading' : 'off',
   email: null,
@@ -124,18 +127,31 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   busy: false,
 
   init: () => {
-    if (!supabase) return;
+    if (!supabase || initialised) return;
+    // Subscribing twice would double every state change, and React runs effects
+    // twice in development.
+    initialised = true;
 
     const failure = readRedirectError();
     if (failure) {
       set({ errorCode: failure.code, error: translate(failure.message || failure.code) });
     }
 
-    void supabase.auth.getSession().then(({ data }) => set(applySession(data.session)));
+    void supabase.auth.getSession().then(({ data }) => {
+      if (data.session) set(applySession(data.session));
+    });
 
     // Fires when the confirmation link is clicked in another tab, or when an
     // OAuth redirect lands, so the banner disappears without a reload.
-    supabase.auth.onAuthStateChange((_event, session) => set(applySession(session)));
+    supabase.auth.onAuthStateChange((event, session) => {
+      // Subscribing emits an immediate INITIAL_SESSION, and it can carry null
+      // while the session is still being restored from storage. Applying that
+      // would overwrite the correct answer getSession just gave us and leave
+      // the app stuck on "loading" — with a perfectly good session sitting
+      // right there. Only an actual sign-out means "no session".
+      if (!session && event !== 'SIGNED_OUT') return;
+      set(applySession(session));
+    });
   },
 
   /**

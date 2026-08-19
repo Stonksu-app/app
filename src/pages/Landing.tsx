@@ -1,7 +1,10 @@
+import { Navigate } from 'react-router-dom';
 import Mascot from '../components/Mascot';
 import Icon from '../components/Icon';
 import { ButtonLink } from '../components/Button';
 import { SKILL_TREE } from '../data/lessons';
+import { useUserStore } from '../store/useUserStore';
+import { useSyncStore } from '../store/useSyncStore';
 
 /* Laid out like Duolingo's landing page: wordmark up top, the mascot as the
  * hero, one big headline, and two stacked calls to action. Stacks vertically on
@@ -18,6 +21,15 @@ const ORBIT = [
 
 export default function Landing() {
   const topics = SKILL_TREE.slice(0, 6);
+  const onboarded = useUserStore((s) => s.onboarded);
+  const settled = useSyncStore((s) => s.status !== 'connecting');
+
+  // Someone with a finished account has no business on the sales pitch. This
+  // is what makes a provider redirect actually arrive somewhere: it lands on
+  // /home, and if the profile is still in flight the guard parks there until
+  // it settles — but a back button, or any stray hop to /, would otherwise
+  // strand a signed-in player here.
+  if (settled && onboarded) return <Navigate to="/home" replace />;
 
   return (
     <div className="min-h-dvh bg-carbon-900 flex flex-col pt-safe pb-safe">

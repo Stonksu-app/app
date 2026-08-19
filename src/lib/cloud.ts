@@ -134,12 +134,54 @@ export async function ensureSession(): Promise<string | null> {
   const { data: existing } = await supabase.auth.getSession();
   if (existing.session) return existing.session.user.id;
 
+  // A sign-in landing from a provider arrives as parameters in the URL and is
+  // exchanged for a session asynchronously. Creating an anonymous account in
+  // that window would be a quiet disaster: the player would be dropped into a
+  // brand new empty profile a heartbeat before their real one arrived, and the
+  // account they just authenticated would be orphaned.
+  if (hasAuthCallbackInUrl()) {
+    const arriving = await waitForSession();
+    if (arriving) return arriving;
+  }
+
   const { data, error } = await supabase.auth.signInAnonymously();
   if (error) {
     console.warn('[cloud] anonymous sign-in failed, staying local:', error.message);
     return null;
   }
   return data.user?.id ?? null;
+}
+
+/** Whether the current URL looks like a provider or email callback. */
+function hasAuthCallbackInUrl(): boolean {
+  if (typeof window === 'undefined') return false;
+  const url = window.location.hash + window.location.search;
+  return /access_token=|refresh_token=|[?&#]code=/.test(url);
+}
+
+/** Resolves with the user id once the callback is exchanged, or null if it
+ *  never lands — a broken callback must not hang the app forever. */
+function waitForSession(timeoutMs = 4000): Promise<string | null> {
+  const client = supabase;
+  if (!client) return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (id: string | null) => {
+      if (settled) return;
+      settled = true;
+      subscription?.unsubscribe();
+      clearTimeout(timer);
+      resolve(id);
+    };
+
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((_event, session) => {
+      if (session) finish(session.user.id);
+    });
+  });
 }
 
 /** Reads the player's whole state. Null means "no usable cloud state". */
