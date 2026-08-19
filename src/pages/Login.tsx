@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Mascot from '../components/Mascot';
 import Icon from '../components/Icon';
@@ -19,11 +19,20 @@ import { useUserStore } from '../store/useUserStore';
  */
 export default function Login() {
   const navigate = useNavigate();
-  const { signInExisting, signInWithPassword, error, busy, clearError } = useAuthStore();
+  const { signInExisting, signInWithPassword, status, error, busy, clearError } = useAuthStore();
   const xp = useUserStore((s) => s.xp);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // signInWithPassword resolves in place, so its submit handler can navigate
+  // straight away. signInExisting doesn't: on a device it just opens the
+  // browser and returns, and the session only lands later through the deep
+  // link listener — with nothing here to react to it, this page kept sitting
+  // on "Entrar con Google" after a successful sign-in.
+  useEffect(() => {
+    if (status === 'registered') navigate('/home');
+  }, [status, navigate]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
