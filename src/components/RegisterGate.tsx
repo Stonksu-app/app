@@ -75,7 +75,12 @@ export default function RegisterGate() {
       {!quiet && (
         <button
           onClick={() => setOpen(true)}
-          className="w-full bg-[#FFC93C] text-carbon-950 px-4 py-2.5 pt-safe flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[13px] font-black text-center hover:bg-[#ffd45f] transition"
+          // The padding matches the rails either side of the lesson path
+          // (NavRail w-[256px] from lg, StatRail w-[368px] from xl) so the text
+          // lands on the same axis as the path itself. Centred on the raw
+          // window it sits 56px right of everything else on a wide screen,
+          // which reads as a mistake even though it is technically centred.
+          className="w-full bg-[#FFC93C] text-carbon-950 px-4 lg:pl-[256px] xl:pr-[368px] py-2.5 pt-safe flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[13px] font-black text-center hover:bg-[#ffd45f] transition"
         >
           <span className="inline-flex items-center gap-2">
             <Icon name="shield" size={16} strokeWidth={2.2} />
