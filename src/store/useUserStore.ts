@@ -30,6 +30,9 @@ interface UserState {
   coins: number;
   streakProtectors: number;
   avatar: MascotLook;
+  /** Activities answered wrong, queued to reappear at the start of the next
+   *  lesson. Keys look like "quiz:<id>" or "sentence:<id>". */
+  pendingMistakes: string[];
   claimedMissionIds: string[];
   /** Cosmetics earned from missions. Everything not listed stays locked. */
   unlockedAccessories: AccessoryStyle[];
@@ -59,6 +62,8 @@ interface UserState {
   buyHeartRefill: () => boolean;
   buyStreakProtector: () => boolean;
   setAvatar: (look: MascotLook) => void;
+  recordMistake: (key: string) => void;
+  clearMistake: (key: string) => void;
   claimMission: (missionId: string) => void;
   isAccessoryUnlocked: (style: AccessoryStyle) => boolean;
   resetProgress: () => void;
@@ -99,6 +104,7 @@ export const useUserStore = create<UserState>()(
       coins: 0,
       streakProtectors: 0,
       avatar: DEFAULT_LOOK,
+      pendingMistakes: [],
       claimedMissionIds: [],
       unlockedAccessories: ['ninguno'],
       testMode: false,
@@ -256,6 +262,18 @@ export const useUserStore = create<UserState>()(
 
       setAvatar: (avatar) => set({ avatar }),
 
+      // A missed activity is queued once; answering it right anywhere (including
+      // when it comes back) takes it off the queue.
+      recordMistake: (key) =>
+        set((s) => (s.pendingMistakes.includes(key) ? s : { pendingMistakes: [...s.pendingMistakes, key] })),
+
+      clearMistake: (key) =>
+        set((s) =>
+          s.pendingMistakes.includes(key)
+            ? { pendingMistakes: s.pendingMistakes.filter((k) => k !== key) }
+            : s
+        ),
+
       claimMission: (missionId) =>
         set((s) => {
           // Guarded so a double tap can't pay out twice, and re-checked against
@@ -304,6 +322,7 @@ export const useUserStore = create<UserState>()(
           coins: 0,
           streakProtectors: 0,
           avatar: DEFAULT_LOOK,
+          pendingMistakes: [],
           claimedMissionIds: [],
           unlockedAccessories: ['ninguno'],
           testMode: false,

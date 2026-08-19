@@ -41,13 +41,11 @@ export default function SentenceRoundCard({
     onResult?.(correct);
   };
 
+  // No retry: the correct word is already highlighted once you've answered, so
+  // a second attempt would only be copying it. Missed rounds come back at the
+  // start of the next lesson instead.
   const handleContinue = () => {
     if (!checked) return;
-    if (!isCorrect) {
-      setChecked(false);
-      setSelectedId(null);
-      return;
-    }
     onDone();
   };
 
@@ -88,12 +86,14 @@ export default function SentenceRoundCard({
       </div>
 
       {checked && !isCorrect && (
-        <p className="text-center text-danger-400 text-sm font-bold mb-3">No es la palabra correcta, ¡inténtalo de nuevo!</p>
+        <p className="text-center text-danger-400 text-sm font-bold mb-3">
+          No era esa. Te la volveremos a preguntar en la próxima lección.
+        </p>
       )}
 
       {checked && (
         <Button onClick={handleContinue} variant={isCorrect ? 'primary' : 'danger'}>
-          {isCorrect ? 'Continuar' : 'Reintentar'}
+          Continuar
         </Button>
       )}
     </div>

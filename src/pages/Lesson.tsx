@@ -18,7 +18,7 @@ import StreakPill from '../components/StreakPill';
 import { getLessonById, getNodeById } from '../data/lessons';
 import { useComboFeedback } from '../hooks/useComboFeedback';
 import { useUserStore } from '../store/useUserStore';
-import { buildStage } from '../utils/buildActivityStream';
+import { buildStage, mistakeKey } from '../utils/buildActivityStream';
 import type { Activity, IconName } from '../types';
 
 const XP_PER_CORRECT = 10;
@@ -34,8 +34,17 @@ export default function Lesson() {
   useUserStore.getState().tickHeartRegen();
   const { lessonId } = useParams<{ lessonId: string }>();
   const navigate = useNavigate();
-  const { completeLesson, unlockBadge, attempts, streak, isLessonCompleted, getNodeStage, getNodeMaxStage } =
-    useUserStore();
+  const {
+    completeLesson,
+    unlockBadge,
+    attempts,
+    streak,
+    isLessonCompleted,
+    getNodeStage,
+    getNodeMaxStage,
+    recordMistake,
+    clearMistake,
+  } = useUserStore();
   const {
     hearts,
     combo,
@@ -54,13 +63,22 @@ export default function Lesson() {
   // The stage you're about to play is the one after what you've cleared, so
   // each attempt serves different content instead of replaying the whole topic.
   const [stageAtEntry] = useState(() => (data ? getNodeStage(data.node.id) : 0));
+  // Frozen at entry: misses made during this run belong to the NEXT lesson, and
+  // a live subscription would rebuild the plan mid-run.
+  const [mistakesAtEntry] = useState(() => useUserStore.getState().pendingMistakes);
   const plan = useMemo(
     () =>
       data
-        ? buildStage(data.node, data.lesson.questions, stageAtEntry, getNodeMaxStage(data.node.id))
+        ? buildStage(
+            data.node,
+            data.lesson.questions,
+            stageAtEntry,
+            getNodeMaxStage(data.node.id),
+            mistakesAtEntry
+          )
         : null,
     // getNodeMaxStage is a stable store getter; stageAtEntry is frozen for the run.
-    [data, stageAtEntry, getNodeMaxStage]
+    [data, stageAtEntry, getNodeMaxStage, mistakesAtEntry]
   );
   const activities = plan?.activities ?? [];
 
@@ -148,13 +166,26 @@ export default function Lesson() {
     setChecked(false);
   };
 
+  /** Wraps the combo tracker so a missed question also gets queued for the next
+   *  lesson — and so getting it right retires it from that queue. Only quiz and
+   *  fill-in-the-blank rounds are one answer apiece; pooled match/classify
+   *  batches report per item, so there's no single activity to bring back. */
+  const trackResult = (correct: boolean) => {
+    registerResult(correct);
+    if (!data) return;
+    if (activity.type !== 'quiz' && activity.type !== 'sentence') return;
+    const key = mistakeKey(data.node.id, activity.id);
+    if (correct) clearMistake(key);
+    else recordMistake(key);
+  };
+
   const handleSelect = (optionId: string) => {
     if (!isQuiz || checked) return;
     const correct = optionId === activity.question.correctOptionId;
     setSelectedId(optionId);
     setChecked(true);
     setMascotLine(randomLine(correct ? 'correct' : 'incorrect'));
-    registerResult(correct);
+    trackResult(correct);
   };
 
   useEffect(() => {
@@ -251,7 +282,7 @@ export default function Lesson() {
             <MatchPairsGame
               pairs={activity.pairs}
               instructions={activity.instructions}
-              onResult={registerResult}
+              onResult={trackResult}
               onDone={advance}
             />
           </div>
@@ -264,7 +295,7 @@ export default function Lesson() {
               instructions={activity.instructions}
               bucketALabel={activity.bucketALabel}
               bucketBLabel={activity.bucketBLabel}
-              onResult={registerResult}
+              onResult={trackResult}
               onDone={advance}
             />
           </div>
@@ -275,7 +306,7 @@ export default function Lesson() {
             <SequenceGame
               steps={activity.steps}
               instructions={activity.instructions}
-              onResult={registerResult}
+              onResult={trackResult}
               onDone={advance}
             />
           </div>
@@ -286,7 +317,7 @@ export default function Lesson() {
             <SentenceRoundCard
               round={activity.round}
               instructions={activity.instructions}
-              onResult={registerResult}
+              onResult={trackResult}
               onDone={advance}
             />
           </div>
