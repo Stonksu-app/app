@@ -84,10 +84,10 @@ export default function PasswordSetting() {
           {error && <p className="text-sm font-bold text-danger-400">{error}</p>}
 
           <div className="flex gap-2">
-            <Button onClick={() => void save()} disabled={!ready || busy}>
+            <Button size="sm" fullWidth={false} onClick={() => void save()} disabled={!ready || busy}>
               {busy ? 'Guardando…' : 'Guardar'}
             </Button>
-            <Button variant="secondary" onClick={() => setOpen(false)}>
+            <Button size="sm" fullWidth={false} variant="secondary" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
           </div>

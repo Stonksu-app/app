@@ -1,4 +1,4 @@
-import type { SkillNode } from '../types';
+import type { QuizQuestion, SkillNode } from '../types';
 
 export const SKILL_TREE: SkillNode[] = [
   {
@@ -1928,4 +1928,25 @@ export function getLessonById(lessonId: string): { node: SkillNode; lesson: Skil
     if (lesson) return { node, lesson };
   }
   return undefined;
+}
+
+/**
+ * Every question from an already-completed lesson, excluding the node
+ * currently being played.
+ *
+ * Feeds the cross-lesson review question in buildStage: a topic covered
+ * weeks ago and never revisited again is the one that actually gets
+ * forgotten, so this pulls candidates from everywhere else in the tree
+ * rather than only from the current node (which already gets its own
+ * "Repaso" stage at the end).
+ */
+export function getReviewPool(completedLessonIds: string[], excludeNodeId: string): QuizQuestion[] {
+  const pool: QuizQuestion[] = [];
+  for (const node of SKILL_TREE) {
+    if (node.id === excludeNodeId) continue;
+    for (const lesson of node.lessons) {
+      if (completedLessonIds.includes(lesson.id)) pool.push(...lesson.questions);
+    }
+  }
+  return pool;
 }

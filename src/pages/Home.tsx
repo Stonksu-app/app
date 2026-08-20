@@ -154,7 +154,7 @@ export default function Home() {
   // path would keep rendering a chest as unopened after you claimed it.
   const { openedChestIds, nodeStageProgress, openChest, testMode } = useUserStore();
   const [selected, setSelected] = useState<SkillNode | null>(null);
-  const [reward, setReward] = useState(false);
+  const [reward, setReward] = useState<{ protectorGifted: boolean } | null>(null);
   const { hearts, msUntilNextHeart } = useHeartRegen();
 
   const nodes = useMemo(
@@ -241,8 +241,8 @@ export default function Home() {
                     <button
                       disabled={!item.unlocked || item.opened}
                       onClick={() => {
-                        openChest(item.key);
-                        setReward(true);
+                        const protectorGifted = openChest(item.key);
+                        setReward({ protectorGifted });
                       }}
                       aria-label={item.opened ? 'Cofre abierto' : 'Abrir cofre'}
                       style={{
@@ -354,7 +354,7 @@ export default function Home() {
       {reward && (
         <div
           className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-          onClick={() => setReward(false)}
+          onClick={() => setReward(null)}
         >
           <div className="text-center animate-pop-in" onClick={(e) => e.stopPropagation()}>
             <div className="w-24 h-24 rounded-3xl bg-[#FFC93C] text-carbon-900 flex items-center justify-center mx-auto animate-bounce-in">
@@ -369,8 +369,13 @@ export default function Home() {
                 <Icon name="coins" size={24} /> +{CHEST_REWARD.coins}
               </span>
             </div>
+            {reward.protectorGifted && (
+              <p className="mt-3 flex items-center justify-center gap-1.5 text-sky-400 font-black text-[15px]">
+                <Icon name="shield" size={18} /> +1 protector de racha
+              </p>
+            )}
             <div className="mt-6 w-[240px] mx-auto">
-              <Button onClick={() => setReward(false)}>Genial</Button>
+              <Button onClick={() => setReward(null)}>Genial</Button>
             </div>
           </div>
         </div>

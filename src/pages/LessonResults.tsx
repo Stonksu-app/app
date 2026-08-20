@@ -16,6 +16,7 @@ interface ResultsState {
   newBadgeIds: string[];
   stage: number;
   maxStage: number;
+  protectorGifted?: boolean;
 }
 
 export default function LessonResults() {
@@ -37,7 +38,7 @@ export default function LessonResults() {
 
   if (!state) return null;
 
-  const { nodeTitle, newBadgeIds, stage, maxStage } = state;
+  const { nodeTitle, newBadgeIds, stage, maxStage, protectorGifted } = state;
   const perfect = correctCount === totalQuestions;
   const earnedBadges = BADGES.filter((b) => newBadgeIds?.includes(b.id));
   const justPlatinumed = maxStage > 0 && stage >= maxStage;
@@ -92,6 +93,15 @@ export default function LessonResults() {
                 </p>
               </>
             )}
+          </div>
+        )}
+
+        {protectorGifted && (
+          <div className="mt-5 pt-4 border-t border-carbon-800 animate-pop-in">
+            <div className="flex items-center justify-center gap-1.5 bg-sky-500/10 border border-sky-500/30 rounded-full px-3 py-1.5 mx-auto w-fit">
+              <Icon name="shield" size={16} className="text-sky-400" />
+              <span className="text-xs font-extrabold text-carbon-100">¡Protector de racha gratis!</span>
+            </div>
           </div>
         )}
 

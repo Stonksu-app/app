@@ -155,6 +155,10 @@ export interface StagePlan {
   /** Ids pulled in from an earlier miss, so the lesson can flag them as repeats
    *  instead of letting them look like new material. */
   replayIds: string[];
+  /** Ids pulled in from a *different, already-completed* lesson elsewhere in
+   *  the tree, so the lesson can flag them as a memory refresher rather than
+   *  new material for the current topic. */
+  reviewIds: string[];
   /** Only the terms this stage introduces, so the intro stays short too. */
   flashcards: Flashcard[];
 }
@@ -171,13 +175,16 @@ export interface StagePlan {
  *
  * @param stage 0-based index of the stage about to be played.
  * @param pendingMistakes keys from the store; ones belonging to other nodes are ignored here.
+ * @param reviewPool questions from other, already-completed lessons; one is
+ *   dropped in at random to keep older material from fading, Duolingo-style.
  */
 export function buildStage(
   node: SkillNode,
   questions: QuizQuestion[],
   stage: number,
   maxStage: number,
-  pendingMistakes: string[] = []
+  pendingMistakes: string[] = [],
+  reviewPool: QuizQuestion[] = []
 ): StagePlan {
   const games = node.intro?.games ?? [];
   const cards = node.intro?.flashcards ?? [];
@@ -202,6 +209,18 @@ export function buildStage(
   /** Keeps a replayed item from also showing up again inside the stage itself. */
   const withReplay = (rest: Activity[]) => [...replay, ...rest.filter((a) => !replayIds.has(a.id))];
 
+  // One question from a different, already-completed lesson, dropped at a
+  // random spot rather than pinned to an end — a review that only ever shows
+  // up last would be easy to tune out as "the wrap-up question".
+  const reviewQuestion = reviewPool.length ? reviewPool[Math.floor(Math.random() * reviewPool.length)] : null;
+  const reviewIds = reviewQuestion ? [`review-${reviewQuestion.id}`] : [];
+  const withReview = (rest: Activity[]) => {
+    if (!reviewQuestion) return rest;
+    const activity: Activity = { type: 'quiz', id: `review-${reviewQuestion.id}`, question: reviewQuestion };
+    const at = Math.floor(Math.random() * (rest.length + 1));
+    return [...rest.slice(0, at), activity, ...rest.slice(at)];
+  };
+
   const teachingStages = Math.max(1, maxStage - 1);
   const isReview = stage >= teachingStages;
 
@@ -209,8 +228,9 @@ export function buildStage(
     return {
       title: 'Repaso',
       isReview: true,
-      activities: withReplay(interleave(spread(quizPool, REVIEW_QUIZ), spread(gamePool, REVIEW_GAMES))),
+      activities: withReview(withReplay(interleave(spread(quizPool, REVIEW_QUIZ), spread(gamePool, REVIEW_GAMES)))),
       replayIds: [...replayIds],
+      reviewIds,
       flashcards: [],
     };
   }
@@ -225,8 +245,9 @@ export function buildStage(
   return {
     title,
     isReview: false,
-    activities: withReplay(interleave(quizSlice.slice(0, TARGET_QUIZ), gameSlice.slice(0, TARGET_GAMES))),
+    activities: withReview(withReplay(interleave(quizSlice.slice(0, TARGET_QUIZ), gameSlice.slice(0, TARGET_GAMES)))),
     replayIds: [...replayIds],
+    reviewIds,
     flashcards: cardSlice,
   };
 }

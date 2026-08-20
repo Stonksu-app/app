@@ -15,7 +15,7 @@ import SentenceRoundCard from '../components/SentenceRoundCard';
 import SequenceGame from '../components/SequenceGame';
 import SortClassifyGame from '../components/SortClassifyGame';
 import StreakPill from '../components/StreakPill';
-import { getLessonById, getNodeById } from '../data/lessons';
+import { getLessonById, getNodeById, getReviewPool } from '../data/lessons';
 import { useComboFeedback } from '../hooks/useComboFeedback';
 import { useUserStore } from '../store/useUserStore';
 import { buildStage, mistakeKey } from '../utils/buildActivityStream';
@@ -44,6 +44,7 @@ export default function Lesson() {
     getNodeMaxStage,
     recordMistake,
     clearMistake,
+    completedLessonIds,
   } = useUserStore();
   const {
     hearts,
@@ -66,6 +67,11 @@ export default function Lesson() {
   // Frozen at entry: misses made during this run belong to the NEXT lesson, and
   // a live subscription would rebuild the plan mid-run.
   const [mistakesAtEntry] = useState(() => useUserStore.getState().pendingMistakes);
+  // Same idea for the review pool: fixed at entry so the one dropped-in
+  // question doesn't shuffle out from under the player mid-run.
+  const [reviewPoolAtEntry] = useState(() =>
+    data ? getReviewPool(completedLessonIds, data.node.id) : []
+  );
   const plan = useMemo(
     () =>
       data
@@ -74,11 +80,13 @@ export default function Lesson() {
             data.lesson.questions,
             stageAtEntry,
             getNodeMaxStage(data.node.id),
-            mistakesAtEntry
+            mistakesAtEntry,
+            reviewPoolAtEntry
           )
         : null,
-    // getNodeMaxStage is a stable store getter; stageAtEntry is frozen for the run.
-    [data, stageAtEntry, getNodeMaxStage, mistakesAtEntry]
+    // getNodeMaxStage is a stable store getter; stageAtEntry/mistakesAtEntry/
+    // reviewPoolAtEntry are all frozen for the run.
+    [data, stageAtEntry, getNodeMaxStage, mistakesAtEntry, reviewPoolAtEntry]
   );
   const activities = plan?.activities ?? [];
 
@@ -111,6 +119,9 @@ export default function Lesson() {
   /** Coming back from an earlier miss. Flagged so it reads as a second chance
    *  rather than as new material you're inexplicably seeing twice. */
   const isRepeat = plan?.replayIds.includes(activity.id) ?? false;
+  /** Pulled in from a different, already-completed lesson to keep it from
+   *  fading — flagged so it reads as a memory check, not new material. */
+  const isReviewQuestion = plan?.reviewIds.includes(activity.id) ?? false;
 
   const isQuiz = activity.type === 'quiz';
   const isCorrect = isQuiz && checked && selectedId === activity.question.correctOptionId;
@@ -121,7 +132,7 @@ export default function Lesson() {
     const wasFirstEverLesson = attempts.length === 0;
     const alreadyCompleted = isLessonCompleted(lesson.id);
 
-    completeLesson({
+    const protectorGifted = completeLesson({
       lessonId: lesson.id,
       nodeId: node.id,
       completedAt: new Date().toISOString(),
@@ -153,6 +164,7 @@ export default function Lesson() {
         newBadgeIds: newBadges,
         stage: getNodeStage(node.id),
         maxStage: getNodeMaxStage(node.id),
+        protectorGifted,
       },
       replace: true,
     });
@@ -228,6 +240,11 @@ export default function Lesson() {
                 <Icon name="refresh" size={11} />
                 Repetición
               </span>
+            ) : isReviewQuestion ? (
+              <span className="flex items-center gap-1 text-[10px] font-black text-lime-400 bg-lime-500/15 border border-lime-500/30 px-2 py-0.5 rounded-full uppercase whitespace-nowrap">
+                <Icon name="brain" size={11} />
+                Repaso
+              </span>
             ) : (
               badge && (
                 <span className="flex items-center gap-1 text-[10px] font-black text-carbon-300 bg-carbon-800 px-2 py-0.5 rounded-full uppercase">
@@ -248,6 +265,12 @@ export default function Lesson() {
         {isRepeat && (
           <p className="mb-3 text-sm font-bold text-[#FFC93C]">
             Esta la fallaste la vez pasada. ¡Inténtalo otra vez!
+          </p>
+        )}
+
+        {isReviewQuestion && !isRepeat && (
+          <p className="mb-3 text-sm font-bold text-lime-400">
+            De una lección anterior. A ver si te acuerdas.
           </p>
         )}
 

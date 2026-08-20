@@ -65,7 +65,8 @@ interface UserState {
   refillHearts: () => void;
   tickHeartRegen: () => void;
   addXp: (amount: number) => void;
-  completeLesson: (attempt: LessonAttempt) => void;
+  /** Returns whether this completion also gifted a streak protector. */
+  completeLesson: (attempt: LessonAttempt) => boolean;
   isNodeUnlocked: (nodeId: string) => boolean;
   isLessonCompleted: (lessonId: string) => boolean;
   unlockBadge: (badgeId: string) => void;
@@ -75,7 +76,8 @@ interface UserState {
   getNodeMaxStage: (nodeId: string) => number;
   isNodePlatinum: (nodeId: string) => boolean;
   isChestOpened: (chestId: string) => boolean;
-  openChest: (chestId: string) => void;
+  /** Returns whether this chest also gifted a streak protector. */
+  openChest: (chestId: string) => boolean;
   buyHeartRefill: () => boolean;
   buyStreakProtector: () => boolean;
   setAvatar: (look: MascotLook) => void;
@@ -96,6 +98,10 @@ export const COINS_PER_CORRECT = 2;
 export const CHEST_REWARD = { xp: 100, coins: 50 } as const;
 /** Owning more than this many protectors at once isn't useful. */
 export const MAX_PROTECTORS = 2;
+/** Every this-many *newly* finished lessons, one is gifted for free — so
+ *  running low on coins never means running out of ways to keep a streak
+ *  alive. Doesn't count repeats of an already-completed lesson. */
+export const LESSON_PROTECTOR_GIFT_EVERY = 3;
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -180,45 +186,59 @@ export const useUserStore = create<UserState>()(
 
       addXp: (amount) => set((s) => ({ xp: s.xp + amount })),
 
-      completeLesson: (attempt) =>
-        set((s) => {
-          const today = todayStr();
-          const { streak, lastActiveDate, protectorsUsed } = computeStreakUpdate(
-            s.lastActiveDate,
-            s.streak,
-            s.streakProtectors,
-            today
-          );
-          // The exact days a protector bridged, so the calendar can mark them
-          // "congelado" instead of leaving a gap that looks like a broken streak.
-          const frozenDates =
-            protectorsUsed > 0 && s.lastActiveDate
-              ? [...new Set([...s.frozenDates, ...datesBetween(s.lastActiveDate, today)])]
-              : s.frozenDates;
-          const completedLessonIds = s.completedLessonIds.includes(attempt.lessonId)
-            ? s.completedLessonIds
-            : [...s.completedLessonIds, attempt.lessonId];
+      completeLesson: (attempt) => {
+        const s = get();
+        const today = todayStr();
+        const { streak, lastActiveDate, protectorsUsed } = computeStreakUpdate(
+          s.lastActiveDate,
+          s.streak,
+          s.streakProtectors,
+          today
+        );
+        // The exact days a protector bridged, so the calendar can mark them
+        // "congelado" instead of leaving a gap that looks like a broken streak.
+        const frozenDates =
+          protectorsUsed > 0 && s.lastActiveDate
+            ? [...new Set([...s.frozenDates, ...datesBetween(s.lastActiveDate, today)])]
+            : s.frozenDates;
+        const isNewCompletion = !s.completedLessonIds.includes(attempt.lessonId);
+        const completedLessonIds = isNewCompletion
+          ? [...s.completedLessonIds, attempt.lessonId]
+          : s.completedLessonIds;
 
-          const node = SKILL_TREE.find((n) => n.id === attempt.nodeId);
-          const maxStage = node ? stagesForDifficulty(node.difficulty) : 0;
-          const currentStage = s.nodeStageProgress[attempt.nodeId] ?? 0;
-          const nodeStageProgress = {
-            ...s.nodeStageProgress,
-            [attempt.nodeId]: Math.min(maxStage, currentStage + 1),
-          };
+        const node = SKILL_TREE.find((n) => n.id === attempt.nodeId);
+        const maxStage = node ? stagesForDifficulty(node.difficulty) : 0;
+        const currentStage = s.nodeStageProgress[attempt.nodeId] ?? 0;
+        const nodeStageProgress = {
+          ...s.nodeStageProgress,
+          [attempt.nodeId]: Math.min(maxStage, currentStage + 1),
+        };
 
-          return {
-            xp: s.xp + attempt.xpEarned,
-            coins: s.coins + attempt.correctCount * COINS_PER_CORRECT,
-            streakProtectors: s.streakProtectors - protectorsUsed,
-            frozenDates,
-            attempts: [...s.attempts, attempt],
-            completedLessonIds,
-            streak,
-            lastActiveDate,
-            nodeStageProgress,
-          };
-        }),
+        // A free protector every few newly-finished lessons, so a coin
+        // shortage never means losing the streak either. Repeating an
+        // already-completed lesson doesn't count towards it, or grinding one
+        // lesson over and over would farm protectors for free.
+        const streakProtectorsAfterUse = s.streakProtectors - protectorsUsed;
+        const gifted =
+          isNewCompletion &&
+          completedLessonIds.length % LESSON_PROTECTOR_GIFT_EVERY === 0 &&
+          streakProtectorsAfterUse < MAX_PROTECTORS;
+        const streakProtectors = gifted ? streakProtectorsAfterUse + 1 : streakProtectorsAfterUse;
+
+        set({
+          xp: s.xp + attempt.xpEarned,
+          coins: s.coins + attempt.correctCount * COINS_PER_CORRECT,
+          streakProtectors,
+          frozenDates,
+          attempts: [...s.attempts, attempt],
+          completedLessonIds,
+          streak,
+          lastActiveDate,
+          nodeStageProgress,
+        });
+
+        return gifted;
+      },
 
       isNodeUnlocked: (nodeId) => {
         if (get().testMode) return true;
@@ -265,17 +285,21 @@ export const useUserStore = create<UserState>()(
 
       isChestOpened: (chestId) => get().openedChestIds.includes(chestId),
 
-      openChest: (chestId) =>
-        set((s) =>
-          // Guarded so a double tap can't pay out twice.
-          s.openedChestIds.includes(chestId)
-            ? s
-            : {
-                openedChestIds: [...s.openedChestIds, chestId],
-                xp: s.xp + CHEST_REWARD.xp,
-                coins: s.coins + CHEST_REWARD.coins,
-              }
-        ),
+      openChest: (chestId) => {
+        const s = get();
+        // Guarded so a double tap can't pay out twice.
+        if (s.openedChestIds.includes(chestId)) return false;
+        // Finishing a whole level is a bigger milestone than a single lesson,
+        // so it always tops up a protector (still capped at MAX_PROTECTORS).
+        const gifted = s.streakProtectors < MAX_PROTECTORS;
+        set({
+          openedChestIds: [...s.openedChestIds, chestId],
+          xp: s.xp + CHEST_REWARD.xp,
+          coins: s.coins + CHEST_REWARD.coins,
+          streakProtectors: gifted ? s.streakProtectors + 1 : s.streakProtectors,
+        });
+        return gifted;
+      },
 
       buyHeartRefill: () => {
         const s = get();
