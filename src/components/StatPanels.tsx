@@ -29,23 +29,39 @@ function useActiveDays() {
   return new Set(attempts.map((a) => localDayKey(new Date(a.completedAt))));
 }
 
-function DayDot({ label, practised, isToday }: { label: string; practised: boolean; isToday: boolean }) {
+function useFrozenDays() {
+  const frozenDates = useUserStore((s) => s.frozenDates);
+  return new Set(frozenDates);
+}
+
+function DayDot({
+  label,
+  practised,
+  frozen,
+  isToday,
+}: {
+  label: string;
+  practised: boolean;
+  frozen: boolean;
+  isToday: boolean;
+}) {
   return (
     <div className="flex flex-col items-center gap-1.5">
       <span className={`text-[11px] font-black ${isToday ? 'text-lime-400' : 'text-carbon-500'}`}>{label}</span>
       <span
         className={`w-8 h-8 rounded-full flex items-center justify-center ${
-          practised ? 'bg-lime-500 text-carbon-900' : 'bg-carbon-800'
+          practised ? 'bg-lime-500 text-carbon-900' : frozen ? 'bg-sky-500 text-carbon-900' : 'bg-carbon-800'
         }`}
       >
         {practised && <Icon name="check" size={16} strokeWidth={3} />}
+        {!practised && frozen && <Icon name="shield" size={14} strokeWidth={3} />}
       </span>
     </div>
   );
 }
 
 /** Monday-first week strip — what the desktop popover shows. */
-function WeekStrip({ activeDays }: { activeDays: Set<string> }) {
+function WeekStrip({ activeDays, frozenDays }: { activeDays: Set<string>; frozenDays: Set<string> }) {
   const today = new Date();
   const todayKey = localDayKey(today);
   // getDay() is Sunday-first; shift so Monday starts the week.
@@ -58,14 +74,22 @@ function WeekStrip({ activeDays }: { activeDays: Set<string> }) {
         const d = new Date(monday);
         d.setDate(monday.getDate() + i);
         const key = localDayKey(d);
-        return <DayDot key={key} label={label} practised={activeDays.has(key)} isToday={key === todayKey} />;
+        return (
+          <DayDot
+            key={key}
+            label={label}
+            practised={activeDays.has(key)}
+            frozen={frozenDays.has(key)}
+            isToday={key === todayKey}
+          />
+        );
       })}
     </div>
   );
 }
 
 /** Full month grid — what the phone panel shows, where there's room. */
-function MonthGrid({ activeDays }: { activeDays: Set<string> }) {
+function MonthGrid({ activeDays, frozenDays }: { activeDays: Set<string>; frozenDays: Set<string> }) {
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
@@ -93,6 +117,7 @@ function MonthGrid({ activeDays }: { activeDays: Set<string> }) {
           if (day === null) return <span key={`empty-${i}`} />;
           const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           const practised = activeDays.has(key);
+          const frozen = !practised && frozenDays.has(key);
           const isToday = key === todayKey;
           return (
             <span
@@ -100,16 +125,26 @@ function MonthGrid({ activeDays }: { activeDays: Set<string> }) {
               className={`mx-auto w-7 h-7 flex items-center justify-center rounded-full text-[12px] font-bold ${
                 practised
                   ? 'bg-lime-500 text-carbon-900'
+                  : frozen
+                  ? 'bg-sky-500 text-carbon-900'
                   : isToday
                   ? 'bg-carbon-800 text-carbon-100 ring-2 ring-carbon-600'
                   : 'text-carbon-500'
               }`}
             >
-              {day}
+              {frozen ? <Icon name="shield" size={13} strokeWidth={3} /> : day}
             </span>
           );
         })}
       </div>
+      <p className="mt-3 flex items-center justify-center gap-4 text-[11px] font-bold text-carbon-500">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-lime-500" /> Practicado
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-sky-500" /> Congelado
+        </span>
+      </p>
     </div>
   );
 }
@@ -118,6 +153,7 @@ export default function StatPanel({ stat, compact = false }: { stat: StatKey; co
   const { streak, xp, coins } = useUserStore();
   const { hearts, msUntilNextHeart } = useHeartRegen();
   const activeDays = useActiveDays();
+  const frozenDays = useFrozenDays();
   const { level, xpIntoLevel, xpForNext } = xpToLevel(xp);
 
   if (stat === 'streak') {
@@ -129,7 +165,11 @@ export default function StatPanel({ stat, compact = false }: { stat: StatKey; co
         <p className="text-sm text-carbon-400 mt-0.5">
           {streak === 0 ? 'Haz una lección hoy y empieza tu racha.' : 'No la sueltes.'}
         </p>
-        {compact ? <WeekStrip activeDays={activeDays} /> : <MonthGrid activeDays={activeDays} />}
+        {compact ? (
+          <WeekStrip activeDays={activeDays} frozenDays={frozenDays} />
+        ) : (
+          <MonthGrid activeDays={activeDays} frozenDays={frozenDays} />
+        )}
       </>
     );
   }

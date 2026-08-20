@@ -5,6 +5,23 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((b - a) / 86_400_000);
 }
 
+/** The calendar dates strictly between two YYYY-MM-DD strings — the days a
+ *  streak protector covered when a lesson bridges a gap. Same UTC-day domain
+ *  as lastActiveDate, so a protected day lines up with the streak that saved
+ *  it rather than a locally-shifted one. */
+export function datesBetween(from: string, to: string): string[] {
+  const start = Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10));
+  const gap = daysBetween(from, to);
+  const dates: string[] = [];
+  for (let i = 1; i < gap; i++) {
+    const d = new Date(start + i * 86_400_000);
+    dates.push(
+      `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+    );
+  }
+  return dates;
+}
+
 /** A streak survives missed days if the player owns enough protectors to cover
  *  them — one protector per missed day, spent automatically. */
 export function computeStreakUpdate(

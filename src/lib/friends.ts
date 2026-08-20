@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { useSyncStore } from '../store/useSyncStore';
 import type { MascotLook } from '../types';
 
 /**
@@ -57,9 +58,21 @@ const PING_MESSAGES: Record<string, string> = {
  * to pull from the server. This tracks it locally instead, purely to drive
  * the button's disabled state and countdown; the server call above remains
  * the actual source of truth and still rejects an early ping.
+ *
+ * Keyed by *both* the signed-in account and the friend: localStorage is
+ * shared by the whole browser/device, not per Supabase session, so testing
+ * with two accounts on the same phone (or switching accounts) must not have
+ * one account's outgoing ping show up as a cooldown on the other's — that
+ * previously made a friend look like they'd "already pinged" someone they
+ * never touched.
  */
 const PING_COOLDOWN_MS = 60 * 60 * 1000;
 const PING_COOLDOWN_KEY = 'stonksu:ping-cooldowns';
+
+function cooldownKey(friendId: string): string {
+  const myId = useSyncStore.getState().userId ?? 'anon';
+  return `${myId}:${friendId}`;
+}
 
 function readPingCooldowns(): Record<string, number> {
   try {
@@ -72,7 +85,7 @@ function readPingCooldowns(): Record<string, number> {
 function startPingCooldown(friendId: string): void {
   try {
     const map = readPingCooldowns();
-    map[friendId] = Date.now();
+    map[cooldownKey(friendId)] = Date.now();
     localStorage.setItem(PING_COOLDOWN_KEY, JSON.stringify(map));
   } catch {
     // Storage might be full or unavailable; the cooldown just won't persist across reloads.
@@ -81,7 +94,7 @@ function startPingCooldown(friendId: string): void {
 
 /** Ms remaining before `friendId` can be pinged again, 0 once it's free. */
 export function pingCooldownRemaining(friendId: string): number {
-  const startedAt = readPingCooldowns()[friendId];
+  const startedAt = readPingCooldowns()[cooldownKey(friendId)];
   if (!startedAt) return 0;
   return Math.max(0, startedAt + PING_COOLDOWN_MS - Date.now());
 }

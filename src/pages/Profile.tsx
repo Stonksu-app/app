@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar';
 import NavRail from '../components/NavRail';
 import BottomNav from '../components/BottomNav';
@@ -8,11 +9,13 @@ import AchievementRow from '../components/AchievementRow';
 import ReminderSetting from '../components/ReminderSetting';
 import HeartsReminderSetting from '../components/HeartsReminderSetting';
 import PasswordSetting from '../components/PasswordSetting';
+import ConfirmModal from '../components/ConfirmModal';
 import { byRelevance, computeAchievements } from '../data/achievements';
 import { getLessonById } from '../data/lessons';
 import { useUserStore, xpToLevel } from '../store/useUserStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { appEnv, isCloudEnabled } from '../lib/supabase';
+import { signOut } from '../lib/cloud';
 import { useSyncStore } from '../store/useSyncStore';
 import type { IconName } from '../types';
 
@@ -63,6 +66,21 @@ export default function Profile() {
   const { level } = xpToLevel(xp);
   const authStatus = useAuthStore((s) => s.status);
   const syncUserId = useSyncStore((s) => s.userId);
+  const navigate = useNavigate();
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const doSignOut = async () => {
+    setLoggingOut(true);
+    // Reset the local view first: if it's left holding this account's data,
+    // the "empty account" branch of the sync would push it straight back up
+    // under the fresh anonymous session that replaces it.
+    resetProgress();
+    await signOut();
+    setLoggingOut(false);
+    setConfirmLogout(false);
+    navigate('/');
+  };
 
   const achievements = computeAchievements({ streak, xp, attempts, nodeStageProgress, openedChestIds });
   const preview = [...achievements].sort(byRelevance).slice(0, 3);
@@ -174,14 +192,10 @@ export default function Profile() {
           <PasswordSetting />
 
           <button
-            onClick={() => {
-              if (confirm('¿Reiniciar todo tu progreso? Esta acción no se puede deshacer.')) {
-                resetProgress();
-              }
-            }}
+            onClick={() => setConfirmLogout(true)}
             className="mt-8 text-xs text-carbon-500 hover:text-danger-400 font-bold"
           >
-            Reiniciar progreso
+            Cerrar sesión
           </button>
 
           {/* Settles "is the new build actually on my phone?" without guesswork,
@@ -205,6 +219,17 @@ export default function Profile() {
           </p>
         </div>
       </div>
+
+      {confirmLogout && (
+        <ConfirmModal
+          title={`¿Seguro, ${name || 'trader'}, que quieres salir?`}
+          message="Se cerrará tu sesión en este dispositivo. Si tienes una cuenta vinculada, tu progreso sigue guardado en la nube y podrás volver a entrar con ella."
+          confirmLabel="Cerrar sesión"
+          busy={loggingOut}
+          onConfirm={() => void doSignOut()}
+          onCancel={() => setConfirmLogout(false)}
+        />
+      )}
     </div>
   );
 }

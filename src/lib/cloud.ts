@@ -172,6 +172,15 @@ async function resolveSession(): Promise<string | null> {
   return data.user?.id ?? null;
 }
 
+/** Signs out and drops back to a fresh anonymous session, shared by the two
+ *  callers that both mean "this account is done, start clean": a deleted
+ *  account discovered mid-sync, and a deliberate "cerrar sesión" tap. */
+async function freshAnonymousSession(): Promise<string | null> {
+  if (!supabase) return null;
+  await supabase.auth.signOut();
+  return ensureSession();
+}
+
 /**
  * Throws away a session whose account no longer exists, and starts over.
  *
@@ -179,10 +188,16 @@ async function resolveSession(): Promise<string | null> {
  * sitting there pretending to save.
  */
 export async function restartSession(): Promise<string | null> {
-  if (!supabase) return null;
   console.warn('[cloud] this session belongs to a deleted account; starting a new one');
-  await supabase.auth.signOut();
-  return ensureSession();
+  return freshAnonymousSession();
+}
+
+/**
+ * A deliberate sign-out from Profile. Returns the new anonymous user id that
+ * replaces it, so the caller can push a clean local state up under it.
+ */
+export async function signOut(): Promise<string | null> {
+  return freshAnonymousSession();
 }
 
 /** Whether the current URL looks like a provider or email callback. */

@@ -5,7 +5,7 @@ import { findMission } from '../data/missions';
 import { DEFAULT_LOOK } from '../components/Mascot';
 import { SKILL_TREE } from '../data/lessons';
 import { stagesForDifficulty } from '../utils/mastery';
-import { computeStreakUpdate } from '../utils/streak';
+import { computeStreakUpdate, datesBetween } from '../utils/streak';
 import { DEFAULT_REMINDER_HOUR } from '../lib/notifications';
 
 const MAX_HEARTS = 5;
@@ -21,6 +21,11 @@ interface UserState {
   lastHeartLostAt: string | null;
   streak: number;
   lastActiveDate: string | null;
+  /** Calendar dates (YYYY-MM-DD, UTC) a streak protector covered so the streak
+   *  page can mark them "congelado" instead of a plain gap. Kept off the
+   *  cloud on purpose — it's cosmetic history for this device's calendar, not
+   *  something worth a schema change to sync. */
+  frozenDates: string[];
   completedLessonIds: string[];
   unlockedBadgeIds: string[];
   attempts: LessonAttempt[];
@@ -108,6 +113,7 @@ export const useUserStore = create<UserState>()(
       lastHeartLostAt: null,
       streak: 0,
       lastActiveDate: null,
+      frozenDates: [],
       completedLessonIds: [],
       unlockedBadgeIds: [],
       attempts: [],
@@ -176,12 +182,19 @@ export const useUserStore = create<UserState>()(
 
       completeLesson: (attempt) =>
         set((s) => {
+          const today = todayStr();
           const { streak, lastActiveDate, protectorsUsed } = computeStreakUpdate(
             s.lastActiveDate,
             s.streak,
             s.streakProtectors,
-            todayStr()
+            today
           );
+          // The exact days a protector bridged, so the calendar can mark them
+          // "congelado" instead of leaving a gap that looks like a broken streak.
+          const frozenDates =
+            protectorsUsed > 0 && s.lastActiveDate
+              ? [...new Set([...s.frozenDates, ...datesBetween(s.lastActiveDate, today)])]
+              : s.frozenDates;
           const completedLessonIds = s.completedLessonIds.includes(attempt.lessonId)
             ? s.completedLessonIds
             : [...s.completedLessonIds, attempt.lessonId];
@@ -198,6 +211,7 @@ export const useUserStore = create<UserState>()(
             xp: s.xp + attempt.xpEarned,
             coins: s.coins + attempt.correctCount * COINS_PER_CORRECT,
             streakProtectors: s.streakProtectors - protectorsUsed,
+            frozenDates,
             attempts: [...s.attempts, attempt],
             completedLessonIds,
             streak,
@@ -337,6 +351,7 @@ export const useUserStore = create<UserState>()(
           lastHeartLostAt: null,
           streak: 0,
           lastActiveDate: null,
+          frozenDates: [],
           completedLessonIds: [],
           unlockedBadgeIds: [],
           attempts: [],
