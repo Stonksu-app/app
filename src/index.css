@@ -186,12 +186,22 @@ button {
   animation: confetti-fall linear forwards;
 }
 
-::-webkit-scrollbar {
-  width: 8px;
+/* The default scrollbar renders as a solid grey bar pinned to the right edge
+ * on WebKit — including inside the Capacitor app, where (unlike a native
+ * screen) it doesn't auto-hide, so it sits over the content permanently.
+ * Scrolling itself still works; only the visible track/thumb is gone. */
+html {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* old Edge / IE */
 }
-::-webkit-scrollbar-thumb {
-  background: var(--color-carbon-700);
-  border-radius: 8px;
+html::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+* {
+  scrollbar-width: none;
 }
 
 @keyframes flash-correct {
