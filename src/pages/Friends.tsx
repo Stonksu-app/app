@@ -32,16 +32,29 @@ function FriendRow({
   onRequestRemove: (friend: Friend) => void;
 }) {
   const [busy, setBusy] = useState(false);
-  // Forces a re-render every second so the ping cooldown counts down live;
-  // the remaining time is read straight from localStorage via
-  // pingCooldownRemaining rather than duplicated into its own state.
-  const [, setTick] = useState(0);
-  const cooldownMs = pingCooldownRemaining(friend.id);
+  const [cooldownMs, setCooldownMs] = useState(0);
   const isCoolingDown = cooldownMs > 0;
 
+  // Reads the real cooldown from the server (see pingCooldownRemaining):
+  // it's the source of truth, so this refreshes whenever the row mounts or
+  // the friend changes rather than trusting whatever stale local guess was
+  // left over from a previous session.
+  useEffect(() => {
+    let cancelled = false;
+    void pingCooldownRemaining(friend.id).then((ms) => {
+      if (!cancelled) setCooldownMs(ms);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [friend.id]);
+
+  // Ticks the countdown down locally once it's known, instead of asking the
+  // server every second — a network round trip per tick would be wasteful
+  // and laggy for something that's just decorating a button.
   useEffect(() => {
     if (!isCoolingDown) return;
-    const id = setInterval(() => setTick((n) => n + 1), 1000);
+    const id = setInterval(() => setCooldownMs((ms) => Math.max(0, ms - 1000)), 1000);
     return () => clearInterval(id);
   }, [isCoolingDown]);
 
@@ -80,6 +93,7 @@ function FriendRow({
               void run(async () => {
                 const { message } = await pingFriend(friend.id);
                 flash(message);
+                setCooldownMs(await pingCooldownRemaining(friend.id));
               })
             }
           >

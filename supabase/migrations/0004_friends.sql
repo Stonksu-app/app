@@ -223,6 +223,41 @@ begin
 end;
 $$;
 
+-- Seconds left before `other` can be pinged again by the caller, 0 if free.
+--
+-- Row level security only lets a player read pings sent *to* them, not ones
+-- they sent, so the client had no way to check its own outgoing cooldown and
+-- fell back to remembering it in localStorage. That breaks the moment the
+-- state it depends on changes underneath it — signing out and back in,
+-- switching devices, or reinstalling all leave localStorage looking like the
+-- cooldown never started, so the button shows as free right up until the
+-- server rejects the ping anyway. This exposes just the remaining seconds via
+-- security definer, without exposing the pings table itself, so the client
+-- can ask the real source of truth instead of tracking its own copy.
+create or replace function public.friend_ping_cooldown(other uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+stable
+as $$
+declare
+  last_ping timestamptz;
+  remaining integer;
+begin
+  if auth.uid() is null then return 0; end if;
+
+  select max(created_at) into last_ping
+  from public.pings
+  where from_id = auth.uid() and to_id = other;
+
+  if last_ping is null then return 0; end if;
+
+  remaining := ceil(extract(epoch from (last_ping + interval '1 hour' - now())));
+  return greatest(0, remaining);
+end;
+$$;
+
 -- The sender's nickname lives behind row level security, so the inbox has to
 -- be assembled here rather than joined client-side.
 create or replace function public.ping_inbox()
@@ -264,6 +299,7 @@ revoke all on function public.friend_respond(uuid, boolean) from public;
 revoke all on function public.friend_remove(uuid) from public;
 revoke all on function public.friend_list() from public;
 revoke all on function public.friend_ping(uuid) from public;
+revoke all on function public.friend_ping_cooldown(uuid) from public;
 revoke all on function public.ping_inbox() from public;
 revoke all on function public.ping_mark_seen() from public;
 
@@ -272,6 +308,7 @@ grant execute on function public.friend_respond(uuid, boolean) to authenticated;
 grant execute on function public.friend_remove(uuid) to authenticated;
 grant execute on function public.friend_list() to authenticated;
 grant execute on function public.friend_ping(uuid) to authenticated;
+grant execute on function public.friend_ping_cooldown(uuid) to authenticated;
 grant execute on function public.ping_inbox() to authenticated;
 grant execute on function public.ping_mark_seen() to authenticated;
 -- are_friends stays internal: it is a building block for the others, not an

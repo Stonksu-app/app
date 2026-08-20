@@ -50,14 +50,15 @@ const PING_MESSAGES: Record<string, string> = {
 };
 
 /**
- * Client-side ping cooldown.
+ * Client-side ping cooldown fallback.
  *
- * The server enforces a 1-hour cooldown per friend pair (see friend_ping in
- * 0004_friends.sql), but row level security only lets a user read pings sent
- * *to* them, not ones they sent — so there is no "last ping sent" timestamp
- * to pull from the server. This tracks it locally instead, purely to drive
- * the button's disabled state and countdown; the server call above remains
- * the actual source of truth and still rejects an early ping.
+ * The real source of truth is `friend_ping_cooldown` below, asked over the
+ * network. This purely-local guess only covers the moment that call can't be
+ * made — offline, or a deployment that hasn't run the migration that added
+ * it yet. It used to be the *only* mechanism, which is why signing out and
+ * back in (or switching devices) used to show a friend as pingable when the
+ * server would still reject it: localStorage has no idea the account come
+ * back is the one that already pinged them.
  *
  * Keyed by *both* the signed-in account and the friend: localStorage is
  * shared by the whole browser/device, not per Supabase session, so testing
@@ -82,7 +83,7 @@ function readPingCooldowns(): Record<string, number> {
   }
 }
 
-function startPingCooldown(friendId: string): void {
+function startLocalPingCooldown(friendId: string): void {
   try {
     const map = readPingCooldowns();
     map[cooldownKey(friendId)] = Date.now();
@@ -92,11 +93,24 @@ function startPingCooldown(friendId: string): void {
   }
 }
 
-/** Ms remaining before `friendId` can be pinged again, 0 once it's free. */
-export function pingCooldownRemaining(friendId: string): number {
+function localPingCooldownRemaining(friendId: string): number {
   const startedAt = readPingCooldowns()[cooldownKey(friendId)];
   if (!startedAt) return 0;
   return Math.max(0, startedAt + PING_COOLDOWN_MS - Date.now());
+}
+
+/**
+ * Ms remaining before `friendId` can be pinged again by us, 0 once free.
+ *
+ * Asks the server, which actually knows — unlike the local guess above, this
+ * survives signing out and back in, switching devices, or reinstalling,
+ * because it comes from the same `pings` row the server itself checks.
+ */
+export async function pingCooldownRemaining(friendId: string): Promise<number> {
+  if (!supabase) return localPingCooldownRemaining(friendId);
+  const { data, error } = await supabase.rpc('friend_ping_cooldown', { other: friendId });
+  if (error) return localPingCooldownRemaining(friendId);
+  return Math.max(0, Math.round(Number(data)) * 1000);
 }
 
 export async function listFriends(): Promise<Friend[]> {
@@ -151,11 +165,9 @@ export async function pingFriend(otherId: string): Promise<{ ok: boolean; messag
   const { data, error } = await supabase.rpc('friend_ping', { other: otherId });
   if (error) return { ok: false, message: error.message };
   const code = String(data);
-  // Starts the local cooldown both on a successful ping and on "too soon" —
-  // the latter means some other device already pinged this friend inside the
-  // window, and a full hour is a safe upper bound for it since the exact
-  // remaining time isn't visible to this client.
-  if (code === 'sent' || code === 'too_soon') startPingCooldown(otherId);
+  // Keeps the local fallback roughly in sync too, in case the next read has
+  // to fall back to it (offline, or the server call fails for some reason).
+  if (code === 'sent' || code === 'too_soon') startLocalPingCooldown(otherId);
   return { ok: code === 'sent', message: PING_MESSAGES[code] ?? code };
 }
 

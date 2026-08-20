@@ -32,7 +32,13 @@ export default function TopBar() {
   );
 
   return (
-    <header className="sticky top-0 z-30 bg-carbon-900/95 backdrop-blur border-b-2 border-carbon-800 pt-safe">
+    <header
+      // iOS WKWebView sometimes leaves a `position: sticky` + `backdrop-blur`
+      // element unpainted after a route change (it stays there in the DOM,
+      // just invisible, until something like a scroll forces a repaint) —
+      // forcing its own compositor layer works around it.
+      className="sticky top-0 z-30 bg-carbon-900/95 backdrop-blur border-b-2 border-carbon-800 pt-safe [transform:translateZ(0)]"
+    >
       <div className="max-w-2xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
         <Link to="/home" className="shrink-0 flex items-center gap-2" aria-label="Stonksu">
           <Mascot size={32} mood="happy" />

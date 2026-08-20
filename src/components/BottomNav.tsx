@@ -7,7 +7,10 @@ import { NAV_ITEMS } from './navItems';
 export default function BottomNav() {
   const { pathname } = useLocation();
   return (
-    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-carbon-900/95 backdrop-blur border-t-2 border-carbon-800 pb-safe">
+    <nav
+      // Same fixed + backdrop-blur repaint issue as TopBar — see its comment.
+      className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-carbon-900/95 backdrop-blur border-t-2 border-carbon-800 pb-safe [transform:translateZ(0)]"
+    >
       <div className="flex items-stretch justify-around max-w-md mx-auto px-2 py-2">
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.to;
