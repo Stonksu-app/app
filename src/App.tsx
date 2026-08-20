@@ -19,6 +19,8 @@ import { useUserStore } from './store/useUserStore';
 import { useSyncStore } from './store/useSyncStore';
 import { useCloudSync } from './hooks/useCloudSync';
 import { useStreakReminders } from './hooks/useStreakReminders';
+import { useHeartsReminder } from './hooks/useHeartsReminder';
+
 import RegisterGate from './components/RegisterGate';
 import PingBanner from './components/PingBanner';
 import { useAuthStore } from './store/useAuthStore';
@@ -55,6 +57,7 @@ function App() {
   // already 10 seconds, which comfortably covers the first pull.
   useCloudSync();
   useStreakReminders();
+  useHeartsReminder();
 
   // Watches the session so the nag knows whether this account is anonymous.
   const initAuth = useAuthStore((s) => s.init);

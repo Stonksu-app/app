@@ -6,8 +6,11 @@ import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
 import Mascot from '../components/Mascot';
 import { Button } from '../components/Button';
+import ConfirmModal from '../components/ConfirmModal';
+import { formatCountdown } from '../hooks/useHeartRegen';
 import {
   listFriends,
+  pingCooldownRemaining,
   pingFriend,
   removeFriend,
   requestFriend,
@@ -21,12 +24,26 @@ function FriendRow({
   friend,
   onChanged,
   flash,
+  onRequestRemove,
 }: {
   friend: Friend;
   onChanged: () => void;
   flash: (message: string) => void;
+  onRequestRemove: (friend: Friend) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  // Forces a re-render every second so the ping cooldown counts down live;
+  // the remaining time is read straight from localStorage via
+  // pingCooldownRemaining rather than duplicated into its own state.
+  const [, setTick] = useState(0);
+  const cooldownMs = pingCooldownRemaining(friend.id);
+  const isCoolingDown = cooldownMs > 0;
+
+  useEffect(() => {
+    if (!isCoolingDown) return;
+    const id = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [isCoolingDown]);
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -58,7 +75,7 @@ function FriendRow({
           <Button
             size="sm"
             fullWidth={false}
-            disabled={busy}
+            disabled={busy || cooldownMs > 0}
             onClick={() =>
               void run(async () => {
                 const { message } = await pingFriend(friend.id);
@@ -66,10 +83,10 @@ function FriendRow({
               })
             }
           >
-            Toque
+            {cooldownMs > 0 ? formatCountdown(cooldownMs) : 'Toque'}
           </Button>
           <button
-            onClick={() => void run(() => removeFriend(friend.id))}
+            onClick={() => onRequestRemove(friend)}
             disabled={busy}
             aria-label={`Eliminar a ${friend.name}`}
             className="text-carbon-600 hover:text-danger-400 transition p-1"
@@ -78,6 +95,7 @@ function FriendRow({
           </button>
         </div>
       )}
+
 
       {friend.relation === 'incoming' && (
         <div className="shrink-0 flex items-center gap-2">
@@ -124,6 +142,8 @@ export default function Friends() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<Friend | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const reload = useCallback(async () => {
     setRows(await listFriends());
@@ -155,6 +175,15 @@ export default function Friends() {
   const incoming = rows.filter((r) => r.relation === 'incoming');
   const friends = rows.filter((r) => r.relation === 'friend');
   const outgoing = rows.filter((r) => r.relation === 'outgoing');
+
+  const confirmRemoveFriend = async () => {
+    if (!confirmRemove) return;
+    setRemoving(true);
+    await removeFriend(confirmRemove.id);
+    setRemoving(false);
+    setConfirmRemove(null);
+    void reload();
+  };
 
   return (
     <div className="min-h-dvh bg-carbon-900 lg:flex">
@@ -210,7 +239,7 @@ export default function Friends() {
                   </h2>
                   <div className="mt-2 bg-carbon-850 border-2 border-carbon-800 rounded-2xl px-4">
                     {incoming.map((f) => (
-                      <FriendRow key={f.id} friend={f} onChanged={reload} flash={flash} />
+                      <FriendRow key={f.id} friend={f} onChanged={reload} flash={flash} onRequestRemove={setConfirmRemove} />
                     ))}
                   </div>
                 </>
@@ -230,7 +259,7 @@ export default function Friends() {
               ) : (
                 <div className="mt-2 bg-carbon-850 border-2 border-carbon-800 rounded-2xl px-4">
                   {friends.map((f) => (
-                    <FriendRow key={f.id} friend={f} onChanged={reload} flash={flash} />
+                    <FriendRow key={f.id} friend={f} onChanged={reload} flash={flash} onRequestRemove={setConfirmRemove} />
                   ))}
                 </div>
               )}
@@ -240,7 +269,7 @@ export default function Friends() {
                   <h2 className="mt-8 text-[19px] font-black text-carbon-50">Esperando respuesta</h2>
                   <div className="mt-2 bg-carbon-850 border-2 border-carbon-800 rounded-2xl px-4">
                     {outgoing.map((f) => (
-                      <FriendRow key={f.id} friend={f} onChanged={reload} flash={flash} />
+                      <FriendRow key={f.id} friend={f} onChanged={reload} flash={flash} onRequestRemove={setConfirmRemove} />
                     ))}
                   </div>
                 </>
@@ -249,6 +278,17 @@ export default function Friends() {
           )}
         </div>
       </div>
+
+      {confirmRemove && (
+        <ConfirmModal
+          title={`¿Eliminar a ${confirmRemove.name}?`}
+          message="Dejaréis de ser amigos y tendrás que enviarle otra solicitud si cambias de idea."
+          confirmLabel="Eliminar"
+          busy={removing}
+          onConfirm={() => void confirmRemoveFriend()}
+          onCancel={() => setConfirmRemove(null)}
+        />
+      )}
     </div>
   );
 }

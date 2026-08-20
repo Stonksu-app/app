@@ -48,6 +48,44 @@ const PING_MESSAGES: Record<string, string> = {
   not_signed_in: 'Necesitas una sesión para esto.',
 };
 
+/**
+ * Client-side ping cooldown.
+ *
+ * The server enforces a 1-hour cooldown per friend pair (see friend_ping in
+ * 0004_friends.sql), but row level security only lets a user read pings sent
+ * *to* them, not ones they sent — so there is no "last ping sent" timestamp
+ * to pull from the server. This tracks it locally instead, purely to drive
+ * the button's disabled state and countdown; the server call above remains
+ * the actual source of truth and still rejects an early ping.
+ */
+const PING_COOLDOWN_MS = 60 * 60 * 1000;
+const PING_COOLDOWN_KEY = 'stonksu:ping-cooldowns';
+
+function readPingCooldowns(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(PING_COOLDOWN_KEY) ?? '{}');
+  } catch {
+    return {};
+  }
+}
+
+function startPingCooldown(friendId: string): void {
+  try {
+    const map = readPingCooldowns();
+    map[friendId] = Date.now();
+    localStorage.setItem(PING_COOLDOWN_KEY, JSON.stringify(map));
+  } catch {
+    // Storage might be full or unavailable; the cooldown just won't persist across reloads.
+  }
+}
+
+/** Ms remaining before `friendId` can be pinged again, 0 once it's free. */
+export function pingCooldownRemaining(friendId: string): number {
+  const startedAt = readPingCooldowns()[friendId];
+  if (!startedAt) return 0;
+  return Math.max(0, startedAt + PING_COOLDOWN_MS - Date.now());
+}
+
 export async function listFriends(): Promise<Friend[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.rpc('friend_list');
@@ -100,6 +138,11 @@ export async function pingFriend(otherId: string): Promise<{ ok: boolean; messag
   const { data, error } = await supabase.rpc('friend_ping', { other: otherId });
   if (error) return { ok: false, message: error.message };
   const code = String(data);
+  // Starts the local cooldown both on a successful ping and on "too soon" —
+  // the latter means some other device already pinged this friend inside the
+  // window, and a full hour is a safe upper bound for it since the exact
+  // remaining time isn't visible to this client.
+  if (code === 'sent' || code === 'too_soon') startPingCooldown(otherId);
   return { ok: code === 'sent', message: PING_MESSAGES[code] ?? code };
 }
 

@@ -48,6 +48,10 @@ interface UserState {
   reminderEnabled: boolean;
   /** Hour of the day, 0-23, in local time. */
   reminderHour: number;
+  /** Notify when hearts finish regenerating. Same on-device-only reasoning as
+   *  reminderEnabled: it depends on a permission granted per device, so it's
+   *  never synced to the cloud. */
+  heartsReminderEnabled: boolean;
 
   startOnboarding: () => void;
   setOnboardingAnswer: (key: keyof OnboardingAnswers, value: string) => void;
@@ -75,6 +79,7 @@ interface UserState {
   claimMission: (missionId: string) => void;
   isAccessoryUnlocked: (style: AccessoryStyle) => boolean;
   setReminder: (patch: { enabled?: boolean; hour?: number }) => void;
+  setHeartsReminder: (enabled: boolean) => void;
   resetProgress: () => void;
 }
 
@@ -119,6 +124,7 @@ export const useUserStore = create<UserState>()(
       testMode: false,
       reminderEnabled: false,
       reminderHour: DEFAULT_REMINDER_HOUR,
+      heartsReminderEnabled: false,
 
       startOnboarding: () => set({ onboarded: false }),
 
@@ -319,6 +325,8 @@ export const useUserStore = create<UserState>()(
           reminderHour: patch.hour ?? s.reminderHour,
         })),
 
+      setHeartsReminder: (enabled) => set({ heartsReminderEnabled: enabled }),
+
       resetProgress: () =>
         set({
           name: '',
@@ -345,6 +353,7 @@ export const useUserStore = create<UserState>()(
           testMode: false,
           reminderEnabled: false,
           reminderHour: DEFAULT_REMINDER_HOUR,
+          heartsReminderEnabled: false,
         }),
     }),
     { name: 'stonksu-storage' }

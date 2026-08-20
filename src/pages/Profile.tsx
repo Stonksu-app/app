@@ -6,6 +6,7 @@ import Mascot from '../components/Mascot';
 import Icon from '../components/Icon';
 import AchievementRow from '../components/AchievementRow';
 import ReminderSetting from '../components/ReminderSetting';
+import HeartsReminderSetting from '../components/HeartsReminderSetting';
 import PasswordSetting from '../components/PasswordSetting';
 import { byRelevance, computeAchievements } from '../data/achievements';
 import { getLessonById } from '../data/lessons';
@@ -169,6 +170,7 @@ export default function Profile() {
           )}
 
           <ReminderSetting />
+          <HeartsReminderSetting />
           <PasswordSetting />
 
           <button

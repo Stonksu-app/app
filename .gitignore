@@ -48,3 +48,5 @@ android/local.properties
 android/app/release
 *.apk
 *.aab
+
+graphify-out/

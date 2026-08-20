@@ -135,3 +135,69 @@ export async function ensureChannel(): Promise<void> {
     importance: 4,
   });
 }
+
+/**
+ * Heart-regen reminder.
+ *
+ * A single local notification for the moment the heart bar is full again,
+ * so someone who ran out doesn't have to keep checking back. Same
+ * local-only reasoning as the streak reminders above.
+ */
+const HEARTS_CHANNEL_ID = 'hearts';
+const HEARTS_ID = 4300;
+
+export async function ensureHeartsChannel(): Promise<void> {
+  if (Capacitor.getPlatform() !== 'android') return;
+  await LocalNotifications.createChannel({
+    id: HEARTS_CHANNEL_ID,
+    name: 'Vidas',
+    description: 'Aviso cuando tus vidas se han recargado',
+    importance: 4,
+  });
+}
+
+/**
+ * Replans the hearts-full notification. Idempotent like planStreakReminders:
+ * it cancels whatever it scheduled before, then lays down a fresh one if
+ * hearts are still missing, so it can be called every time hearts or the
+ * setting change without piling anything up.
+ */
+export async function planHeartsNotification(options: {
+  enabled: boolean;
+  hearts: number;
+  maxHearts: number;
+  lastHeartLostAt: string | null;
+  regenMinutes: number;
+}): Promise<void> {
+  if (!notificationsSupported()) return;
+
+  try {
+    await LocalNotifications.cancel({ notifications: [{ id: HEARTS_ID }] });
+  } catch {
+    // Nothing was scheduled yet. Not worth reporting.
+  }
+
+  if (!options.enabled || !(await hasPermission())) return;
+  if (options.hearts >= options.maxHearts || !options.lastHeartLostAt) return;
+
+  const heartsMissing = options.maxHearts - options.hearts;
+  const at = new Date(
+    new Date(options.lastHeartLostAt).getTime() + heartsMissing * options.regenMinutes * 60_000
+  );
+  // Already due - tickHeartRegen will catch it up the moment the app opens.
+  if (at.getTime() <= Date.now()) return;
+
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: HEARTS_ID,
+        title: '¡Tus vidas están completas!',
+        body: 'Ya puedes volver a fallar sin miedo. Vuelve a Stonksu.',
+        schedule: { at, allowWhileIdle: true },
+        channelId: HEARTS_CHANNEL_ID,
+        smallIcon: 'ic_stat_icon_config_sample',
+      },
+    ],
+  });
+}
+
