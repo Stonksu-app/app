@@ -95,8 +95,24 @@ const persistedKeys = Object.keys(storeState).filter(
   (k) => typeof (storeState as Record<string, unknown>)[k] !== 'function'
 );
 const cloudKeys = new Set(Object.keys(sample));
-/** Local-only by design: a debugging switch, not progress. */
-const LOCAL_ONLY = new Set(['testMode', 'reminderEnabled', 'reminderHour']);
+/**
+ * Local-only by design, each for its own reason.
+ *
+ * Listing them here is the point of the check: a field left out of the cloud
+ * mapping by accident looks exactly like one left out on purpose, so the only
+ * difference that can be enforced is whether someone wrote it down.
+ *
+ * - testMode: a debugging switch, not progress.
+ * - reminder*: the notification permission behind them is granted per device.
+ * - frozenDates: cosmetic annotation on this device's streak calendar.
+ */
+const LOCAL_ONLY = new Set([
+  'testMode',
+  'reminderEnabled',
+  'reminderHour',
+  'heartsReminderEnabled',
+  'frozenDates',
+]);
 
 for (const key of persistedKeys) {
   if (LOCAL_ONLY.has(key)) {

@@ -156,6 +156,12 @@ export interface SkillNode {
   position: { x: number; y: number };
   intro?: NodeIntro;
   difficulty: NodeDifficulty;
+  /** SECTION: Represents the Duolingo "section" (e.g., Section 1, Section 2).
+   *  Nodes sharing a section render under one section banner. */
+  section?: { number: number; title: string };
+  /** UNIT: Represents the Duolingo "unit" within a section (e.g., Unit 1, Unit 2).
+   *  Nodes sharing both section and unit render under one unit banner. */
+  unit?: { number: number; title: string };
 }
 
 export interface Badge {

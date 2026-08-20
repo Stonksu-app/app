@@ -9,6 +9,8 @@ export const SKILL_TREE: SkillNode[] = [
     requires: [],
     position: { x: 50, y: 0 },
     difficulty: 'hard',
+    section: { number: 1, title: 'Fundamentos del mercado' },
+    unit: { number: 1, title: 'Introducción al Trading' },
     intro: {
       flashcards: [
         { id: 'fc-broker', term: 'Bróker', definition: 'Plataforma que te da acceso a comprar y vender en los mercados.' },
@@ -230,6 +232,8 @@ export const SKILL_TREE: SkillNode[] = [
     requires: ['fundamentos'],
     position: { x: 20, y: 1 },
     difficulty: 'medium',
+    section: { number: 1, title: 'Fundamentos del mercado' },
+    unit: { number: 2, title: 'Patrones de Velas' },
     intro: {
       flashcards: [
         { id: 'fc-vela-alcista', term: 'Vela alcista', definition: 'Cierre por encima de la apertura (verde).' },
@@ -435,6 +439,8 @@ export const SKILL_TREE: SkillNode[] = [
     requires: ['velas-japonesas'],
     position: { x: 80, y: 2 },
     difficulty: 'easy',
+    section: { number: 2, title: 'Lectura técnica' },
+    unit: { number: 1, title: 'Soportes y Resistencias' },
     intro: {
       flashcards: [
         { id: 'fc-soporte', term: 'Soporte', definition: 'Zona donde la caída del precio tiende a detenerse.' },
@@ -621,6 +627,8 @@ export const SKILL_TREE: SkillNode[] = [
     requires: ['soportes-resistencias'],
     position: { x: 50, y: 3 },
     difficulty: 'medium',
+    section: { number: 2, title: 'Lectura técnica' },
+    unit: { number: 2, title: 'Indicadores Técnicos' },
     intro: {
       flashcards: [
         { id: 'fc-ma', term: 'Media móvil', definition: 'Promedio del precio de las últimas N velas. Suaviza el ruido.' },
@@ -882,6 +890,8 @@ export const SKILL_TREE: SkillNode[] = [
     requires: ['indicadores'],
     position: { x: 20, y: 4 },
     difficulty: 'medium',
+    section: { number: 3, title: 'Gestión y mentalidad' },
+    unit: { number: 1, title: 'Protección de Capital' },
     intro: {
       flashcards: [
         { id: 'fc-stop-loss', term: 'Stop loss', definition: 'Orden que cierra la operación en una pérdida que tú decides de antemano.' },
@@ -1142,6 +1152,8 @@ export const SKILL_TREE: SkillNode[] = [
     requires: ['gestion-riesgo'],
     position: { x: 80, y: 5 },
     difficulty: 'medium',
+    section: { number: 3, title: 'Gestión y mentalidad' },
+    unit: { number: 2, title: 'Psicología del Trading' },
     intro: {
       flashcards: [
         { id: 'fc-fomo', term: 'FOMO', definition: 'Miedo a quedarte fuera: entrar tarde solo porque algo está subiendo.' },
@@ -1402,6 +1414,8 @@ export const SKILL_TREE: SkillNode[] = [
     requires: ['psicologia'],
     position: { x: 50, y: 6 },
     difficulty: 'medium',
+    section: { number: 4, title: 'Operativa avanzada' },
+    unit: { number: 1, title: 'Tipos de Órdenes' },
     intro: {
       flashcards: [
         { id: 'fc-mercado', term: 'Orden de mercado', definition: 'Se ejecuta ya, al mejor precio que haya disponible.' },
@@ -1664,6 +1678,8 @@ export const SKILL_TREE: SkillNode[] = [
     requires: ['ordenes'],
     position: { x: 20, y: 7 },
     difficulty: 'medium',
+    section: { number: 4, title: 'Operativa avanzada' },
+    unit: { number: 2, title: 'Análisis Fundamental' },
     intro: {
       flashcards: [
         { id: 'fc-af', term: 'Análisis fundamental', definition: 'Estudiar lo que vale un activo por sus datos, no por su gráfico.' },
@@ -1917,6 +1933,30 @@ export const SKILL_TREE: SkillNode[] = [
     ],
   },
 ];
+
+export interface Section {
+  number: number;
+  title: string;
+  /** In path order, which is also unlock order. */
+  units: SkillNode[];
+}
+
+/**
+ * The tree grouped into sections, in the order the path walks them.
+ *
+ * Derived rather than stored: the section a topic belongs to already lives on
+ * the topic, and a second list would be one more thing to keep in step.
+ */
+export function getSections(): Section[] {
+  const byNumber = new Map<number, Section>();
+  for (const node of SKILL_TREE) {
+    if (!node.section) continue;
+    const existing = byNumber.get(node.section.number);
+    if (existing) existing.units.push(node);
+    else byNumber.set(node.section.number, { ...node.section, units: [node] });
+  }
+  return [...byNumber.values()].sort((a, b) => a.number - b.number);
+}
 
 export function getNodeById(id: string): SkillNode | undefined {
   return SKILL_TREE.find((n) => n.id === id);

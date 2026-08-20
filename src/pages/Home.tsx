@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar';
 import NavRail from '../components/NavRail';
@@ -26,6 +26,16 @@ const NODE_PITCH = 116;
  *  at two, you'd have to platinum two whole subjects before seeing one.
  *  The payout itself lives in the store as CHEST_REWARD. */
 const CHEST_EVERY = 1;
+
+/** One banner style per unit, cycling if more units get added later — same
+ *  idea as Duolingo's colour-coded section banners, so each stretch of the
+ *  path reads as its own chapter instead of one long undifferentiated list. */
+const UNIT_STYLES = [
+  { bg: 'bg-lime-500', text: 'text-carbon-900', sub: 'text-carbon-900/70', chip: 'bg-carbon-900/15 hover:bg-carbon-900/25 text-carbon-900' },
+  { bg: 'bg-sky-500', text: 'text-carbon-900', sub: 'text-carbon-900/70', chip: 'bg-carbon-900/15 hover:bg-carbon-900/25 text-carbon-900' },
+  { bg: 'bg-amber-500', text: 'text-carbon-900', sub: 'text-carbon-900/70', chip: 'bg-carbon-900/15 hover:bg-carbon-900/25 text-carbon-900' },
+  { bg: 'bg-fuchsia-500', text: 'text-carbon-50', sub: 'text-carbon-50/70', chip: 'bg-carbon-50/15 hover:bg-carbon-50/25 text-carbon-50' },
+];
 
 function StatRail({
   hearts,
@@ -175,14 +185,96 @@ export default function Home() {
    *  "empezar" marker point at. */
   const current = nodes.find((n) => n.unlocked && !n.platinum && n.node.lessons.length > 0) ?? null;
 
+  /**
+   * The unit the banner is describing.
+   *
+   * Follows the scroll rather than progress, which is what Duolingo does and
+   * what makes the header useful: scrolling ahead to see what's coming should
+   * tell you what you're looking at, not keep repeating where you left off.
+   * Falls back to the unit being played, which is what you see on arrival.
+   */
+  const [scrolledUnit, setScrolledUnit] = useState<{ section: number; unit: number; title: string } | null>(null);
+
+  useEffect(() => {
+    let queued = false;
+    const update = () => {
+      queued = false;
+      const markers = document.querySelectorAll<HTMLElement>('[data-unit]');
+      let latest: { section: number; unit: number; title: string } | null = null;
+      markers.forEach((el) => {
+        // Anything whose divider has passed under the banner is a unit we are
+        // now inside; the last such one wins.
+        if (el.getBoundingClientRect().top <= 72) {
+          const [section, unit, title] = (el.dataset.unit ?? '').split('|');
+          latest = { section: Number(section), unit: Number(unit), title };
+        }
+      });
+      setScrolledUnit(latest);
+    };
+
+    // Coalesced into a frame: a scroll listener that measures on every event
+    // would read layout dozens of times per gesture.
+    const onScroll = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  // Keyed on nodes rather than the derived path: the dividers come from these,
+  // and pathItems is built further down.
+  }, [nodes]);
+
+  const shownUnit =
+    scrolledUnit ??
+    (current?.node.section && current.node.unit
+      ? { section: current.node.section.number, unit: current.node.unit.number, title: current.node.unit.title }
+      : null);
+
+  const unitStyle = UNIT_STYLES[((shownUnit?.section ?? 1) - 1) % UNIT_STYLES.length];
+
   /** Topics and chests woven into a single walkable list, so the sway offset
    *  applies to both and the chest genuinely sits on the path. */
   const pathItems = useMemo(() => {
     type Item =
       | { kind: 'node'; key: string; data: (typeof nodes)[number] }
-      | { kind: 'chest'; key: string; unlocked: boolean; opened: boolean };
+      | { kind: 'chest'; key: string; unlocked: boolean; opened: boolean }
+      /** Marks where a unit begins, and says so louder when a whole section
+       *  does. Duolingo puts the coloured banner at the top of the screen and
+       *  a quiet line in the path itself — the banner tells you where you are,
+       *  the line tells you where one chapter ended and the next began. */
+      | {
+          kind: 'divider';
+          key: string;
+          section: number;
+          sectionTitle: string;
+          startsSection: boolean;
+          unit: number;
+          title: string;
+        };
     const items: Item[] = [];
+    let lastSection: number | null = null;
+    let lastUnit: number | null = null;
+
     nodes.forEach((n, i) => {
+      const { section, unit } = n.node;
+      if (section && unit && (section.number !== lastSection || unit.number !== lastUnit)) {
+        const startsSection = section.number !== lastSection;
+        items.push({
+          kind: 'divider',
+          key: `divider-${section.number}-${unit.number}`,
+          section: section.number,
+          sectionTitle: section.title,
+          startsSection,
+          unit: unit.number,
+          title: unit.title,
+        });
+        lastSection = section.number;
+        lastUnit = unit.number;
+      }
+
       items.push({ kind: 'node', key: n.node.id, data: n });
       const lastOne = i === nodes.length - 1;
       if (!lastOne && (i + 1) % CHEST_EVERY === 0) {
@@ -209,20 +301,39 @@ export default function Home() {
       {/* pb-32 keeps the last node clear of the fixed BottomNav on phones. */}
       <main className="flex-1 min-w-0 px-4 pb-32 lg:pb-6 lg:py-6">
         <div className="max-w-[600px] mx-auto">
-          {/* Section banner */}
-          <div className="mt-4 lg:mt-0 bg-lime-500 rounded-2xl px-5 py-4 flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-[13px] font-black text-carbon-900/70 uppercase tracking-wide">
-                {current ? `Etapa ${current.stage + 1} de ${current.maxStage}` : 'Todo platinado'}
+          {/* The unit you are on, pinned to the top the way Duolingo does it,
+              so the answer to "where am I?" survives scrolling down the path.
+              Coloured per section, which is what makes one chapter feel
+              different from the next rather than the palette wandering. */}
+          <div
+            // Pinned to the very top, not below the phone's TopBar: that bar
+            // is marked sticky but its wrapper is exactly its own height, so
+            // it has no room to travel and scrolls away regardless. Offsetting
+            // for a bar that isn't there would leave a gap. They never collide
+            // — by the time this reaches the top, that one has already gone.
+            className={`sticky top-0 z-20 mt-4 lg:mt-0 ${unitStyle.bg} rounded-2xl px-4 py-3.5 flex items-center gap-3`}
+          >
+            <Link
+              to="/secciones"
+              aria-label="Ver todas las secciones"
+              className={`shrink-0 -ml-1 p-1 rounded-lg transition ${unitStyle.chip}`}
+            >
+              <Icon name="chevron-left" size={22} strokeWidth={2.6} />
+            </Link>
+
+            <div className="min-w-0 flex-1">
+              <p className={`text-[13px] font-black uppercase tracking-[0.8px] ${unitStyle.sub}`}>
+                {shownUnit ? `Sección ${shownUnit.section}, Unidad ${shownUnit.unit}` : 'Todo platinado'}
               </p>
-              <h1 className="text-xl font-black text-carbon-900 truncate">
-                {current ? current.node.title : `¡Bien hecho, ${name || 'trader'}!`}
+              <h1 className={`text-xl font-black truncate ${unitStyle.text}`}>
+                {shownUnit ? shownUnit.title : `¡Bien hecho, ${name || 'trader'}!`}
               </h1>
             </div>
+
             {current && (
               <Link
                 to={`/guia?tema=${current.node.id}`}
-                className="shrink-0 flex items-center gap-1.5 bg-carbon-900/15 hover:bg-carbon-900/25 text-carbon-900 font-black text-[13px] uppercase tracking-wide rounded-xl px-3 py-2.5 transition"
+                className={`shrink-0 flex items-center gap-1.5 font-black text-[13px] uppercase tracking-wide rounded-xl px-3 py-2.5 transition ${unitStyle.chip}`}
               >
                 <Icon name="clipboard" size={16} /> Guía
               </Link>
@@ -278,6 +389,34 @@ export default function Home() {
                         'PLATINA PARA ABRIR'
                       )}
                     </span>
+                  </div>
+                );
+              }
+
+              if (item.kind === 'divider') {
+                // Deliberately not swayed: the path weaves, the chapter marks
+                // stay straight, which is what makes them read as structure
+                // rather than as another thing on the trail.
+                return (
+                  <div
+                    key={item.key}
+                    data-unit={`${item.section}|${item.unit}|${item.title}`}
+                    className="w-full"
+                    style={{ marginBottom: NODE_PITCH - 70 }}
+                  >
+                    {item.startsSection && (
+                      <div className="text-center mb-6 mt-4 first:mt-0">
+                        <p className="text-[25px] font-black text-carbon-200 leading-tight">
+                          Sección {item.section}
+                        </p>
+                        <p className="text-sm text-carbon-500 mt-0.5">{item.sectionTitle}</p>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-4">
+                      <span className="h-0.5 flex-1 bg-carbon-800" />
+                      <h2 className="text-[19px] font-black text-carbon-500 text-center">{item.title}</h2>
+                      <span className="h-0.5 flex-1 bg-carbon-800" />
+                    </div>
                   </div>
                 );
               }
