@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { isCloudEnabled } from '../lib/supabase';
+import { isCloudEnabled, supabase } from '../lib/supabase';
 import { ensureSession, hasProgress, pullState, pushState, restartSession, type CloudState } from '../lib/cloud';
 import { suffixName } from '../lib/names';
 import { useUserStore } from '../store/useUserStore';
@@ -130,14 +130,13 @@ export function useCloudSync(): void {
     };
 
     let unsubscribe: (() => void) | undefined;
+    // Guards the auth-change listener below from acting on the very session
+    // the initial resolution is still busy settling.
+    let initialised = false;
 
-    (async () => {
-      const id = await ensureSession();
-      if (cancelled) return;
-      if (!id) {
-        setStatus('error');
-        return;
-      }
+    /** Pulls and adopts whichever account `id` belongs to. Used both for the
+     *  session found at mount and for one that arrives afterwards. */
+    const adoptSession = async (id: string) => {
       userId.current = id;
       setUserId(id);
 
@@ -168,14 +167,50 @@ export function useCloudSync(): void {
       if (cancelled) return;
 
       setStatus('ready');
+    };
+
+    (async () => {
+      const id = await ensureSession();
+      if (cancelled) return;
+      if (!id) {
+        setStatus('error');
+        return;
+      }
+      await adoptSession(id);
+      initialised = true;
+      if (cancelled) return;
+
       unsubscribe = useUserStore.subscribe(schedulePush);
       document.addEventListener('visibilitychange', onHide);
       window.addEventListener('pagehide', flush);
     })();
 
+    // Catches a sign-in that lands *after* the block above already resolved
+    // a session — the native OAuth round trip: the app opens with an
+    // anonymous session, that pull finishes, and only then does the deep
+    // link come back with an existing, already-registered account. Without
+    // this the profile that was just pulled (empty, "not onboarded") is the
+    // one left standing, so the player is sent to onboarding despite already
+    // having a finished profile — until the app is restarted and getSession()
+    // picks the real session up from scratch.
+    let authSubscription: { unsubscribe: () => void } | undefined;
+    if (supabase) {
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (!initialised) return; // still settling the session found at mount
+        const newId = session?.user.id ?? null;
+        if (!newId || newId === userId.current) return;
+        // Push whatever this device holds under the outgoing account first,
+        // then switch and pull the incoming one's real profile.
+        flush();
+        void adoptSession(newId);
+      });
+      authSubscription = data.subscription;
+    }
+
     return () => {
       cancelled = true;
       unsubscribe?.();
+      authSubscription?.unsubscribe();
       document.removeEventListener('visibilitychange', onHide);
       window.removeEventListener('pagehide', flush);
       if (timer) clearTimeout(timer);
