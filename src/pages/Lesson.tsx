@@ -97,6 +97,19 @@ export default function Lesson() {
   const [showOutOfHearts, setShowOutOfHearts] = useState(false);
   const [enteredWithNoHearts] = useState(() => hearts <= 0);
 
+  // Above the early returns below, and it has to stay there: those returns
+  // skip everything after them, so a hook placed lower is called on some
+  // renders and not others. React counts hooks by order, so the first render
+  // where the condition flips crashes the lesson outright.
+  useEffect(() => {
+    if (!outOfHearts) return;
+    // Just long enough for the red flash on the wrong answer to register —
+    // any longer and there's a window to tap "continuar" or another option
+    // before the lock screen takes over.
+    const t = setTimeout(() => setShowOutOfHearts(true), 700);
+    return () => clearTimeout(t);
+  }, [outOfHearts]);
+
   if (!data || activities.length === 0) {
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-carbon-900 p-6 text-center">
@@ -202,15 +215,6 @@ export default function Lesson() {
     setMascotLine(randomLine(correct ? 'correct' : 'incorrect'));
     trackResult(correct);
   };
-
-  useEffect(() => {
-    if (!outOfHearts) return;
-    // Just long enough for the red flash on the wrong answer to register —
-    // any longer and there's a window to tap "continuar" or another option
-    // before the lock screen takes over.
-    const t = setTimeout(() => setShowOutOfHearts(true), 700);
-    return () => clearTimeout(t);
-  }, [outOfHearts]);
 
   if (showOutOfHearts) return <OutOfHeartsScreen />;
 
