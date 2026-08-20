@@ -33,11 +33,14 @@ export default function TopBar() {
 
   return (
     <header
-      // iOS WKWebView sometimes leaves a `position: sticky` + `backdrop-blur`
-      // element unpainted after a route change (it stays there in the DOM,
-      // just invisible, until something like a scroll forces a repaint) —
-      // forcing its own compositor layer works around it.
-      className="sticky top-0 z-30 bg-carbon-900/95 backdrop-blur border-b-2 border-carbon-800 pt-safe [transform:translateZ(0)]"
+      // Plain solid background, no `backdrop-blur`: on WKWebView (iOS) a
+      // `backdrop-filter` on a sticky/fixed element sometimes fails to
+      // repaint after a route change (it stays in the DOM but goes
+      // invisible, or in the worst case its sticky positioning itself stops
+      // being honoured and it scrolls away with the rest of the page,
+      // uncovering the status bar). A solid background sidesteps the whole
+      // bug class instead of trying to force a repaint around it.
+      className="sticky top-0 z-30 bg-carbon-900 border-b-2 border-carbon-800 pt-safe"
     >
       <div className="max-w-2xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
         <Link to="/home" className="shrink-0 flex items-center gap-2" aria-label="Stonksu">

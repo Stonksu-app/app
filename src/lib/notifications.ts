@@ -137,30 +137,35 @@ export async function ensureChannel(): Promise<void> {
 }
 
 /**
- * Heart-regen reminder.
+ * Heart-regen reminders.
  *
- * A single local notification for the moment the heart bar is full again,
- * so someone who ran out doesn't have to keep checking back. Same
- * local-only reasoning as the streak reminders above.
+ * One local notification per heart that comes back, plus the last of them
+ * doubling as "the bar is full" — someone who ran out gets to see their
+ * hearts trickling back in instead of only finding out once it's all done,
+ * without having to keep the app open and checking. Same local-only
+ * reasoning as the streak reminders above.
  */
 const HEARTS_CHANNEL_ID = 'hearts';
-const HEARTS_ID = 4300;
+const HEARTS_ID_BASE = 4300;
+/** Generous upper bound on how many of these could ever be pending at once,
+ *  used only to know which ids to clear before replanning. */
+const MAX_HEARTS_NOTIFICATIONS = 10;
 
 export async function ensureHeartsChannel(): Promise<void> {
   if (Capacitor.getPlatform() !== 'android') return;
   await LocalNotifications.createChannel({
     id: HEARTS_CHANNEL_ID,
     name: 'Vidas',
-    description: 'Aviso cuando tus vidas se han recargado',
+    description: 'Avisos cuando se te recargan las vidas',
     importance: 4,
   });
 }
 
 /**
- * Replans the hearts-full notification. Idempotent like planStreakReminders:
- * it cancels whatever it scheduled before, then lays down a fresh one if
- * hearts are still missing, so it can be called every time hearts or the
- * setting change without piling anything up.
+ * Replans the hearts-regen notifications. Idempotent like
+ * planStreakReminders: it cancels whatever it scheduled before, then lays
+ * down one notification per heart still missing, so it can be called every
+ * time hearts or the setting change without piling anything up.
  */
 export async function planHeartsNotification(options: {
   enabled: boolean;
@@ -171,8 +176,9 @@ export async function planHeartsNotification(options: {
 }): Promise<void> {
   if (!notificationsSupported()) return;
 
+  const ids = Array.from({ length: MAX_HEARTS_NOTIFICATIONS }, (_, i) => ({ id: HEARTS_ID_BASE + i }));
   try {
-    await LocalNotifications.cancel({ notifications: [{ id: HEARTS_ID }] });
+    await LocalNotifications.cancel({ notifications: ids });
   } catch {
     // Nothing was scheduled yet. Not worth reporting.
   }
@@ -181,23 +187,30 @@ export async function planHeartsNotification(options: {
   if (options.hearts >= options.maxHearts || !options.lastHeartLostAt) return;
 
   const heartsMissing = options.maxHearts - options.hearts;
-  const at = new Date(
-    new Date(options.lastHeartLostAt).getTime() + heartsMissing * options.regenMinutes * 60_000
-  );
-  // Already due - tickHeartRegen will catch it up the moment the app opens.
-  if (at.getTime() <= Date.now()) return;
+  const lostAt = new Date(options.lastHeartLostAt).getTime();
+  const regenMs = options.regenMinutes * 60_000;
+  const now = Date.now();
 
-  await LocalNotifications.schedule({
-    notifications: [
-      {
-        id: HEARTS_ID,
-        title: '¡Tus vidas están completas!',
-        body: 'Ya puedes volver a fallar sin miedo. Vuelve a Stonksu.',
-        schedule: { at, allowWhileIdle: true },
-        channelId: HEARTS_CHANNEL_ID,
-        smallIcon: 'ic_stat_icon_config_sample',
-      },
-    ],
-  });
+  const notifications = [];
+  for (let i = 1; i <= heartsMissing; i++) {
+    const at = new Date(lostAt + i * regenMs);
+    // Already due - tickHeartRegen will catch it up the moment the app opens.
+    if (at.getTime() <= now) continue;
+
+    const isLast = i === heartsMissing;
+    const heartsByThen = options.hearts + i;
+    notifications.push({
+      id: HEARTS_ID_BASE + i - 1,
+      title: isLast ? '¡Tus vidas están completas!' : 'Se te ha recargado una vida',
+      body: isLast
+        ? 'Ya puedes volver a fallar sin miedo. Vuelve a Stonksu.'
+        : `Ya tienes ${heartsByThen} de ${options.maxHearts} vidas.`,
+      schedule: { at, allowWhileIdle: true },
+      channelId: HEARTS_CHANNEL_ID,
+      smallIcon: 'ic_stat_icon_config_sample',
+    });
+  }
+
+  if (notifications.length) await LocalNotifications.schedule({ notifications });
 }
 

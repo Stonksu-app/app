@@ -34,7 +34,7 @@ export default function HeartsReminderSetting() {
           <h2 className="text-[19px] font-black text-carbon-50">Aviso de vidas</h2>
           <p className="text-sm text-carbon-400 mt-0.5">
             {supported
-              ? 'Un aviso cuando tus vidas se hayan recargado del todo.'
+              ? 'Un aviso cada vez que se te recargue una vida, y otro cuando estén todas.'
               : 'Solo en la app del móvil. En el navegador no hay avisos.'}
           </p>
         </div>
