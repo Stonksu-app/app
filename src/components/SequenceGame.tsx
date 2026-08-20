@@ -3,7 +3,7 @@ import type { SequenceGame as SequenceGameType } from '../types';
 import { Button } from './Button';
 import { shuffle } from '../utils/shuffle';
 
-const ROW_HEIGHT = 60;
+const ROW_HEIGHT = 82;
 
 export default function SequenceGame({
   steps,
@@ -44,7 +44,9 @@ export default function SequenceGame({
   };
 
   const handlePointerDown = (e: React.PointerEvent, id: string) => {
-    if (checked) return;
+    // Only a solved order should freeze the boxes — after a wrong guess you
+    // still need to be able to drag them into a new order to try again.
+    if (checked && isCorrect) return;
     (e.target as Element).setPointerCapture(e.pointerId);
     setDragId(id);
     dragFromIndexRef.current = order.indexOf(id);
@@ -100,19 +102,19 @@ export default function SequenceGame({
               onPointerMove={(e) => handlePointerMove(e, id)}
               onPointerUp={() => endDrag(id)}
               onPointerCancel={() => endDrag(id)}
-              className={`absolute left-0 right-0 flex items-center gap-3 px-3 py-3 rounded-xl border-2 text-sm font-bold touch-none cursor-grab active:cursor-grabbing ${
+              className={`absolute left-0 right-0 flex items-center gap-3 px-3 py-3 rounded-xl border-2 text-sm font-bold touch-none cursor-grab active:cursor-grabbing overflow-hidden ${
                 isDragging ? 'z-10 shadow-lg' : 'transition-transform duration-200'
               } ${
                 checked && isCorrect
                   ? 'border-lime-500 bg-lime-500/10 text-lime-300'
                   : 'border-carbon-800 bg-carbon-850 text-carbon-100'
               }`}
-              style={{ top, transform: `translateY(${offset}px)` }}
+              style={{ top, height: ROW_HEIGHT - 8, transform: `translateY(${offset}px)` }}
             >
               <span className="w-6 h-6 rounded-full bg-carbon-800 text-carbon-300 text-xs font-black flex items-center justify-center shrink-0">
                 {i + 1}
               </span>
-              <span className="flex-1">{step.label}</span>
+              <span className="flex-1 line-clamp-2 leading-snug">{step.label}</span>
             </div>
           );
         })}

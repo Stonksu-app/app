@@ -205,7 +205,10 @@ export default function Lesson() {
 
   useEffect(() => {
     if (!outOfHearts) return;
-    const t = setTimeout(() => setShowOutOfHearts(true), 1400);
+    // Just long enough for the red flash on the wrong answer to register —
+    // any longer and there's a window to tap "continuar" or another option
+    // before the lock screen takes over.
+    const t = setTimeout(() => setShowOutOfHearts(true), 700);
     return () => clearTimeout(t);
   }, [outOfHearts]);
 
