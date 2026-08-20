@@ -232,9 +232,13 @@ button {
   animation: heart-lose 0.55s ease-in-out;
 }
 
+/* Stacked with the .btn-3d lip (first shadow) so the pulse doesn't replace
+   it — a single animated box-shadow would overwrite the lip entirely on each
+   frame, making the button's bottom edge flicker away and look clipped
+   (most visible on iOS Safari/WebKit). */
 @keyframes pulse-ring {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(198, 255, 52, 0.45); }
-  50% { box-shadow: 0 0 0 10px rgba(198, 255, 52, 0); }
+  0%, 100% { box-shadow: 0 4px 0 var(--btn-lip), 0 0 0 0 rgba(198, 255, 52, 0.45); }
+  50% { box-shadow: 0 4px 0 var(--btn-lip), 0 0 0 10px rgba(198, 255, 52, 0); }
 }
 .animate-pulse-ring {
   animation: pulse-ring 1.3s ease-out infinite;
