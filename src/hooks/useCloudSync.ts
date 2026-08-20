@@ -202,6 +202,13 @@ export function useCloudSync(): void {
         // Push whatever this device holds under the outgoing account first,
         // then switch and pull the incoming one's real profile.
         flush();
+        // Back to 'connecting' so RequireOnboarded waits for the real profile
+        // instead of deciding from the outgoing account's stale `onboarded`
+        // (still in the store until adoptSession's pull resolves) — without
+        // this, a route change fired the instant auth flips to "registered"
+        // reads a not-onboarded flag that belongs to the account being left
+        // behind and bounces an existing player into onboarding.
+        setStatus('connecting');
         void adoptSession(newId);
       });
       authSubscription = data.subscription;
