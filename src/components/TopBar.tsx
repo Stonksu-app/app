@@ -40,9 +40,14 @@ export default function TopBar() {
       // being honoured and it scrolls away with the rest of the page,
       // uncovering the status bar). A solid background sidesteps the whole
       // bug class instead of trying to force a repaint around it.
-      className="sticky top-0 z-30 bg-carbon-900 border-b-2 border-carbon-800 pt-safe"
+      // `lg:hidden` lives here rather than on a wrapper: a sticky element can
+      // only travel inside its parent's box, and a wrapper drawn around a
+      // single header is exactly the header's height — so it stuck to
+      // nothing and scrolled away with the page. Its parent is now the page
+      // itself, which is as tall as the scroll.
+      className="lg:hidden sticky top-0 z-30 bg-carbon-900 border-b-2 border-carbon-800 pt-safe"
     >
-      <div className="max-w-2xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
+      <div className="max-w-2xl mx-auto px-3 h-[calc(var(--topbar-h)-2px)] flex items-center justify-between gap-2">
         <Link to="/home" className="shrink-0 flex items-center gap-2" aria-label="Stonksu">
           <Mascot size={32} mood="happy" />
           {testMode && (

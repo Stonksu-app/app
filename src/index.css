@@ -79,6 +79,13 @@ button {
    element whose padding on that side is theirs alone. Combined with py-* they
    silently win and zero it out on any screen without an inset — if you need
    both, write calc(<your padding> + env(safe-area-inset-*)) instead. */
+/* The phone stat bar's collapsed height, border included. The banner parks
+   below it, so the two have to agree on one number rather than each guessing
+   — 4px of disagreement is a header clipping the banner's rounded corner. */
+:root {
+  --topbar-h: 54px;
+}
+
 .pt-safe {
   padding-top: env(safe-area-inset-top);
 }
@@ -354,8 +361,11 @@ html::-webkit-scrollbar,
    with a highlight that sweeps across it. The sweep is what sells it — a flat
    gradient looks like just another colour, while something that catches the
    light looks like a material. */
+/* No `position` here on purpose. This file is unlayered, so anything it sets
+   outranks Tailwind's utilities — a blanket `position: relative` silently
+   unstuck the unit banner, which is sticky. Each user brings its own
+   positioning; all this needs is for the sweep to be clipped. */
 .platinum-node {
-  position: relative;
   overflow: hidden;
   background-image: linear-gradient(150deg, #7dd3fc 0%, #38bdf8 35%, #2563eb 100%);
   box-shadow:

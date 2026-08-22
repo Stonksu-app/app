@@ -238,17 +238,22 @@ export default function Home() {
    * Falls back to the unit being played, which is what you see on arrival.
    */
   const [scrolledUnit, setScrolledUnit] = useState<{ section: number; unit: number; title: string } | null>(null);
+  const banner = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let queued = false;
     const update = () => {
       queued = false;
+      // Measured, not assumed: where the banner ends depends on whether the
+      // stat bar is above it, how deep the notch is, and whether the title
+      // needed a second line.
+      const threshold = banner.current?.getBoundingClientRect().bottom ?? 72;
       const markers = document.querySelectorAll<HTMLElement>('[data-unit]');
       let latest: { section: number; unit: number; title: string } | null = null;
       markers.forEach((el) => {
         // Anything whose divider has passed under the banner is a unit we are
         // now inside; the last such one wins.
-        if (el.getBoundingClientRect().top <= 72) {
+        if (el.getBoundingClientRect().top <= threshold) {
           const [section, unit, title] = (el.dataset.unit ?? '').split('|');
           latest = { section: Number(section), unit: Number(unit), title };
         }
@@ -379,9 +384,7 @@ export default function Home() {
     <div className="min-h-dvh bg-carbon-900 lg:flex">
       <NavRail />
 
-      <div className="lg:hidden">
         <TopBar />
-      </div>
 
       {/* pb-32 keeps the last node clear of the fixed BottomNav on phones. */}
       <main className="flex-1 min-w-0 px-4 pb-32 lg:pb-6 lg:py-6">
@@ -391,12 +394,11 @@ export default function Home() {
               Coloured per section, which is what makes one chapter feel
               different from the next rather than the palette wandering. */}
           <div
-            // Pinned to the very top, not below the phone's TopBar: that bar
-            // is marked sticky but its wrapper is exactly its own height, so
-            // it has no room to travel and scrolls away regardless. Offsetting
-            // for a bar that isn't there would leave a gap. They never collide
-            // — by the time this reaches the top, that one has already gone.
-            className={`sticky top-0 z-20 mt-4 lg:mt-0 ${unitStyle.bg} rounded-2xl px-4 py-3.5 flex items-center gap-3`}
+            ref={banner}
+            // Parks below the phone's stat bar, which is pinned too: the
+            // bar's own height plus whatever the notch takes. On desktop that
+            // bar isn't there and the banner goes to the very top.
+            className={`sticky top-[calc(var(--topbar-h)_+_env(safe-area-inset-top))] lg:top-0 z-20 mt-4 lg:mt-0 ${unitStyle.bg} rounded-2xl px-4 py-3.5 flex items-center gap-3`}
           >
             <Link
               to="/secciones"
@@ -558,7 +560,7 @@ export default function Home() {
                       }}
                       className={`btn-3d w-[70px] h-[70px] rounded-full flex items-center justify-center ${
                         platinum
-                          ? 'platinum-node platinum-glow text-white'
+                          ? 'relative platinum-node platinum-glow text-white'
                           : unlocked
                           ? 'bg-lime-500 text-carbon-900'
                           : 'bg-carbon-800 text-carbon-600 cursor-not-allowed'
@@ -660,7 +662,7 @@ export default function Home() {
                   // Same blue and the same sweep as the node on the path, so
                   // opening a mastered topic confirms what the map promised
                   // instead of dropping back to a plain grey line.
-                  <p className="platinum-node -m-3 rounded-2xl px-3 py-3 flex items-center justify-center gap-1.5 text-sm font-black text-white">
+                  <p className="relative platinum-node -m-3 rounded-2xl px-3 py-3 flex items-center justify-center gap-1.5 text-sm font-black text-white">
                     <Icon name="diamond" size={16} className="relative z-10 text-white" />
                     <span className="relative z-10">¡PLATINO conseguido!</span>
                   </p>

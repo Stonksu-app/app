@@ -39,9 +39,7 @@ export default function Missions() {
       <BottomNav />
 
       <div className="flex-1 min-w-0">
-        <div className="lg:hidden">
           <TopBar />
-        </div>
 
         <div className="max-w-2xl mx-auto px-4 py-6 pb-32 lg:pb-6">
           <h1 className="text-2xl font-black text-carbon-50">Misiones</h1>
