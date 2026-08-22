@@ -212,10 +212,21 @@ export default function StatPanel({ stat, compact = false }: { stat: StatKey; co
   return (
     <>
       <p className="text-xl font-black text-carbon-50 text-center">Vidas</p>
-      <div className="flex justify-center gap-1.5 mt-2">
-        {Array.from({ length: MAX_HEARTS }).map((_, i) => (
-          <Icon key={i} name="heart" size={24} className={i < hearts ? 'text-lime-500' : 'text-carbon-700'} />
-        ))}
+      <div className="flex justify-center items-center gap-1.5 mt-2">
+        {unlimited ? (
+          // The same heart-and-infinity as the counter above it, so opening
+          // the panel confirms what the bar said instead of re-drawing five.
+          <>
+            <Icon name="heart" size={26} className="text-ultra-400" />
+            <span aria-hidden="true" className="text-[28px] font-black leading-none text-ultra-300">
+              ∞
+            </span>
+          </>
+        ) : (
+          Array.from({ length: MAX_HEARTS }).map((_, i) => (
+            <Icon key={i} name="heart" size={24} className={i < hearts ? 'text-lime-500' : 'text-carbon-700'} />
+          ))
+        )}
       </div>
       <p className="text-center font-black text-carbon-100 mt-3">
         {unlimited

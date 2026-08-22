@@ -16,13 +16,13 @@ export default function TopBar() {
 
   const toggle = (p: StatKey) => setOpen((cur) => (cur === p ? null : p));
 
-  const stat = (key: StatKey, icon: React.ReactNode, value: string | number) => (
+  const stat = (key: StatKey, icon: React.ReactNode, value: string | number, valueClass = 'text-carbon-50') => (
     <button
       onClick={() => toggle(key)}
       aria-expanded={open === key}
       // Tighter padding below sm: four counters at px-3 overflow a 375px
       // viewport once the numbers reach three digits.
-      className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl font-black text-carbon-50 tabular-nums transition ${
+      className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl font-black tabular-nums transition ${valueClass} ${
         open === key ? 'bg-carbon-800' : 'hover:bg-carbon-850'
       }`}
     >
@@ -70,8 +70,19 @@ export default function TopBar() {
           {stat('xp', <Icon name="star" size={20} className="text-lime-500" />, xp)}
           {stat('coins', <Icon name="coins" size={20} className="text-lime-500" />, coins)}
           {/* An Ultra account showing "5" would look like it's about to run
-              out of something it can't run out of. */}
-          {stat('hearts', <Icon name="heart" size={20} className="text-lime-500" />, unlimited ? '∞' : hearts)}
+              out of something it can't run out of. In Ultra's violet, so the
+              heart reads as part of the plan rather than as a counter that
+              happens to be stuck. */}
+          {stat(
+            'hearts',
+            <Icon
+              name="heart"
+              size={20}
+              className={unlimited ? 'text-ultra-400' : 'text-lime-500'}
+            />,
+            unlimited ? '∞' : hearts,
+            unlimited ? 'text-ultra-300' : 'text-carbon-50'
+          )}
         </div>
       </div>
 
