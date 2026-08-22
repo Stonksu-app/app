@@ -584,7 +584,7 @@ export default function Home() {
                       aria-label={node.title}
                       style={{
                         ['--btn-lip' as string]: platinum
-                          ? '#1e40af'
+                          ? 'var(--color-ultra-800)'
                           : unlocked
                           ? 'var(--color-lime-700)'
                           : 'var(--color-carbon-950)',
@@ -618,7 +618,7 @@ export default function Home() {
                   {unlocked && maxStage > 0 && (
                     <span
                       className={`text-[11px] font-black mt-0.5 ${
-                        platinum ? 'text-sky-400' : 'text-carbon-500'
+                        platinum ? 'text-ultra-300' : 'text-carbon-500'
                       }`}
                     >
                       {platinum ? 'PLATINO' : `${stage}/${maxStage}`}
@@ -753,7 +753,7 @@ export default function Home() {
                 // Sold, not scolded: a locked topic explains what opens it and
                 // takes you there in one tap.
                 <div className="mt-4 space-y-3">
-                  <p className="flex items-center justify-center gap-1.5 text-sm font-black text-sky-400">
+                  <p className="flex items-center justify-center gap-1.5 text-sm font-black text-ultra-300">
                     <Icon name="diamond" size={16} /> Tema exclusivo de Ultra
                   </p>
                   <Button variant="platinum" onClick={() => navigate('/planes')}>

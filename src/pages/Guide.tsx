@@ -81,7 +81,7 @@ export default function Guide() {
           {totalShown > 0 && (
             <div className="mt-4 rounded-3xl border-2 border-carbon-800 bg-carbon-850 p-5">
               <div className="flex items-baseline justify-between gap-3">
-                <p className="text-[13px] font-black uppercase tracking-[0.8px] text-sky-400">
+                <p className="text-[13px] font-black uppercase tracking-[0.8px] text-ultra-400">
                   Dominados
                 </p>
                 <p className="text-sm font-black text-carbon-300 tabular-nums">
@@ -218,7 +218,7 @@ export default function Guide() {
             <p className="mt-2 text-carbon-300 leading-snug">{open.definition}</p>
 
             {(termMastery[open.id] ?? 0) >= TERM_MASTERY_GOAL ? (
-              <p className="mt-4 flex items-center gap-1.5 text-sky-400 font-black text-sm">
+              <p className="mt-4 flex items-center gap-1.5 text-ultra-400 font-black text-sm">
                 <Icon name="diamond" size={16} /> Dominado
               </p>
             ) : (

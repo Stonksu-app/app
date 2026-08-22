@@ -37,6 +37,23 @@ check(
 );
 check('.platinum-node recorta su brillo', /overflow:\s*hidden/.test(rule));
 
+/*
+ * Premium and mastery own one colour, and it isn't sky.
+ *
+ * Sky already means three things — the streak protector, a frozen day and the
+ * section 2 banner — which is why the platinum finish moved off it. Nothing
+ * stops it drifting back except this.
+ */
+check(
+  'el acabado platino usa el violeta de ultra, no el azul del protector',
+  /#c4b5fd/i.test(rule) && !/#38bdf8|#7dd3fc/i.test(rule),
+  rule.replace(/\s+/g, ' ')
+);
+check(
+  'el violeta de ultra está declarado en la paleta',
+  /--color-ultra-400:\s*#a78bfa/i.test(css)
+);
+
 /** Anything that makes an element a containing block for absolute children. */
 const POSITIONS = ['relative', 'absolute', 'fixed', 'sticky'];
 

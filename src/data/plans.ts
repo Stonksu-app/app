@@ -49,7 +49,7 @@ export interface PlanOffer {
   featured: boolean;
   /** The plan's colour, in one place. Ultra wears the platinum blue it gives
    *  you; Premium wears the app's lime, because it's the plain plan. */
-  accent: 'sky' | 'lime';
+  accent: 'ultra' | 'lime';
   /** The chip above the name. Both plans get one — a card with a label next
    *  to one without reads as unfinished rather than as less prominent. */
   label: string;
@@ -61,7 +61,7 @@ export const PLAN_OFFERS: PlanOffer[] = [
     name: 'Ultra',
     price: 6.99,
     tagline: 'Todo lo de Stonksu, sin límites y sin anuncios.',
-    accent: 'sky',
+    accent: 'ultra',
     label: 'El más completo',
     perks: [
       { icon: 'heart', text: 'Vidas infinitas: falla sin quedarte fuera' },

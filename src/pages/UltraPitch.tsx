@@ -42,13 +42,13 @@ export default function UltraPitch() {
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 -top-32 h-80 opacity-25 blur-3xl"
-        style={{ background: 'radial-gradient(circle, #38bdf8 0%, transparent 70%)' }}
+        style={{ background: 'radial-gradient(circle, #8b5cf6 0%, transparent 70%)' }}
       />
 
       <div className="relative m-auto w-full max-w-sm py-8">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <span className="inline-block rounded-lg bg-sky-500/15 px-2.5 py-1 text-[12px] font-black uppercase tracking-[0.8px] text-sky-400">
+            <span className="inline-block rounded-lg bg-ultra-500/15 px-2.5 py-1 text-[12px] font-black uppercase tracking-[0.8px] text-ultra-400">
               Stonksu Ultra
             </span>
             <h1 className="mt-3 text-3xl font-black leading-tight text-carbon-50">
@@ -83,7 +83,7 @@ export default function UltraPitch() {
         </p>
 
         {notice && (
-          <p className="mt-4 rounded-2xl border-2 border-sky-500/30 bg-sky-500/10 px-4 py-3 text-center text-sm font-bold text-sky-300 animate-pop-in">
+          <p className="mt-4 rounded-2xl border-2 border-ultra-500/30 bg-ultra-500/10 px-4 py-3 text-center text-sm font-bold text-ultra-300 animate-pop-in">
             {notice}
           </p>
         )}

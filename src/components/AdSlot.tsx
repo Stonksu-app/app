@@ -24,8 +24,8 @@ export default function AdSlot({ className = '' }: { className?: string }) {
     >
       <p className="text-[10px] font-black uppercase tracking-[0.8px] text-carbon-600">Anuncio</p>
       <div className="mt-1.5 flex items-center gap-3">
-        <div className="w-10 h-10 shrink-0 rounded-xl bg-sky-500/15 flex items-center justify-center">
-          <Icon name="shield" size={22} className="text-sky-400" />
+        <div className="w-10 h-10 shrink-0 rounded-xl bg-ultra-500/15 flex items-center justify-center">
+          <Icon name="shield" size={22} className="text-ultra-400" />
         </div>
         <div className="min-w-0">
           <p className="text-[15px] font-black text-carbon-50 leading-tight">

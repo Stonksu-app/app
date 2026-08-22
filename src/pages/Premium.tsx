@@ -31,12 +31,12 @@ function PlanCard({
   return (
     <div
       className={`relative overflow-hidden rounded-3xl border-2 p-6 ${
-        offer.featured ? 'platinum-banner border-sky-500/40 bg-carbon-850' : 'border-carbon-800 bg-carbon-850'
+        offer.featured ? 'platinum-banner border-ultra-500/40 bg-carbon-850' : 'border-carbon-800 bg-carbon-850'
       }`}
     >
       <span
         className={`inline-block rounded-lg px-2.5 py-1 text-[12px] font-black uppercase tracking-[0.8px] ${
-          offer.accent === 'sky' ? 'bg-sky-500/15 text-sky-400' : 'bg-lime-500/15 text-lime-400'
+          offer.accent === 'ultra' ? 'bg-ultra-500/15 text-ultra-400' : 'bg-lime-500/15 text-lime-400'
         }`}
       >
         {offer.label}
@@ -58,7 +58,7 @@ function PlanCard({
             <Icon
               name={perk.icon}
               size={18}
-              className={`mt-0.5 shrink-0 ${offer.accent === 'sky' ? 'text-sky-400' : 'text-lime-500'}`}
+              className={`mt-0.5 shrink-0 ${offer.accent === 'ultra' ? 'text-ultra-400' : 'text-lime-500'}`}
             />
             <span className="text-sm font-bold text-carbon-200 leading-snug">{perk.text}</span>
           </li>
@@ -69,15 +69,15 @@ function PlanCard({
         {current ? (
           <p
             className={`flex items-center justify-center gap-2 h-[50px] rounded-xl text-sm font-black uppercase tracking-wide ${
-              offer.accent === 'sky'
-                ? 'bg-sky-500/15 text-sky-400'
+              offer.accent === 'ultra'
+                ? 'bg-ultra-500/15 text-ultra-400'
                 : 'bg-lime-500/15 text-lime-400'
             }`}
           >
             <Icon name="check" size={18} strokeWidth={3} /> Tu plan actual
           </p>
         ) : (
-          <Button variant={offer.accent === 'sky' ? 'platinum' : 'primary'} onClick={onChoose}>
+          <Button variant={offer.accent === 'ultra' ? 'platinum' : 'primary'} onClick={onChoose}>
             Elegir {offer.name}
           </Button>
         )}
@@ -89,17 +89,20 @@ function PlanCard({
 export default function Premium() {
   const navigate = useNavigate();
   const { plan, testMode, setPlan } = useUserStore();
-  const [notice, setNotice] = useState<string | null>(null);
+  /** Carries the plan it came from: an answer to "elegir Premium" printed in
+   *  Ultra's violet reads as being about the other card. */
+  const [notice, setNotice] = useState<{ text: string; accent: PlanOffer['accent'] } | null>(null);
 
   const choose = (offer: PlanOffer) => {
     if (testMode) {
       setPlan(offer.id);
-      setNotice(`Modo test: ${offer.name} activado sin pagar nada.`);
+      setNotice({ text: `Modo test: ${offer.name} activado sin pagar nada.`, accent: offer.accent });
       return;
     }
-    setNotice(
-      'Los pagos todavía no están conectados. En cuanto lo estén, este botón abrirá la pasarela.'
-    );
+    setNotice({
+      text: 'Los pagos todavía no están conectados. En cuanto lo estén, este botón abrirá la pasarela.',
+      accent: offer.accent,
+    });
   };
 
   return (
@@ -134,7 +137,7 @@ export default function Premium() {
               <button
                 onClick={() => {
                   setPlan('free');
-                  setNotice('Has vuelto al plan gratuito.');
+                  setNotice({ text: 'Has vuelto al plan gratuito.', accent: 'lime' });
                 }}
                 className="ml-auto shrink-0 text-[13px] font-black uppercase tracking-wide text-carbon-500 hover:text-carbon-300 transition"
               >
@@ -144,8 +147,14 @@ export default function Premium() {
           </div>
 
           {notice && (
-            <p className="mt-4 rounded-2xl border-2 border-sky-500/30 bg-sky-500/10 px-4 py-3 text-sm font-bold text-sky-300 animate-pop-in">
-              {notice}
+            <p
+              className={`mt-4 rounded-2xl border-2 px-4 py-3 text-sm font-bold animate-pop-in ${
+                notice.accent === 'ultra'
+                  ? 'border-ultra-500/30 bg-ultra-500/10 text-ultra-300'
+                  : 'border-lime-500/30 bg-lime-500/10 text-lime-400'
+              }`}
+            >
+              {notice.text}
             </p>
           )}
 

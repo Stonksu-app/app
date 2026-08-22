@@ -121,7 +121,7 @@ export default function Shop() {
               to="/planes"
               className="mt-6 block rounded-3xl border-2 border-carbon-800 bg-carbon-850 px-5 py-4 hover:border-carbon-700 transition"
             >
-              <p className="text-[12px] font-black uppercase tracking-[0.8px] text-sky-400">
+              <p className="text-[12px] font-black uppercase tracking-[0.8px] text-ultra-400">
                 Tu plan · {planName(plan)}
               </p>
               <p className="mt-1 text-sm text-carbon-400">Gestiona tu suscripción</p>

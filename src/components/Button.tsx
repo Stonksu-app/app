@@ -20,11 +20,13 @@ const VARIANTS: Record<Variant, { classes: string; lip: string }> = {
     classes: 'bg-danger-500 hover:enabled:bg-danger-600 text-white',
     lip: '#8f1d1d',
   },
-  /* For anything about mastery. Lime is the app's "go", so a green button
-     under a platinum bar reads as two different subjects sharing a card. */
+  /* For anything about mastery or Ultra. Lime is the app's "go", so a green
+     button under a platinum bar reads as two subjects sharing a card.
+     ultra-400 rather than 500 for the fill: carbon text on 500 measures 4.23:1,
+     under the 4.5 this size of type needs, and on 400 it's 6.59. */
   platinum: {
-    classes: 'bg-sky-500 hover:enabled:bg-sky-400 text-carbon-900',
-    lip: '#1e40af',
+    classes: 'bg-ultra-400 hover:enabled:bg-ultra-300 text-carbon-900',
+    lip: 'var(--color-ultra-800)',
   },
 };
 

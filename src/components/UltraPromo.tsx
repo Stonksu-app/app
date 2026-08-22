@@ -23,7 +23,7 @@ export default function UltraPromo({ className = '' }: { className?: string }) {
 
   return (
     <div
-      className={`relative overflow-hidden rounded-3xl border-2 border-sky-500/40 platinum-banner bg-carbon-850 p-5 ${className}`}
+      className={`relative overflow-hidden rounded-3xl border-2 border-ultra-500/40 platinum-banner bg-carbon-850 p-5 ${className}`}
     >
       {/* Sits under everything: the mascot is decoration, not a target. */}
       <Mascot
@@ -32,7 +32,7 @@ export default function UltraPromo({ className = '' }: { className?: string }) {
         className="pointer-events-none absolute -right-3 -top-1 opacity-90"
       />
 
-      <span className="relative z-10 inline-block rounded-lg bg-sky-500/15 px-2.5 py-1 text-[12px] font-black uppercase tracking-[0.8px] text-sky-400">
+      <span className="relative z-10 inline-block rounded-lg bg-ultra-500/15 px-2.5 py-1 text-[12px] font-black uppercase tracking-[0.8px] text-ultra-400">
         Ultra
       </span>
 
@@ -46,8 +46,8 @@ export default function UltraPromo({ className = '' }: { className?: string }) {
 
       <Link
         to="/planes"
-        className="relative z-10 mt-4 flex h-[46px] items-center justify-center gap-1.5 rounded-xl bg-sky-500 text-[14px] font-black uppercase tracking-[0.8px] text-carbon-900 transition hover:bg-sky-400"
-        style={{ boxShadow: '0 4px 0 #1e40af' }}
+        className="relative z-10 mt-4 flex h-[46px] items-center justify-center gap-1.5 rounded-xl bg-ultra-400 text-[14px] font-black uppercase tracking-[0.8px] text-carbon-900 transition hover:bg-ultra-300"
+        style={{ boxShadow: '0 4px 0 #4c1d95' }}
       >
         <Icon name="diamond" size={17} />
         {upgrading ? 'Pásate a Ultra' : 'Conseguir Ultra'}
