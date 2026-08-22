@@ -91,7 +91,11 @@ export default function Guide() {
                 <div
                   // Platinum rather than a flat colour: this bar measures the
                   // terms that went platinum, so it should be made of them.
-                  className="h-full rounded-full platinum-node transition-all duration-500"
+                  // `relative` matters: the sweeping highlight is an absolute
+                  // ::after, so without it the highlight resolves against
+                  // whatever ancestor happens to be positioned and sweeps
+                  // across the whole screen instead of along this bar.
+                  className="relative h-full rounded-full platinum-node transition-all duration-500"
                   style={{ width: `${masteredPct}%` }}
                 />
               </div>
@@ -99,7 +103,9 @@ export default function Guide() {
                 Acierta un término {TERM_MASTERY_GOAL} veces en el repaso para dejarlo en platino.
               </p>
               <div className="mt-4">
-                <Button onClick={() => navigate('/guia/repaso')}>Repasar términos</Button>
+                <Button variant="platinum" onClick={() => navigate('/guia/repaso')}>
+                  Repasar términos
+                </Button>
               </div>
             </div>
           )}

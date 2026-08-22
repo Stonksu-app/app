@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
  * es.duolingo.com: 50px tall, 12px radius, 15px/700 uppercase with 0.8px
  * tracking, sitting on a 4px lip it squashes into when pressed. */
 
-type Variant = 'primary' | 'secondary' | 'danger';
+type Variant = 'primary' | 'secondary' | 'danger' | 'platinum';
 type Size = 'md' | 'sm';
 
 const VARIANTS: Record<Variant, { classes: string; lip: string }> = {
@@ -19,6 +19,12 @@ const VARIANTS: Record<Variant, { classes: string; lip: string }> = {
   danger: {
     classes: 'bg-danger-500 hover:enabled:bg-danger-600 text-white',
     lip: '#8f1d1d',
+  },
+  /* For anything about mastery. Lime is the app's "go", so a green button
+     under a platinum bar reads as two different subjects sharing a card. */
+  platinum: {
+    classes: 'bg-sky-500 hover:enabled:bg-sky-400 text-carbon-900',
+    lip: '#1e40af',
   },
 };
 

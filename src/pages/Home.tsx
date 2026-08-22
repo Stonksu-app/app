@@ -41,6 +41,8 @@ const UNIT_STYLES = [
  *  nodes wear, so the banner reads as something you earned rather than as a
  *  label that happens to be there. */
 const PLATINUM_STYLE = {
+  // platinum-position-ok: the banner this lands on is sticky, so it already
+  // establishes the containing block the shine needs.
   bg: 'platinum-node platinum-banner',
   text: 'text-white',
   sub: 'text-white/75',
