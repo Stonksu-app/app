@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar';
 import NavRail from '../components/NavRail';
@@ -92,6 +92,21 @@ export default function Premium() {
   /** Carries the plan it came from: an answer to "elegir Premium" printed in
    *  Ultra's violet reads as being about the other card. */
   const [notice, setNotice] = useState<{ text: string; accent: PlanOffer['accent'] } | null>(null);
+  const noticeRef = useRef<HTMLParagraphElement>(null);
+
+  /*
+   * The answer lives above the cards, and on a phone the button you pressed is
+   * a screen and a half below it — so pressing it looked like pressing a dead
+   * button. Bringing the message into view is the difference between "nothing
+   * happened" and "here's what happened".
+   *
+   * Announced as well as scrolled: a screen reader user gets the same answer
+   * without either of us relying on where the page happens to be.
+   */
+  useEffect(() => {
+    if (!notice) return;
+    noticeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [notice]);
 
   const choose = (offer: PlanOffer) => {
     if (testMode) {
@@ -148,6 +163,9 @@ export default function Premium() {
 
           {notice && (
             <p
+              ref={noticeRef}
+              role="status"
+              aria-live="polite"
               className={`mt-4 rounded-2xl border-2 px-4 py-3 text-sm font-bold animate-pop-in ${
                 notice.accent === 'ultra'
                   ? 'border-ultra-500/30 bg-ultra-500/10 text-ultra-300'

@@ -22,6 +22,9 @@ import type { IconName, SkillNode } from '../types';
 /** Horizontal offsets, in px, that give the path its serpentine walk. Cycles. */
 const SWAY = [0, -44, -70, -44, 0, 44, 70, 44];
 const NODE_PITCH = 116;
+/** Room above the node wearing the "empezar" flag: the flag's 48px offset plus
+ *  its own height, so it never lands on the line above it. */
+const MARKER_CLEARANCE = 56;
 
 /** A chest sits after every CHEST_EVERY topics and opens once the topic before
  *  it is platinum, so it pays out for mastering a subject rather than for
@@ -565,7 +568,16 @@ export default function Home() {
               const { node, unlocked, platinum, stage, maxStage } = item.data;
               const isCurrent = current?.node.id === node.id;
               return (
-                <div key={item.key} className="relative flex flex-col items-center" style={sway}>
+                <div
+                  key={item.key}
+                  className="relative flex flex-col items-center"
+                  // The "empezar" flag floats 48px above the node, over space
+                  // that belongs to whatever came before — the unit's title
+                  // when the node opens a unit, the previous node's caption
+                  // otherwise. It gets its own clearance rather than the two
+                  // sharing.
+                  style={isCurrent ? { ...sway, marginTop: MARKER_CLEARANCE } : sway}
+                >
                   {isCurrent && (
                     <span className="absolute -top-12 whitespace-nowrap bg-carbon-850 border-2 border-carbon-700 text-lime-400 text-[11px] font-black uppercase tracking-[0.8px] px-3 py-1.5 rounded-xl animate-float">
                       Empezar
