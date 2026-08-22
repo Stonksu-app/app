@@ -407,13 +407,19 @@ export default function Home() {
             </Link>
 
             <div className={`min-w-0 flex-1 ${overSweep}`}>
-              <p className={`text-[13px] font-black uppercase tracking-[0.8px] ${unitStyle.sub}`}>
+              <p
+                className={`text-[11px] sm:text-[13px] font-black uppercase tracking-[0.6px] sm:tracking-[0.8px] ${unitStyle.sub}`}
+              >
                 {shownUnit ? `Sección ${shownUnit.section}, Unidad ${shownUnit.unit}` : 'Todo platinado'}
                 {/* Says so out loud: landing in an old chapter without this
                     reads as having lost your place. */}
                 {reviewing && ' · Repaso'}
               </p>
-              <h1 className={`text-xl font-black truncate ${unitStyle.text}`}>
+              {/* Two lines rather than one clipped one: on a phone the title
+                  has ~180px between the back arrow and the guide chip, and
+                  most of them are wider than that. Clamped at two so a long
+                  title can't push the path down the screen. */}
+              <h1 className={`text-lg sm:text-xl font-black leading-tight line-clamp-2 ${unitStyle.text}`}>
                 {shownUnit ? shownUnit.title : `¡Bien hecho, ${name || 'trader'}!`}
               </h1>
             </div>
@@ -421,9 +427,13 @@ export default function Home() {
             {current && (
               <Link
                 to={`/guia?tema=${current.node.id}`}
-                className={`shrink-0 flex items-center gap-1.5 font-black text-[13px] uppercase tracking-wide rounded-xl px-3 py-2.5 transition ${unitStyle.chip} ${overSweep}`}
+                aria-label="Guía del tema"
+                className={`shrink-0 flex items-center gap-1.5 font-black text-[13px] uppercase tracking-wide rounded-xl px-2.5 sm:px-3 py-2.5 transition ${unitStyle.chip} ${overSweep}`}
               >
-                <Icon name="clipboard" size={16} /> Guía
+                {/* The word is dropped on phones, not the button: those
+                    ~45px are the difference between a title that fits on one
+                    line and one that doesn't. */}
+                <Icon name="clipboard" size={16} /> <span className="hidden sm:inline">Guía</span>
               </Link>
             )}
           </div>
