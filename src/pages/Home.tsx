@@ -37,6 +37,16 @@ const UNIT_STYLES = [
   { bg: 'bg-fuchsia-500', text: 'text-carbon-50', sub: 'text-carbon-50/70', chip: 'bg-carbon-50/15 hover:bg-carbon-50/25 text-carbon-50' },
 ];
 
+/** A unit you've platinumed drops its chapter colour for the same blue the
+ *  nodes wear, so the banner reads as something you earned rather than as a
+ *  label that happens to be there. */
+const PLATINUM_STYLE = {
+  bg: 'platinum-node platinum-banner',
+  text: 'text-white',
+  sub: 'text-white/75',
+  chip: 'bg-carbon-900/25 hover:bg-carbon-900/40 text-white',
+};
+
 function StatRail({
   hearts,
   msUntilNextHeart,
@@ -276,7 +286,33 @@ export default function Home() {
 
   const shownUnit = scrolledUnit ?? fallbackUnit;
 
-  const unitStyle = UNIT_STYLES[((shownUnit?.section ?? 1) - 1) % UNIT_STYLES.length];
+  /**
+   * Which units are finished outright.
+   *
+   * A unit counts only once every topic in it is platinum — chests and any
+   * node without lessons are scenery, not something you can master, so they
+   * neither hold a unit back nor let an empty one qualify.
+   */
+  const platinumUnits = useMemo(() => {
+    const byUnit = new Map<string, boolean>();
+    for (const n of nodes) {
+      const { section, unit } = n.node;
+      if (!section || !unit || n.node.lessons.length === 0) continue;
+      const key = `${section.number}|${unit.number}`;
+      byUnit.set(key, (byUnit.get(key) ?? true) && n.platinum);
+    }
+    return byUnit;
+  }, [nodes]);
+
+  const shownUnitPlatinum = !shownUnit || (platinumUnits.get(`${shownUnit.section}|${shownUnit.unit}`) ?? false);
+
+  const unitStyle = shownUnitPlatinum
+    ? PLATINUM_STYLE
+    : UNIT_STYLES[((shownUnit?.section ?? 1) - 1) % UNIT_STYLES.length];
+
+  /** The sweeping highlight is an overlay, so everything written on top of it
+   *  needs to be lifted out of its way. */
+  const overSweep = shownUnitPlatinum ? 'relative z-10' : '';
 
   /** Topics and chests woven into a single walkable list, so the sway offset
    *  applies to both and the chest genuinely sits on the path. */
@@ -294,8 +330,10 @@ export default function Home() {
           section: number;
           sectionTitle: string;
           startsSection: boolean;
+          sectionPlatinum: boolean;
           unit: number;
           title: string;
+          platinum: boolean;
         };
     const items: Item[] = [];
     let lastSection: number | null = null;
@@ -311,8 +349,12 @@ export default function Home() {
           section: section.number,
           sectionTitle: section.title,
           startsSection,
+          sectionPlatinum: sectionNodes.every(
+            (m) => m.node.lessons.length === 0 || m.platinum
+          ),
           unit: unit.number,
           title: unit.title,
+          platinum: platinumUnits.get(`${section.number}|${unit.number}`) ?? false,
         });
         lastSection = section.number;
         lastUnit = unit.number;
@@ -331,7 +373,7 @@ export default function Home() {
       }
     });
     return items;
-  }, [sectionNodes, openedChestIds, testMode]);
+  }, [sectionNodes, openedChestIds, testMode, platinumUnits]);
 
   return (
     <div className="min-h-dvh bg-carbon-900 lg:flex">
@@ -359,12 +401,12 @@ export default function Home() {
             <Link
               to="/secciones"
               aria-label="Ver todas las secciones"
-              className={`shrink-0 -ml-1 p-1 rounded-lg transition ${unitStyle.chip}`}
+              className={`shrink-0 -ml-1 p-1 rounded-lg transition ${unitStyle.chip} ${overSweep}`}
             >
               <Icon name="chevron-left" size={22} strokeWidth={2.6} />
             </Link>
 
-            <div className="min-w-0 flex-1">
+            <div className={`min-w-0 flex-1 ${overSweep}`}>
               <p className={`text-[13px] font-black uppercase tracking-[0.8px] ${unitStyle.sub}`}>
                 {shownUnit ? `Sección ${shownUnit.section}, Unidad ${shownUnit.unit}` : 'Todo platinado'}
                 {/* Says so out loud: landing in an old chapter without this
@@ -379,7 +421,7 @@ export default function Home() {
             {current && (
               <Link
                 to={`/guia?tema=${current.node.id}`}
-                className={`shrink-0 flex items-center gap-1.5 font-black text-[13px] uppercase tracking-wide rounded-xl px-3 py-2.5 transition ${unitStyle.chip}`}
+                className={`shrink-0 flex items-center gap-1.5 font-black text-[13px] uppercase tracking-wide rounded-xl px-3 py-2.5 transition ${unitStyle.chip} ${overSweep}`}
               >
                 <Icon name="clipboard" size={16} /> Guía
               </Link>
@@ -452,7 +494,11 @@ export default function Home() {
                   >
                     {item.startsSection && (
                       <div className="text-center mb-6 mt-4 first:mt-0">
-                        <p className="text-[25px] font-black text-carbon-200 leading-tight">
+                        <p
+                          className={`text-[25px] font-black leading-tight ${
+                            item.sectionPlatinum ? 'platinum-text' : 'text-carbon-200'
+                          }`}
+                        >
                           Sección {item.section}
                         </p>
                         <p className="text-sm text-carbon-500 mt-0.5">{item.sectionTitle}</p>
@@ -460,7 +506,13 @@ export default function Home() {
                     )}
                     <div className="flex items-center gap-4">
                       <span className="h-0.5 flex-1 bg-carbon-800" />
-                      <h2 className="text-[19px] font-black text-carbon-500 text-center">{item.title}</h2>
+                      <h2
+                        className={`text-[19px] font-black text-center ${
+                          item.platinum ? 'platinum-text' : 'text-carbon-500'
+                        }`}
+                      >
+                        {item.title}
+                      </h2>
                       <span className="h-0.5 flex-1 bg-carbon-800" />
                     </div>
                   </div>
