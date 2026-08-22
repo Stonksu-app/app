@@ -1,6 +1,11 @@
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Icon from '../components/Icon';
+import Avatar from '../components/Avatar';
+import DirectionBadge from '../components/DirectionBadge';
+import ParticleBurst from '../components/ParticleBurst';
+import ResultsScreen from '../components/ResultsScreen';
+import { randomLine } from '../components/Mascot';
 import { Button } from '../components/Button';
 import { SKILL_TREE } from '../data/lessons';
 import { TERM_MASTERY_GOAL, useUserStore } from '../store/useUserStore';
@@ -44,6 +49,7 @@ export default function GuidePractice() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const topic = params.get('tema');
+  const topicTitle = topic ? (SKILL_TREE.find((n) => n.id === topic)?.title ?? null) : null;
 
   const { isNodeUnlocked, getNodeStage, getNodeMaxStage, termMastery, recordTermAnswer, addXp } =
     useUserStore();
@@ -90,6 +96,12 @@ export default function GuidePractice() {
   const [correctCount, setCorrectCount] = useState(0);
   const [done, setDone] = useState(false);
   const locked = useRef(false);
+  /** Picked once per answer, like a lesson's — the mascot saying the same
+   *  sentence ten times running stops reading as a reaction. */
+  const [mascotLine, setMascotLine] = useState('');
+  /** Bumped on every answer so the full-screen flash replays even when two
+   *  answers in a row land the same way. */
+  const [flash, setFlash] = useState<{ correct: boolean; nonce: number } | null>(null);
 
   // Fewer than two terms means there's nothing to build wrong answers from.
   if (pool.length < OPTIONS || questions.length === 0) {
@@ -127,6 +139,8 @@ export default function GuidePractice() {
     setPicked(id);
     const right = id === question.card.id;
     recordTermAnswer(question.card.id, right);
+    setMascotLine(randomLine(right ? 'correct' : 'incorrect'));
+    setFlash({ correct: right, nonce: Date.now() });
     if (right) setCorrectCount((n) => n + 1);
   };
 
@@ -144,39 +158,44 @@ export default function GuidePractice() {
   if (done) {
     const mastered = questions.filter((q) => (termMastery[q.card.id] ?? 0) >= TERM_MASTERY_GOAL).length;
     return (
-      <div className="min-h-dvh bg-carbon-900 flex items-center justify-center px-6 text-center">
-        <div className="animate-pop-in">
-          <div className="w-24 h-24 rounded-3xl platinum-node relative flex items-center justify-center mx-auto">
-            <Icon name="diamond" size={44} className="relative z-10 text-white" />
-          </div>
-          <p className="mt-5 text-2xl font-black text-carbon-50">¡Repaso terminado!</p>
-          <p className="mt-1 text-carbon-400">
-            {correctCount} de {questions.length} correctas
-          </p>
-          <p className="mt-3 flex items-center justify-center gap-1.5 text-lime-400 font-black">
-            <Icon name="star" size={18} /> +{XP_PER_SESSION} XP
-          </p>
-          {mastered > 0 && (
-            <p className="mt-1.5 flex items-center justify-center gap-1.5 text-sky-400 font-black text-[15px]">
-              <Icon name="diamond" size={16} /> {mastered}{' '}
-              {mastered === 1 ? 'término en platino' : 'términos en platino'}
+      <ResultsScreen
+        title={correctCount === questions.length ? '¡Repaso perfecto!' : '¡Repaso terminado!'}
+        subtitle={topicTitle ?? 'Guía'}
+        icon="cards"
+        xpEarned={XP_PER_SESSION}
+        correctCount={correctCount}
+        totalQuestions={questions.length}
+        onContinue={() => navigate('/guia')}
+        continueLabel="Volver a la guía"
+        secondary={{ label: 'Otro repaso', onClick: () => window.location.reload() }}
+      >
+        {mastered > 0 && (
+          <div className="mt-4 pt-4 border-t border-carbon-800">
+            <p className="flex items-center justify-center gap-1.5 text-sm font-black text-carbon-50 animate-pop-in">
+              <Icon name="diamond" size={16} className="text-carbon-100" /> {mastered}{' '}
+              {mastered === 1 ? 'término en PLATINO' : 'términos en PLATINO'}
             </p>
-          )}
-          <div className="mt-7 w-[240px] mx-auto space-y-3">
-            <Button onClick={() => navigate('/guia')}>Volver a la guía</Button>
-            <Button variant="secondary" onClick={() => window.location.reload()}>
-              Otro repaso
-            </Button>
           </div>
-        </div>
-      </div>
+        )}
+      </ResultsScreen>
     );
   }
 
   const asksForTerm = question.mode === 'definition-to-term';
 
   return (
-    <div className="min-h-dvh bg-carbon-900 flex flex-col">
+    <div className="min-h-dvh bg-carbon-900 flex flex-col relative">
+      {/* Keyed on the nonce so two right answers in a row flash twice rather
+          than the animation being considered already played. */}
+      {flash && (
+        <div
+          key={flash.nonce}
+          className={`fixed inset-0 pointer-events-none z-30 ${
+            flash.correct ? 'animate-flash-correct' : 'animate-flash-incorrect'
+          }`}
+        />
+      )}
+
       <div className="px-4 pt-safe">
         <div className="max-w-2xl mx-auto flex items-center gap-3 py-3">
           <button
@@ -235,29 +254,43 @@ export default function GuidePractice() {
         </div>
       </div>
 
+      {/* The same footer a lesson shows, mascot included. Revision that looked
+          plainer than the lessons would read as the lesser activity, which is
+          exactly the wrong signal to send about going back over things. */}
       {answered && (
         <div
           className={`fixed bottom-0 inset-x-0 border-t-2 pb-safe ${
-            gotItRight ? 'bg-lime-500/10 border-lime-500/40' : 'bg-danger-500/10 border-danger-500/40'
+            gotItRight ? 'bg-lime-500/5 border-lime-500/20' : 'bg-danger-950 border-danger-500/20'
           }`}
         >
           <div className="max-w-2xl mx-auto px-4 py-4">
-            <p
-              className={`flex items-center gap-2 font-black ${
-                gotItRight ? 'text-lime-400' : 'text-danger-400'
-              }`}
-            >
-              <Icon name={gotItRight ? 'check' : 'close'} size={20} strokeWidth={3} />
-              {gotItRight ? '¡Correcto!' : question.card.term}
-            </p>
-            {!gotItRight && (
-              <p className="mt-1 text-sm text-carbon-300 leading-snug">{question.card.definition}</p>
-            )}
-            <div className="mt-3">
-              <Button onClick={next}>
-                {index + 1 >= questions.length ? 'Terminar' : 'Continuar'}
-              </Button>
+            <div className="flex items-center gap-3 mb-3 animate-pop-in">
+              <div className="relative shrink-0 flex items-center justify-center">
+                <DirectionBadge direction={gotItRight ? 'long' : 'short'} />
+                <Avatar
+                  size={44}
+                  mood={gotItRight ? 'hype' : 'sad'}
+                  className={gotItRight ? '' : 'animate-shake'}
+                />
+                <ParticleBurst show={gotItRight} />
+              </div>
+              <div className="min-w-0">
+                <p className={`font-black ${gotItRight ? 'text-lime-400' : 'text-danger-400'}`}>
+                  {gotItRight ? '¡Correcto! ' : `${question.card.term}. `}
+                  {mascotLine}
+                </p>
+                {!gotItRight && (
+                  <p className="text-sm text-carbon-400 leading-snug">{question.card.definition}</p>
+                )}
+              </div>
             </div>
+            <Button
+              onClick={next}
+              variant={gotItRight ? 'primary' : 'danger'}
+              className={gotItRight ? 'animate-pulse-ring' : ''}
+            >
+              {index + 1 >= questions.length ? 'Terminar' : 'Continuar'}
+            </Button>
           </div>
         </div>
       )}

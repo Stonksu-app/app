@@ -336,7 +336,28 @@ export function classifyWriteError(code: string | undefined): PushResult {
 export async function pushState(userId: string, state: CloudState): Promise<PushResult> {
   if (!supabase) return 'failed';
 
-  const { error: profileError } = await supabase.from('profiles').upsert(toRow(state, userId));
+  let { error: profileError } = await supabase.from('profiles').upsert(toRow(state, userId));
+
+  /*
+   * A column the client knows about and the database doesn't.
+   *
+   * PostgREST answers PGRST204 and rejects the whole row, so one un-run
+   * migration doesn't cost you that one field — it stops *all* progress from
+   * saving, silently. That's too harsh a punishment for a schema that's merely
+   * behind, so the row is sent again without the offending column: everything
+   * else keeps syncing, and the missing field starts working by itself once
+   * the migration runs.
+   */
+  if (profileError?.code === 'PGRST204') {
+    const missing = profileError.message.match(/'([a-z_]+)' column/)?.[1];
+    const row = toRow(state, userId) as Record<string, unknown>;
+    if (missing && missing in row) {
+      console.warn(`[cloud] la columna "${missing}" no existe todavía; guardando sin ella`);
+      delete row[missing];
+      ({ error: profileError } = await supabase.from('profiles').upsert(row));
+    }
+  }
+
   if (profileError) {
     const result = classifyWriteError(profileError.code);
     if (result === 'failed') console.warn('[cloud] could not save profile:', profileError.message);

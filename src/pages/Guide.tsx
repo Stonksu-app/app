@@ -89,7 +89,9 @@ export default function Guide() {
               </div>
               <div className="mt-2.5 h-3 rounded-full bg-carbon-800 overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-sky-500 transition-all duration-500"
+                  // Platinum rather than a flat colour: this bar measures the
+                  // terms that went platinum, so it should be made of them.
+                  className="h-full rounded-full platinum-node transition-all duration-500"
                   style={{ width: `${masteredPct}%` }}
                 />
               </div>
@@ -148,8 +150,11 @@ export default function Guide() {
                             }`}
                           >
                             <span
+                              // Green while you're getting there, like every
+                              // other progress bar in the app; the tile itself
+                              // turns platinum once it's done.
                               className={`block h-full rounded-full transition-all duration-500 ${
-                                isMastered ? 'bg-white' : 'bg-sky-500'
+                                isMastered ? 'bg-white' : 'bg-lime-500'
                               }`}
                               style={{ width: `${(level / TERM_MASTERY_GOAL) * 100}%` }}
                             />

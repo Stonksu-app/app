@@ -1,12 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Button } from '../components/Button';
-import Confetti from '../components/Confetti';
 import Icon from '../components/Icon';
-import Avatar from '../components/Avatar';
-import { randomLine } from '../components/Mascot';
+import ResultsScreen from '../components/ResultsScreen';
 import { BADGES } from '../data/badges';
-import { useCountUp } from '../hooks/useCountUp';
 
 interface ResultsState {
   correctCount: number;
@@ -28,106 +24,73 @@ export default function LessonResults() {
     if (!state) navigate('/home', { replace: true });
   }, [state, navigate]);
 
-  const xpEarned = state?.xpEarned ?? 0;
-  const totalQuestions = state?.totalQuestions ?? 0;
-  const correctCount = state?.correctCount ?? 0;
-  const accuracy = totalQuestions ? Math.round((correctCount / totalQuestions) * 100) : 0;
-  const animatedXp = useCountUp(xpEarned);
-  const animatedAccuracy = useCountUp(accuracy);
-  const [completeLine] = useState(() => randomLine('lessonComplete'));
-
   if (!state) return null;
 
-  const { nodeTitle, newBadgeIds, stage, maxStage, protectorGifted } = state;
+  const { nodeTitle, newBadgeIds, stage, maxStage, protectorGifted, correctCount, totalQuestions } =
+    state;
   const perfect = correctCount === totalQuestions;
   const earnedBadges = BADGES.filter((b) => newBadgeIds?.includes(b.id));
   const justPlatinumed = maxStage > 0 && stage >= maxStage;
 
   return (
-    <div className="screen-safe bg-carbon-900 flex flex-col px-6 text-center relative">
-      <Confetti count={perfect ? 90 : 50} />
+    <ResultsScreen
+      title={perfect ? '¡Lección perfecta!' : '¡Lección completada!'}
+      subtitle={nodeTitle}
+      xpEarned={state.xpEarned ?? 0}
+      correctCount={correctCount}
+      totalQuestions={totalQuestions}
+      onContinue={() => navigate('/home')}
+    >
+      {maxStage > 0 && (
+        <div className="mt-4 pt-4 border-t border-carbon-800">
+          {justPlatinumed ? (
+            <p className="flex items-center justify-center gap-1.5 text-sm font-black text-carbon-50 animate-pop-in">
+              <Icon name="diamond" size={16} className="text-carbon-100" /> ¡Tema PLATINADO!
+            </p>
+          ) : (
+            <>
+              <div className="flex items-center justify-center gap-1 mb-2">
+                {Array.from({ length: maxStage }).map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-2 flex-1 rounded-full ${i < stage ? 'bg-lime-500' : 'bg-carbon-700'}`}
+                  />
+                ))}
+              </div>
+              <p className="text-xs font-bold text-carbon-400">
+                Etapa {stage}/{maxStage} — te faltan {maxStage - stage} para PLATINO
+              </p>
+            </>
+          )}
+        </div>
+      )}
 
-      <div className="m-auto py-6 w-full flex flex-col items-center">
-      <Avatar size={130} mood="hype" glow />
-      <div className="flex items-center gap-2 mt-4">
-        <Icon name={perfect ? 'trophy' : 'sparkles'} size={30} className="text-lime-500" />
-        <h1 className="text-3xl sm:text-4xl font-black text-carbon-50">
-          {perfect ? '¡Lección perfecta!' : '¡Lección completada!'}
-        </h1>
-      </div>
-      <p className="text-carbon-300 mt-1 font-medium">{nodeTitle} — {completeLine}</p>
-
-      <div className="mt-8 bg-carbon-850 border border-carbon-800 rounded-3xl p-6 w-full max-w-sm">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-lime-500/10 rounded-2xl p-4">
-            <p className="text-2xl font-black text-lime-400 tabular-nums">+{animatedXp}</p>
-            <p className="text-xs font-bold text-carbon-400 uppercase">XP ganado</p>
-          </div>
-          <div className="bg-carbon-800 rounded-2xl p-4">
-            <p className="text-2xl font-black text-carbon-50 tabular-nums">{animatedAccuracy}%</p>
-            <p className="text-xs font-bold text-carbon-400 uppercase">Precisión</p>
+      {protectorGifted && (
+        <div className="mt-5 pt-4 border-t border-carbon-800 animate-pop-in">
+          <div className="flex items-center justify-center gap-1.5 bg-sky-500/10 border border-sky-500/30 rounded-full px-3 py-1.5 mx-auto w-fit">
+            <Icon name="shield" size={16} className="text-sky-400" />
+            <span className="text-xs font-extrabold text-carbon-100">¡Protector de racha gratis!</span>
           </div>
         </div>
-        <p className="mt-4 text-sm font-bold text-carbon-300">
-          {correctCount} de {totalQuestions} respuestas correctas
-        </p>
+      )}
 
-        {maxStage > 0 && (
-          <div className="mt-4 pt-4 border-t border-carbon-800">
-            {justPlatinumed ? (
-              <p className="flex items-center justify-center gap-1.5 text-sm font-black text-carbon-50 animate-pop-in">
-                <Icon name="diamond" size={16} className="text-carbon-100" /> ¡Tema PLATINADO!
-              </p>
-            ) : (
-              <>
-                <div className="flex items-center justify-center gap-1 mb-2">
-                  {Array.from({ length: maxStage }).map((_, i) => (
-                    <span
-                      key={i}
-                      className={`h-2 flex-1 rounded-full ${i < stage ? 'bg-lime-500' : 'bg-carbon-700'}`}
-                    />
-                  ))}
-                </div>
-                <p className="text-xs font-bold text-carbon-400">
-                  Etapa {stage}/{maxStage} — te faltan {maxStage - stage} para PLATINO
-                </p>
-              </>
-            )}
+      {earnedBadges.length > 0 && (
+        <div className="mt-5 pt-4 border-t border-carbon-800">
+          <p className="text-xs font-black text-carbon-400 uppercase mb-2">Nuevos logros</p>
+          <div className="flex flex-wrap gap-2 justify-center">
+            {earnedBadges.map((b, i) => (
+              <div
+                key={b.id}
+                className="flex items-center gap-1.5 bg-lime-500/10 border border-lime-500/30 rounded-full px-3 py-1.5 animate-pop-in"
+                style={{ animationDelay: `${0.4 + i * 0.15}s`, animationFillMode: 'backwards' }}
+              >
+                <Icon name={b.icon} size={16} className="text-lime-400" />
+                <span className="text-xs font-extrabold text-carbon-100">{b.title}</span>
+              </div>
+            ))}
           </div>
-        )}
-
-        {protectorGifted && (
-          <div className="mt-5 pt-4 border-t border-carbon-800 animate-pop-in">
-            <div className="flex items-center justify-center gap-1.5 bg-sky-500/10 border border-sky-500/30 rounded-full px-3 py-1.5 mx-auto w-fit">
-              <Icon name="shield" size={16} className="text-sky-400" />
-              <span className="text-xs font-extrabold text-carbon-100">¡Protector de racha gratis!</span>
-            </div>
-          </div>
-        )}
-
-        {earnedBadges.length > 0 && (
-          <div className="mt-5 pt-4 border-t border-carbon-800">
-            <p className="text-xs font-black text-carbon-400 uppercase mb-2">Nuevos logros</p>
-            <div className="flex flex-wrap gap-2 justify-center">
-              {earnedBadges.map((b, i) => (
-                <div
-                  key={b.id}
-                  className="flex items-center gap-1.5 bg-lime-500/10 border border-lime-500/30 rounded-full px-3 py-1.5 animate-pop-in"
-                  style={{ animationDelay: `${0.4 + i * 0.15}s`, animationFillMode: 'backwards' }}
-                >
-                  <Icon name={b.icon} size={16} className="text-lime-400" />
-                  <span className="text-xs font-extrabold text-carbon-100">{b.title}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-8 w-full max-w-sm flex flex-col gap-3">
-        <Button onClick={() => navigate('/home')}>Continuar</Button>
-      </div>
-      </div>
-    </div>
+        </div>
+      )}
+    </ResultsScreen>
   );
 }

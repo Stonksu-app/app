@@ -198,6 +198,14 @@ check(
   /sessionInFlight/.test(pullSource)
 );
 
+// ------------------------- a schema that's behind doesn't stop all syncing
+// Adding a field to the client before running the migration used to mean every
+// write failed, not just that field's — PostgREST rejects the whole row.
+check(
+  'a column the database does not have yet is dropped and the row retried',
+  /PGRST204/.test(pullSource) && /delete row\[missing\]/.test(pullSource)
+);
+
 // --------------------------------- the deep link scheme agrees everywhere
 // Three files have to name the same scheme, and none of them can see the
 // others. A mismatch shows up as a sign-in that opens the browser, succeeds,
