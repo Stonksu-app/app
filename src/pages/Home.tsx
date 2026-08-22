@@ -183,8 +183,41 @@ export default function Home() {
   );
 
   /** The furthest node you can actually play — what the banner and the
-   *  "empezar" marker point at. */
+   *  "empezar" marker point at. Taken from the whole tree, not the section on
+   *  screen, so reviewing an old section doesn't move where you are. */
   const current = nodes.find((n) => n.unlocked && !n.platinum && n.node.lessons.length > 0) ?? null;
+
+  /**
+   * The section the path is showing.
+   *
+   * One at a time, the way Duolingo does it: the path is a section, not the
+   * whole course. Scrolling can't wander into a section you finished or one
+   * you haven't earned — changing chapter is a deliberate trip through the
+   * sections page, which is what makes it feel like somewhere you go rather
+   * than a list you scrolled past.
+   *
+   * Defaults to the section being studied, so opening the app lands you where
+   * you left off rather than at the beginning of the course.
+   */
+  const requestedSection = Number(searchParams.get('seccion')) || null;
+  const currentSection = current?.node.section?.number ?? 1;
+
+  const viewSection = useMemo(() => {
+    if (!requestedSection) return currentSection;
+    // A section nobody has reached yet isn't reachable by typing a number into
+    // the address bar either.
+    const reachable = nodes.some((n) => n.node.section?.number === requestedSection && n.unlocked);
+    return reachable ? requestedSection : currentSection;
+  }, [requestedSection, currentSection, nodes]);
+
+  /** Only this section's topics are on the path. */
+  const sectionNodes = useMemo(
+    () => nodes.filter((n) => (n.node.section?.number ?? 1) === viewSection),
+    [nodes, viewSection]
+  );
+
+  /** True when you're looking at a chapter you already finished. */
+  const reviewing = viewSection !== currentSection;
 
   /**
    * The unit the banner is describing.
@@ -229,48 +262,19 @@ export default function Home() {
   }, [nodes]);
 
   /**
-   * Opens the path where the player actually is, not at the very beginning.
-   *
-   * The tree is one long scroll, so without this every launch drops you at
-   * Section 1 Unit 1 and asks you to scroll past everything you have already
-   * finished. `?seccion=` overrides it, which is what the sections page uses
-   * to take you into the one you picked.
-   *
-   * Runs once per mount and only after the path has rendered — the markers it
-   * looks for do not exist before that.
+   * Before any divider has scrolled past, the banner falls back to something
+   * sensible — and it has to be something from the section on screen. Falling
+   * back to where you are studying would label a section you opened to review
+   * with the name of a unit that isn't even on the path.
    */
-  const jumpedRef = useRef(false);
-  useEffect(() => {
-    if (jumpedRef.current) return;
-    const markers = document.querySelectorAll<HTMLElement>('[data-unit]');
-    if (!markers.length) return;
+  const fallbackUnit = useMemo(() => {
+    const inView =
+      sectionNodes.find((n) => n.node.id === current?.node.id) ?? sectionNodes[0] ?? null;
+    const { section, unit } = inView?.node ?? {};
+    return section && unit ? { section: section.number, unit: unit.number, title: unit.title } : null;
+  }, [sectionNodes, current]);
 
-    const wantedSection = Number(searchParams.get('seccion'));
-    const target =
-      [...markers].find((el) => {
-        const [section, unit] = (el.dataset.unit ?? '').split('|');
-        return wantedSection
-          ? Number(section) === wantedSection && unit === '1'
-          : Number(section) === current?.node.section?.number &&
-              Number(unit) === current?.node.unit?.number;
-      }) ?? null;
-
-    jumpedRef.current = true;
-    if (!target) return;
-
-    // Instant, not smooth: this is where the screen starts, and animating to
-    // it would look like the app scrolling away from you on launch.
-    const top = target.getBoundingClientRect().top + window.scrollY - 12;
-    window.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
-  // Keyed on nodes, not the derived path: pathItems is built further down, and
-  // effects run after paint either way, so the markers exist by then.
-  }, [nodes, current, searchParams]);
-
-  const shownUnit =
-    scrolledUnit ??
-    (current?.node.section && current.node.unit
-      ? { section: current.node.section.number, unit: current.node.unit.number, title: current.node.unit.title }
-      : null);
+  const shownUnit = scrolledUnit ?? fallbackUnit;
 
   const unitStyle = UNIT_STYLES[((shownUnit?.section ?? 1) - 1) % UNIT_STYLES.length];
 
@@ -297,7 +301,7 @@ export default function Home() {
     let lastSection: number | null = null;
     let lastUnit: number | null = null;
 
-    nodes.forEach((n, i) => {
+    sectionNodes.forEach((n, i) => {
       const { section, unit } = n.node;
       if (section && unit && (section.number !== lastSection || unit.number !== lastUnit)) {
         const startsSection = section.number !== lastSection;
@@ -315,7 +319,7 @@ export default function Home() {
       }
 
       items.push({ kind: 'node', key: n.node.id, data: n });
-      const lastOne = i === nodes.length - 1;
+      const lastOne = i === sectionNodes.length - 1;
       if (!lastOne && (i + 1) % CHEST_EVERY === 0) {
         const key = `chest-${n.node.id}`;
         items.push({
@@ -327,7 +331,7 @@ export default function Home() {
       }
     });
     return items;
-  }, [nodes, openedChestIds, testMode]);
+  }, [sectionNodes, openedChestIds, testMode]);
 
   return (
     <div className="min-h-dvh bg-carbon-900 lg:flex">
@@ -363,6 +367,9 @@ export default function Home() {
             <div className="min-w-0 flex-1">
               <p className={`text-[13px] font-black uppercase tracking-[0.8px] ${unitStyle.sub}`}>
                 {shownUnit ? `Sección ${shownUnit.section}, Unidad ${shownUnit.unit}` : 'Todo platinado'}
+                {/* Says so out loud: landing in an old chapter without this
+                    reads as having lost your place. */}
+                {reviewing && ' · Repaso'}
               </p>
               <h1 className={`text-xl font-black truncate ${unitStyle.text}`}>
                 {shownUnit ? shownUnit.title : `¡Bien hecho, ${name || 'trader'}!`}
@@ -588,8 +595,12 @@ export default function Home() {
             {selected.lessons.length > 0 && (
               <div className="mt-4 bg-carbon-800 rounded-2xl p-3">
                 {isNodePlatinum(selected.id) ? (
-                  <p className="flex items-center justify-center gap-1.5 text-sm font-black text-carbon-50">
-                    <Icon name="diamond" size={16} className="text-carbon-100" /> ¡PLATINO conseguido!
+                  // Same blue and the same sweep as the node on the path, so
+                  // opening a mastered topic confirms what the map promised
+                  // instead of dropping back to a plain grey line.
+                  <p className="platinum-node -m-3 rounded-2xl px-3 py-3 flex items-center justify-center gap-1.5 text-sm font-black text-white">
+                    <Icon name="diamond" size={16} className="relative z-10 text-white" />
+                    <span className="relative z-10">¡PLATINO conseguido!</span>
                   </p>
                 ) : (
                   <>

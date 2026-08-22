@@ -133,15 +133,18 @@ export default function Sections() {
                           <span className="text-sm font-black text-carbon-300 tabular-nums shrink-0">{pct}%</span>
                         </div>
 
-                        {!complete && (
-                          <div className="mt-4 w-[180px]">
-                            {/* Carries the section, so the path opens on it
-                                rather than at the top of the whole tree. */}
-                            <Button size="sm" onClick={() => navigate(`/home?seccion=${section.number}`)}>
-                              Continuar
-                            </Button>
-                          </div>
-                        )}
+                        {/* A finished section is still worth going back into,
+                            and since the path shows one section at a time this
+                            is the only way in. */}
+                        <div className="mt-4 w-[180px]">
+                          <Button
+                            size="sm"
+                            variant={complete ? 'secondary' : 'primary'}
+                            onClick={() => navigate(`/home?seccion=${section.number}`)}
+                          >
+                            {complete ? 'Repasar' : 'Continuar'}
+                          </Button>
+                        </div>
                       </>
                     ) : (
                       <p className="mt-4 flex items-center gap-2 text-sm font-bold text-carbon-500">
