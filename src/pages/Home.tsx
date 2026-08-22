@@ -12,7 +12,7 @@ import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import { SKILL_TREE } from '../data/lessons';
 import StatPanel, { type StatKey } from '../components/StatPanels';
 import { CHEST_REWARD, useUserStore, xpToLevel } from '../store/useUserStore';
-import { canPlayUltraLessons } from '../data/plans';
+import { canPlayUltraLessons, hasUnlimitedHearts } from '../data/plans';
 import type { IconName, SkillNode } from '../types';
 
 /* Three-column learn layout, in the shape Duolingo uses: nav rail on the left,
@@ -64,7 +64,7 @@ function StatRail({
   msUntilNextHeart: number | null;
   active: { node: SkillNode; stage: number; maxStage: number } | null;
 }) {
-  const { streak, xp, coins } = useUserStore();
+  const { streak, xp, coins, plan } = useUserStore();
   const { level } = xpToLevel(xp);
   const [hovered, setHovered] = useState<StatKey | null>(null);
   // Measured rather than derived from the index: the counters are laid out with
@@ -72,11 +72,26 @@ function StatRail({
   const [arrowX, setArrowX] = useState(0);
   const rowRef = useRef<HTMLDivElement>(null);
 
-  const STATS: { key: StatKey; icon: IconName; value: number; dim?: boolean }[] = [
+  // The desktop rail counts the same things the phone's bar does, so Ultra has
+  // to read the same in both: an infinity in the plan's violet, not a five
+  // that never moves.
+  const unlimitedHearts = hasUnlimitedHearts(plan);
+  const STATS: {
+    key: StatKey;
+    icon: IconName;
+    value: number | string;
+    dim?: boolean;
+    tone?: string;
+  }[] = [
     { key: 'streak', icon: 'flame', value: streak, dim: streak === 0 },
     { key: 'xp', icon: 'star', value: xp },
     { key: 'coins', icon: 'coins', value: coins },
-    { key: 'hearts', icon: 'heart', value: hearts },
+    {
+      key: 'hearts',
+      icon: 'heart',
+      value: unlimitedHearts ? '∞' : hearts,
+      tone: unlimitedHearts ? 'ultra' : undefined,
+    },
   ];
 
   const reveal = (key: StatKey, el: HTMLElement) => {
@@ -104,15 +119,21 @@ function StatRail({
               onFocus={(e) => reveal(s.key, e.currentTarget)}
               onBlur={() => setHovered(null)}
               aria-expanded={hovered === s.key}
-              className={`flex items-center gap-1.5 font-black text-carbon-50 px-3 py-1 rounded-lg transition ${
-                hovered === s.key ? 'bg-carbon-800' : ''
-              }`}
+              className={`flex items-center gap-1.5 font-black px-3 py-1 rounded-lg transition ${
+                s.tone === 'ultra' ? 'text-ultra-300' : 'text-carbon-50'
+              } ${hovered === s.key ? 'bg-carbon-800' : ''}`}
             >
               <Icon
                 name={s.icon}
                 size={20}
                 className={
-                  s.dim ? 'text-carbon-600' : s.key === 'streak' ? 'text-lime-500 animate-flame-flicker' : 'text-lime-500'
+                  s.dim
+                    ? 'text-carbon-600'
+                    : s.tone === 'ultra'
+                    ? 'text-ultra-400'
+                    : s.key === 'streak'
+                    ? 'text-lime-500 animate-flame-flicker'
+                    : 'text-lime-500'
                 }
               />
               {s.value}
