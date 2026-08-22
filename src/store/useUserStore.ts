@@ -372,6 +372,10 @@ export const useUserStore = create<UserState>()(
         set((s) => ({
           plan,
           planStartedAt: plan === 'free' ? null : new Date().toISOString(),
+          // Subscribing to infinite hearts with none left would leave you
+          // locked out of the thing you just paid to stop being locked out of.
+          hearts: hasUnlimitedHearts(plan) ? MAX_HEARTS : s.hearts,
+          lastHeartLostAt: hasUnlimitedHearts(plan) ? null : s.lastHeartLostAt,
           // Ultra's cosmetics arrive with the plan; the ones already earned
           // from missions stay earned if it later lapses.
           unlockedAccessories: hasAllAccessories(plan)

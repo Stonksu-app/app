@@ -151,7 +151,7 @@ function MonthGrid({ activeDays, frozenDays }: { activeDays: Set<string>; frozen
 
 export default function StatPanel({ stat, compact = false }: { stat: StatKey; compact?: boolean }) {
   const { streak, xp, coins } = useUserStore();
-  const { hearts, msUntilNextHeart } = useHeartRegen();
+  const { hearts, msUntilNextHeart, unlimited } = useHeartRegen();
   const activeDays = useActiveDays();
   const frozenDays = useFrozenDays();
   const { level, xpIntoLevel, xpForNext } = xpToLevel(xp);
@@ -218,10 +218,16 @@ export default function StatPanel({ stat, compact = false }: { stat: StatKey; co
         ))}
       </div>
       <p className="text-center font-black text-carbon-100 mt-3">
-        {hearts >= MAX_HEARTS ? 'Tu set de vidas está completo' : `Te quedan ${hearts}`}
+        {unlimited
+          ? 'Vidas infinitas con Ultra'
+          : hearts >= MAX_HEARTS
+          ? 'Tu set de vidas está completo'
+          : `Te quedan ${hearts}`}
       </p>
       <p className="text-center text-sm text-carbon-400 mt-0.5">
-        {hearts >= MAX_HEARTS
+        {unlimited
+          ? 'Falla todo lo que quieras: no se gastan'
+          : hearts >= MAX_HEARTS
           ? 'Ya puedes seguir aprendiendo'
           : msUntilNextHeart !== null
           ? `Próxima vida en ${formatCountdown(msUntilNextHeart)}`

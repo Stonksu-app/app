@@ -116,6 +116,27 @@ check(
   useUserStore.getState().unlockedAccessories.includes('corona')
 );
 
+// Subscribing while locked out is the case that matters: hearts already at
+// zero, and infinite hearts only stopping *new* losses, left somebody paying
+// to be let in and still waiting outside.
+useUserStore.setState({ plan: 'free', hearts: 0, lastHeartLostAt: new Date().toISOString() });
+store.setPlan('ultra');
+check(
+  'contratar Ultra sin vidas las devuelve',
+  useUserStore.getState().hearts === 5,
+  `quedaron ${useUserStore.getState().hearts}`
+);
+check('y deja de contar la regeneración', useUserStore.getState().lastHeartLostAt === null);
+
+useUserStore.setState({ plan: 'free', hearts: 2, lastHeartLostAt: null });
+store.setPlan('premium');
+check(
+  'Premium no toca las vidas, porque no las promete',
+  useUserStore.getState().hearts === 2,
+  `quedaron ${useUserStore.getState().hearts}`
+);
+store.setPlan('free');
+
 // ---------------------------------------- how often Ultra gets pitched
 useUserStore.setState({ plan: 'free', lessonsSincePitch: 0 });
 check('no se ofrece Ultra nada más empezar', !store.shouldPitchUltra());

@@ -11,7 +11,7 @@ import Mascot from './Mascot';
 
 export default function TopBar() {
   const { streak, xp, coins, testMode } = useUserStore();
-  const { hearts } = useHeartRegen();
+  const { hearts, unlimited } = useHeartRegen();
   const [open, setOpen] = useState<StatKey | null>(null);
 
   const toggle = (p: StatKey) => setOpen((cur) => (cur === p ? null : p));
@@ -69,7 +69,9 @@ export default function TopBar() {
           )}
           {stat('xp', <Icon name="star" size={20} className="text-lime-500" />, xp)}
           {stat('coins', <Icon name="coins" size={20} className="text-lime-500" />, coins)}
-          {stat('hearts', <Icon name="heart" size={20} className="text-lime-500" />, hearts)}
+          {/* An Ultra account showing "5" would look like it's about to run
+              out of something it can't run out of. */}
+          {stat('hearts', <Icon name="heart" size={20} className="text-lime-500" />, unlimited ? '∞' : hearts)}
         </div>
       </div>
 
