@@ -230,6 +230,31 @@ export default function Home() {
   const reviewing = viewSection !== currentSection;
 
   /**
+   * What comes after this section, for the card at the end of the path.
+   *
+   * The path stops at the section boundary now, so without this the last
+   * node is simply where the page ends — nothing says there's more course
+   * behind it, or that finishing this one is what opens it.
+   */
+  const nextSection = useMemo(() => {
+    const after = nodes.filter((n) => n.node.section?.number === viewSection + 1);
+    if (after.length === 0) return null;
+    return {
+      number: viewSection + 1,
+      title: after[0].node.section?.title ?? '',
+      units: [...new Set(after.map((n) => n.node.unit?.title).filter(Boolean))] as string[],
+      unlocked: after.some((n) => n.unlocked),
+    };
+  }, [nodes, viewSection]);
+
+  // Changing section keeps the same route, so the browser has no reason to
+  // move the scroll — without this you'd arrive at the new section's path
+  // already scrolled to wherever the old one ended.
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [viewSection]);
+
+  /**
    * The unit the banner is describing.
    *
    * Follows the scroll rather than progress, which is what Duolingo does and
@@ -597,6 +622,31 @@ export default function Home() {
               );
             })}
           </div>
+
+          {/* Where the section ends. Duolingo's version of this is what makes
+              a section feel finished rather than truncated, so it says what's
+              next by name and — while it's still shut — what opens it. */}
+          {nextSection && (
+            <div className="mt-16 rounded-3xl border-2 border-carbon-800 bg-carbon-850 p-6 text-center">
+              <span className="inline-block rounded-lg bg-lime-500/15 px-2.5 py-1 text-[12px] font-black uppercase tracking-[0.8px] text-lime-400">
+                A continuación
+              </span>
+              <h2 className="mt-3 text-2xl font-black text-carbon-50">Sección {nextSection.number}</h2>
+              <p className="mt-1 text-sm text-carbon-400">{nextSection.title}</p>
+              {nextSection.units.length > 0 && (
+                <p className="mt-1 text-[13px] text-carbon-500">{nextSection.units.join(' · ')}</p>
+              )}
+              <div className="mt-5 max-w-[280px] mx-auto">
+                {nextSection.unlocked ? (
+                  <Button onClick={() => navigate(`/home?seccion=${nextSection.number}`)}>Continuar</Button>
+                ) : (
+                  <p className="flex items-center justify-center gap-2 text-sm font-bold text-carbon-500">
+                    <Icon name="lock" size={16} /> Termina esta sección para abrirla
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Chests live between topics, so they're rendered by splicing the
               path above rather than as a separate list. */}
