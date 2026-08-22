@@ -45,6 +45,8 @@ function snapshot(): CloudState {
     pendingMistakes: s.pendingMistakes,
     nodeStageProgress: s.nodeStageProgress,
     termMastery: s.termMastery,
+    plan: s.plan,
+    planStartedAt: s.planStartedAt,
     avatar: s.avatar,
     virtualBalance: s.virtualBalance,
     attempts: s.attempts,

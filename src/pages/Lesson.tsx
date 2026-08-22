@@ -16,6 +16,7 @@ import SequenceGame from '../components/SequenceGame';
 import SortClassifyGame from '../components/SortClassifyGame';
 import StreakPill from '../components/StreakPill';
 import { getLessonById, getNodeById, getReviewPool } from '../data/lessons';
+import { canPlayUltraLessons } from '../data/plans';
 import { useComboFeedback } from '../hooks/useComboFeedback';
 import { useUserStore } from '../store/useUserStore';
 import { buildStage, mistakeKey } from '../utils/buildActivityStream';
@@ -45,6 +46,8 @@ export default function Lesson() {
     recordMistake,
     clearMistake,
     completedLessonIds,
+    // Aliased: `plan` in this file already means the stage's activity plan.
+    plan: subscription,
   } = useUserStore();
   const {
     hearts,
@@ -117,6 +120,30 @@ export default function Lesson() {
         <button onClick={() => navigate('/home')} className="text-lime-400 font-bold">
           Volver al mapa
         </button>
+      </div>
+    );
+  }
+
+  // Checked on the route, not only in the dialog that leads here: a topic
+  // that's exclusive has to be exclusive to someone typing the URL too.
+  if (data.node.ultra && !canPlayUltraLessons(subscription)) {
+    return (
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-carbon-900 p-6 text-center">
+        <div className="w-20 h-20 rounded-3xl relative platinum-node flex items-center justify-center">
+          <Icon name="diamond" size={38} className="relative z-10 text-white" />
+        </div>
+        <p className="font-black text-xl text-carbon-50">Este tema es de Ultra</p>
+        <p className="text-sm text-carbon-400 max-w-xs">
+          Desbloquéalo con Stonksu Ultra, junto a las vidas infinitas y el repaso sin límite.
+        </p>
+        <div className="w-[240px] space-y-3 mt-2">
+          <Button variant="platinum" onClick={() => navigate('/planes')}>
+            Ver Ultra
+          </Button>
+          <Button variant="secondary" onClick={() => navigate('/home')}>
+            Volver al mapa
+          </Button>
+        </div>
       </div>
     );
   }

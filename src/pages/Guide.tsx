@@ -4,6 +4,7 @@ import TopBar from '../components/TopBar';
 import NavRail from '../components/NavRail';
 import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
+import AdSlot from '../components/AdSlot';
 import { Button } from '../components/Button';
 import { SKILL_TREE } from '../data/lessons';
 import { TERM_MASTERY_GOAL, useUserStore } from '../store/useUserStore';
@@ -109,6 +110,8 @@ export default function Guide() {
               </div>
             </div>
           )}
+
+          <AdSlot className="mt-4" />
 
           {ordered.map(({ node, cards, stage, maxStage, shown, locked }) => (
             <section key={node.id} className="mt-8">

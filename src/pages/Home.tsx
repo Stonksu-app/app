@@ -5,11 +5,13 @@ import NavRail from '../components/NavRail';
 import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
 import NodeRing from '../components/NodeRing';
+import AdSlot from '../components/AdSlot';
 import { Button } from '../components/Button';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import { SKILL_TREE } from '../data/lessons';
 import StatPanel, { type StatKey } from '../components/StatPanels';
 import { CHEST_REWARD, useUserStore, xpToLevel } from '../store/useUserStore';
+import { canPlayUltraLessons } from '../data/plans';
 import type { IconName, SkillNode } from '../types';
 
 /* Three-column learn layout, in the shape Duolingo uses: nav rail on the left,
@@ -175,7 +177,7 @@ export default function Home() {
   // Depend on the raw state slices, not on the store's getter functions: those
   // keep a stable identity, so a memo keyed on them never recomputes and the
   // path would keep rendering a chest as unopened after you claimed it.
-  const { openedChestIds, nodeStageProgress, openChest, testMode } = useUserStore();
+  const { openedChestIds, nodeStageProgress, openChest, testMode, plan } = useUserStore();
   const [selected, setSelected] = useState<SkillNode | null>(null);
   const [reward, setReward] = useState<{ protectorGifted: boolean } | null>(null);
   const { hearts, msUntilNextHeart } = useHeartRegen();
@@ -625,6 +627,11 @@ export default function Home() {
             })}
           </div>
 
+          {/* The path is where people spend their time, so it's where the
+              thing being sold has to be visible — once, at the end, rather
+              than floating over the lesson nodes. */}
+          <AdSlot className="mt-14" />
+
           {/* Where the section ends. Duolingo's version of this is what makes
               a section feel finished rather than truncated, so it says what's
               next by name and — while it's still shut — what opens it. */}
@@ -740,7 +747,18 @@ export default function Home() {
             )}
 
             {selected.lessons.length > 0 ? (
-              hearts <= 0 ? (
+              selected.ultra && !canPlayUltraLessons(plan) ? (
+                // Sold, not scolded: a locked topic explains what opens it and
+                // takes you there in one tap.
+                <div className="mt-4 space-y-3">
+                  <p className="flex items-center justify-center gap-1.5 text-sm font-black text-sky-400">
+                    <Icon name="diamond" size={16} /> Tema exclusivo de Ultra
+                  </p>
+                  <Button variant="platinum" onClick={() => navigate('/planes')}>
+                    Desbloquear con Ultra
+                  </Button>
+                </div>
+              ) : hearts <= 0 ? (
                 <div className="mt-4 w-full bg-carbon-800 rounded-2xl py-3.5 flex flex-col items-center gap-1">
                   <p className="text-sm font-black text-carbon-300 flex items-center gap-1.5">
                     <Icon name="heart" size={16} className="text-carbon-600" /> Sin vidas

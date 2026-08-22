@@ -7,6 +7,7 @@ import { SKILL_TREE } from '../data/lessons';
 import { stagesForDifficulty } from '../utils/mastery';
 import { computeStreakUpdate, datesBetween } from '../utils/streak';
 import { DEFAULT_REMINDER_HOUR } from '../lib/notifications';
+import { FREE_PRACTICE_PER_DAY, hasAllAccessories, hasUnlimitedHearts, hasUnlimitedPractice, type Plan } from '../data/plans';
 
 const MAX_HEARTS = 5;
 const HEART_REGEN_MINUTES = 30;
@@ -39,6 +40,20 @@ interface UserState {
    * you've had right five times shouldn't erase the term.
    */
   termMastery: Record<string, number>;
+  /** Which subscription is active. Synced, because it's what was paid for. */
+  plan: Plan;
+  /** ISO date the current plan started, for the profile screen. */
+  planStartedAt: string | null;
+  /**
+   * The day's practice allowance, kept off the cloud.
+   *
+   * It's a rate limit rather than progress: syncing a counter that resets
+   * every midnight would mean two columns and a timezone argument, and the
+   * worst a determined player gets by clearing their storage is a second
+   * round of revision — which is the thing the app wants them doing anyway.
+   */
+  practiceDay: string | null;
+  practiceRoundsToday: number;
   openedChestIds: string[];
   coins: number;
   streakProtectors: number;
@@ -86,6 +101,11 @@ interface UserState {
   recordTermAnswer: (termId: string, correct: boolean) => number;
   getTermMastery: (termId: string) => number;
   isTermMastered: (termId: string) => boolean;
+  setPlan: (plan: Plan) => void;
+  /** Whether another practice round is allowed right now. */
+  canPractice: () => boolean;
+  /** Consumes one round of the day's allowance. Returns false if none left. */
+  startPracticeRound: () => boolean;
   isChestOpened: (chestId: string) => boolean;
   /** Returns whether this chest also gifted a streak protector. */
   openChest: (chestId: string) => boolean;
@@ -143,6 +163,10 @@ export const useUserStore = create<UserState>()(
       seenIntroNodeIds: [],
       nodeStageProgress: {},
       termMastery: {},
+      plan: 'free',
+      planStartedAt: null,
+      practiceDay: null,
+      practiceRoundsToday: 0,
       openedChestIds: [],
       coins: 0,
       streakProtectors: 0,
@@ -179,10 +203,15 @@ export const useUserStore = create<UserState>()(
         }),
 
       loseHeart: () =>
-        set((s) => ({
-          hearts: Math.max(0, s.hearts - 1),
-          lastHeartLostAt: s.hearts <= 0 ? s.lastHeartLostAt : new Date().toISOString(),
-        })),
+        set((s) => {
+          // The headline perk. Checked here rather than at each call site so
+          // there's one place it can be true, and no screen can forget.
+          if (hasUnlimitedHearts(s.plan)) return s;
+          return {
+            hearts: Math.max(0, s.hearts - 1),
+            lastHeartLostAt: s.hearts <= 0 ? s.lastHeartLostAt : new Date().toISOString(),
+          };
+        }),
 
       refillHearts: () => set({ hearts: MAX_HEARTS, lastHeartLostAt: null }),
 
@@ -313,6 +342,34 @@ export const useUserStore = create<UserState>()(
         return next;
       },
 
+      setPlan: (plan) =>
+        set((s) => ({
+          plan,
+          planStartedAt: plan === 'free' ? null : new Date().toISOString(),
+          // Ultra's cosmetics arrive with the plan; the ones already earned
+          // from missions stay earned if it later lapses.
+          unlockedAccessories: hasAllAccessories(plan)
+            ? ([...new Set([...s.unlockedAccessories, 'corona'])] as typeof s.unlockedAccessories)
+            : s.unlockedAccessories,
+        })),
+
+      canPractice: () => {
+        const s = get();
+        if (hasUnlimitedPractice(s.plan)) return true;
+        if (s.practiceDay !== todayStr()) return true;
+        return s.practiceRoundsToday < FREE_PRACTICE_PER_DAY;
+      },
+
+      startPracticeRound: () => {
+        const s = get();
+        if (hasUnlimitedPractice(s.plan)) return true;
+        const today = todayStr();
+        const used = s.practiceDay === today ? s.practiceRoundsToday : 0;
+        if (used >= FREE_PRACTICE_PER_DAY) return false;
+        set({ practiceDay: today, practiceRoundsToday: used + 1 });
+        return true;
+      },
+
       isChestOpened: (chestId) => get().openedChestIds.includes(chestId),
 
       openChest: (chestId) => {
@@ -413,6 +470,10 @@ export const useUserStore = create<UserState>()(
           seenIntroNodeIds: [],
           nodeStageProgress: {},
           termMastery: {},
+          plan: 'free',
+          planStartedAt: null,
+          practiceDay: null,
+          practiceRoundsToday: 0,
           openedChestIds: [],
           coins: 0,
           streakProtectors: 0,

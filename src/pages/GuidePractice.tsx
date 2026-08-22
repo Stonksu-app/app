@@ -9,6 +9,7 @@ import { randomLine } from '../components/Mascot';
 import { Button } from '../components/Button';
 import { SKILL_TREE } from '../data/lessons';
 import { TERM_MASTERY_GOAL, useUserStore } from '../store/useUserStore';
+import { FREE_PRACTICE_PER_DAY } from '../data/plans';
 import type { Flashcard } from '../types';
 
 /*
@@ -53,6 +54,15 @@ export default function GuidePractice() {
 
   const { isNodeUnlocked, getNodeStage, getNodeMaxStage, termMastery, recordTermAnswer, addXp } =
     useUserStore();
+
+  /**
+   * The day's allowance, spent on arrival rather than on the last question.
+   *
+   * Charged once per mount and remembered, so a re-render can't spend a second
+   * round and abandoning one mid-way still costs it — otherwise the limit is
+   * just a suggestion you dismiss by pressing back.
+   */
+  const [allowed] = useState(() => useUserStore.getState().startPracticeRound());
 
   /** Everything the guide has revealed, which is exactly what may be asked. */
   const pool = useMemo(() => {
@@ -102,6 +112,32 @@ export default function GuidePractice() {
   /** Bumped on every answer so the full-screen flash replays even when two
    *  answers in a row land the same way. */
   const [flash, setFlash] = useState<{ correct: boolean; nonce: number } | null>(null);
+
+  if (!allowed) {
+    return (
+      <div className="min-h-dvh bg-carbon-900 flex items-center justify-center px-6 text-center">
+        <div className="max-w-sm">
+          <div className="w-20 h-20 rounded-3xl relative platinum-node flex items-center justify-center mx-auto">
+            <Icon name="cards" size={38} className="relative z-10 text-white" />
+          </div>
+          <p className="mt-5 text-2xl font-black text-carbon-50">Ya repasaste hoy</p>
+          <p className="mt-1.5 text-sm text-carbon-400 leading-snug">
+            El plan gratuito incluye {FREE_PRACTICE_PER_DAY}{' '}
+            {FREE_PRACTICE_PER_DAY === 1 ? 'repaso al día' : 'repasos al día'}. Con Ultra repasas
+            todas las veces que quieras.
+          </p>
+          <div className="mt-7 space-y-3">
+            <Button variant="platinum" onClick={() => navigate('/planes')}>
+              Ver Ultra
+            </Button>
+            <Button variant="secondary" onClick={() => navigate('/guia')}>
+              Volver a la guía
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Fewer than two terms means there's nothing to build wrong answers from.
   if (pool.length < OPTIONS || questions.length === 0) {

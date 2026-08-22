@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import type { LessonAttempt, MascotLook, OnboardingAnswers } from '../types';
 import type { AccessoryStyle } from '../types';
+import type { Plan } from '../data/plans';
 
 /**
  * Translation layer between the Zustand store and Postgres.
@@ -34,6 +35,8 @@ export interface CloudState {
   pendingMistakes: string[];
   nodeStageProgress: Record<string, number>;
   termMastery: Record<string, number>;
+  plan: Plan;
+  planStartedAt: string | null;
   avatar: MascotLook;
   virtualBalance: number;
   attempts: LessonAttempt[];
@@ -59,6 +62,8 @@ export interface ProfileRow {
   pending_mistakes: string[];
   node_stage_progress: Record<string, number>;
   term_mastery: Record<string, number>;
+  plan: Plan;
+  plan_started_at: string | null;
   avatar: MascotLook;
   virtual_balance: number | string;
 }
@@ -86,6 +91,8 @@ export function toRow(s: CloudState, id: string) {
     pending_mistakes: s.pendingMistakes,
     node_stage_progress: s.nodeStageProgress,
     term_mastery: s.termMastery,
+    plan: s.plan,
+    plan_started_at: s.planStartedAt,
     avatar: s.avatar,
     virtual_balance: s.virtualBalance,
   };
@@ -113,6 +120,9 @@ export function fromRow(row: ProfileRow, attempts: LessonAttempt[]): CloudState 
     nodeStageProgress: row.node_stage_progress,
     // A profile written before the column existed comes back null, not {}.
     termMastery: row.term_mastery ?? {},
+    // Same reasoning: a profile written before the columns existed is free.
+    plan: row.plan ?? 'free',
+    planStartedAt: row.plan_started_at ?? null,
     avatar: row.avatar,
     // numeric(14,2) comes back as a string from PostgREST to avoid float drift.
     virtualBalance: Number(row.virtual_balance),
@@ -124,7 +134,8 @@ const PROFILE_COLUMNS =
   'name, onboarded, onboarding_answers, xp, coins, hearts, last_heart_lost_at, streak, ' +
   'last_active_date, streak_protectors, completed_lesson_ids, unlocked_badge_ids, ' +
   'seen_intro_node_ids, opened_chest_ids, claimed_mission_ids, unlocked_accessories, ' +
-  'pending_mistakes, node_stage_progress, term_mastery, avatar, virtual_balance';
+  'pending_mistakes, node_stage_progress, term_mastery, plan, plan_started_at, avatar, ' +
+  'virtual_balance';
 
 /**
  * Signs in, creating an anonymous account on first launch.

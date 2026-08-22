@@ -4,6 +4,7 @@ import SplashScreen from './components/SplashScreen';
 import Landing from './pages/Landing';
 import Guide from './pages/Guide';
 import GuidePractice from './pages/GuidePractice';
+import Premium from './pages/Premium';
 import Shop from './pages/Shop';
 import Achievements from './pages/Achievements';
 import AvatarEditor from './pages/AvatarEditor';
@@ -119,6 +120,14 @@ function App() {
         element={
           <RequireOnboarded>
             <GuidePractice />
+          </RequireOnboarded>
+        }
+      />
+      <Route
+        path="/planes"
+        element={
+          <RequireOnboarded>
+            <Premium />
           </RequireOnboarded>
         }
       />

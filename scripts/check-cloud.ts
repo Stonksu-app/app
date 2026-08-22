@@ -47,6 +47,8 @@ const sample: CloudState = {
   pendingMistakes: ['fundamentos::f2'],
   nodeStageProgress: { fundamentos: 5, indicadores: 2 },
   termMastery: { 'fc-soporte': 3, 'fc-resistencia': 1 },
+  plan: 'ultra',
+  planStartedAt: '2026-08-20T08:00:00.000Z',
   avatar: {
     body: '#FF5252',
     mask: '#2a0e0e',
@@ -106,9 +108,14 @@ const cloudKeys = new Set(Object.keys(sample));
  * - testMode: a debugging switch, not progress.
  * - reminder*: the notification permission behind them is granted per device.
  * - frozenDates: cosmetic annotation on this device's streak calendar.
+ * - practice*: a daily rate limit, not progress. Syncing a counter that
+ *   resets at midnight would need columns and a timezone argument, and the
+ *   worst it buys is one extra round of revision.
  */
 const LOCAL_ONLY = new Set([
   'testMode',
+  'practiceDay',
+  'practiceRoundsToday',
   'reminderEnabled',
   'reminderHour',
   'heartsReminderEnabled',

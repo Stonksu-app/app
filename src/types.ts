@@ -162,6 +162,10 @@ export interface SkillNode {
   /** UNIT: Represents the Duolingo "unit" within a section (e.g., Unit 1, Unit 2).
    *  Nodes sharing both section and unit render under one unit banner. */
   unit?: { number: number; title: string };
+  /** Playable only on Ultra. Nothing carries it yet — the whole course is
+   *  free — but the path, the node dialog and the lesson route all honour it,
+   *  so making a topic exclusive is one word rather than a feature. */
+  ultra?: boolean;
 }
 
 export interface Badge {
