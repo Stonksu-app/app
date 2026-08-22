@@ -135,7 +135,9 @@ export default function Sections() {
 
                         {!complete && (
                           <div className="mt-4 w-[180px]">
-                            <Button size="sm" onClick={() => navigate('/home')}>
+                            {/* Carries the section, so the path opens on it
+                                rather than at the top of the whole tree. */}
+                            <Button size="sm" onClick={() => navigate(`/home?seccion=${section.number}`)}>
                               Continuar
                             </Button>
                           </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import TopBar from '../components/TopBar';
 import NavRail from '../components/NavRail';
 import BottomNav from '../components/BottomNav';
@@ -150,6 +150,7 @@ function StatRail({
 
 export default function Home() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
     name,
     isNodeUnlocked,
@@ -226,6 +227,44 @@ export default function Home() {
   // Keyed on nodes rather than the derived path: the dividers come from these,
   // and pathItems is built further down.
   }, [nodes]);
+
+  /**
+   * Opens the path where the player actually is, not at the very beginning.
+   *
+   * The tree is one long scroll, so without this every launch drops you at
+   * Section 1 Unit 1 and asks you to scroll past everything you have already
+   * finished. `?seccion=` overrides it, which is what the sections page uses
+   * to take you into the one you picked.
+   *
+   * Runs once per mount and only after the path has rendered — the markers it
+   * looks for do not exist before that.
+   */
+  const jumpedRef = useRef(false);
+  useEffect(() => {
+    if (jumpedRef.current) return;
+    const markers = document.querySelectorAll<HTMLElement>('[data-unit]');
+    if (!markers.length) return;
+
+    const wantedSection = Number(searchParams.get('seccion'));
+    const target =
+      [...markers].find((el) => {
+        const [section, unit] = (el.dataset.unit ?? '').split('|');
+        return wantedSection
+          ? Number(section) === wantedSection && unit === '1'
+          : Number(section) === current?.node.section?.number &&
+              Number(unit) === current?.node.unit?.number;
+      }) ?? null;
+
+    jumpedRef.current = true;
+    if (!target) return;
+
+    // Instant, not smooth: this is where the screen starts, and animating to
+    // it would look like the app scrolling away from you on launch.
+    const top = target.getBoundingClientRect().top + window.scrollY - 12;
+    window.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
+  // Keyed on nodes, not the derived path: pathItems is built further down, and
+  // effects run after paint either way, so the markers exist by then.
+  }, [nodes, current, searchParams]);
 
   const shownUnit =
     scrolledUnit ??
@@ -443,20 +482,27 @@ export default function Home() {
                       aria-label={node.title}
                       style={{
                         ['--btn-lip' as string]: platinum
-                          ? 'var(--color-carbon-500)'
+                          ? '#1e40af'
                           : unlocked
                           ? 'var(--color-lime-700)'
                           : 'var(--color-carbon-950)',
                       }}
                       className={`btn-3d w-[70px] h-[70px] rounded-full flex items-center justify-center ${
                         platinum
-                          ? 'bg-gradient-to-br from-carbon-100 to-carbon-300 text-carbon-900'
+                          ? 'platinum-node platinum-glow text-white'
                           : unlocked
                           ? 'bg-lime-500 text-carbon-900'
                           : 'bg-carbon-800 text-carbon-600 cursor-not-allowed'
                       }`}
                     >
-                      <Icon name={unlocked ? node.icon : 'lock'} size={30} strokeWidth={unlocked ? 1.9 : 2} />
+                      {/* Above the sweeping highlight, which is an ::after and
+                          would otherwise wash over the icon itself. */}
+                      <Icon
+                        name={unlocked ? node.icon : 'lock'}
+                        size={30}
+                        strokeWidth={unlocked ? 1.9 : 2}
+                        className={platinum ? 'relative z-10' : undefined}
+                      />
                     </button>
                   </div>
 
@@ -468,7 +514,11 @@ export default function Home() {
                     {node.title}
                   </span>
                   {unlocked && maxStage > 0 && (
-                    <span className="text-[11px] font-black text-carbon-500 mt-0.5">
+                    <span
+                      className={`text-[11px] font-black mt-0.5 ${
+                        platinum ? 'text-sky-400' : 'text-carbon-500'
+                      }`}
+                    >
                       {platinum ? 'PLATINO' : `${stage}/${maxStage}`}
                     </span>
                   )}
