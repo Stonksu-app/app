@@ -33,6 +33,7 @@ export interface CloudState {
   unlockedAccessories: AccessoryStyle[];
   pendingMistakes: string[];
   nodeStageProgress: Record<string, number>;
+  termMastery: Record<string, number>;
   avatar: MascotLook;
   virtualBalance: number;
   attempts: LessonAttempt[];
@@ -57,6 +58,7 @@ export interface ProfileRow {
   unlocked_accessories: AccessoryStyle[];
   pending_mistakes: string[];
   node_stage_progress: Record<string, number>;
+  term_mastery: Record<string, number>;
   avatar: MascotLook;
   virtual_balance: number | string;
 }
@@ -83,6 +85,7 @@ export function toRow(s: CloudState, id: string) {
     unlocked_accessories: s.unlockedAccessories,
     pending_mistakes: s.pendingMistakes,
     node_stage_progress: s.nodeStageProgress,
+    term_mastery: s.termMastery,
     avatar: s.avatar,
     virtual_balance: s.virtualBalance,
   };
@@ -108,6 +111,8 @@ export function fromRow(row: ProfileRow, attempts: LessonAttempt[]): CloudState 
     unlockedAccessories: row.unlocked_accessories,
     pendingMistakes: row.pending_mistakes,
     nodeStageProgress: row.node_stage_progress,
+    // A profile written before the column existed comes back null, not {}.
+    termMastery: row.term_mastery ?? {},
     avatar: row.avatar,
     // numeric(14,2) comes back as a string from PostgREST to avoid float drift.
     virtualBalance: Number(row.virtual_balance),
@@ -119,7 +124,7 @@ const PROFILE_COLUMNS =
   'name, onboarded, onboarding_answers, xp, coins, hearts, last_heart_lost_at, streak, ' +
   'last_active_date, streak_protectors, completed_lesson_ids, unlocked_badge_ids, ' +
   'seen_intro_node_ids, opened_chest_ids, claimed_mission_ids, unlocked_accessories, ' +
-  'pending_mistakes, node_stage_progress, avatar, virtual_balance';
+  'pending_mistakes, node_stage_progress, term_mastery, avatar, virtual_balance';
 
 /**
  * Signs in, creating an anonymous account on first launch.

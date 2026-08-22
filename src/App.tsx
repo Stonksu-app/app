@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import SplashScreen from './components/SplashScreen';
 import Landing from './pages/Landing';
 import Guide from './pages/Guide';
+import GuidePractice from './pages/GuidePractice';
 import Shop from './pages/Shop';
 import Achievements from './pages/Achievements';
 import AvatarEditor from './pages/AvatarEditor';
@@ -110,6 +111,14 @@ function App() {
         element={
           <RequireOnboarded>
             <Guide />
+          </RequireOnboarded>
+        }
+      />
+      <Route
+        path="/guia/repaso"
+        element={
+          <RequireOnboarded>
+            <GuidePractice />
           </RequireOnboarded>
         }
       />

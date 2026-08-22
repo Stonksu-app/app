@@ -899,7 +899,7 @@ export const SKILL_TREE: SkillNode[] = [
         { id: 'fc-rr', term: 'Ratio riesgo/beneficio', definition: 'Cuánto arriesgas frente a cuánto esperas ganar. Se escribe 1:2, 1:3…' },
         { id: 'fc-tamano', term: 'Tamaño de posición', definition: 'Cuántas unidades compras, calculado desde el riesgo que aceptas.' },
         { id: 'fc-regla-uno', term: 'Regla del 1%', definition: 'No arriesgar más del 1-2% de la cuenta en una sola operación.' },
-        { id: 'fc-drawdown', term: 'Drawdown', definition: 'Cuánto ha caído tu cuenta desde su punto más alto.' },
+        { id: 'fc-drawdown-riesgo', term: 'Drawdown', definition: 'Cuánto ha caído tu cuenta desde su punto más alto.' },
         { id: 'fc-riesgo-op', term: 'Riesgo por operación', definition: 'El dinero exacto que pierdes si salta tu stop loss.' },
         { id: 'fc-diversificar', term: 'Diversificación', definition: 'Repartir el capital para que un solo activo no te hunda.' },
       ],
@@ -1418,13 +1418,13 @@ export const SKILL_TREE: SkillNode[] = [
     unit: { number: 1, title: 'Tipos de Órdenes' },
     intro: {
       flashcards: [
-        { id: 'fc-mercado', term: 'Orden de mercado', definition: 'Se ejecuta ya, al mejor precio que haya disponible.' },
+        { id: 'fc-orden-mercado', term: 'Orden de mercado', definition: 'Se ejecuta ya, al mejor precio que haya disponible.' },
         { id: 'fc-limitada', term: 'Orden limitada', definition: 'Solo se ejecuta a tu precio o mejor. Puede no ejecutarse nunca.' },
         { id: 'fc-stop-orden', term: 'Orden stop', definition: 'Se activa cuando el precio toca el nivel que marcaste.' },
         { id: 'fc-stop-limitada', term: 'Stop limitada', definition: 'Se activa en un nivel y a partir de ahí se comporta como limitada.' },
         { id: 'fc-spread-o', term: 'Spread', definition: 'Diferencia entre el precio al que puedes comprar y al que puedes vender.' },
         { id: 'fc-slippage', term: 'Slippage', definition: 'Diferencia entre el precio que esperabas y al que se ejecutó.' },
-        { id: 'fc-liquidez', term: 'Liquidez', definition: 'Facilidad para entrar y salir sin mover el precio.' },
+        { id: 'fc-liquidez-ordenes', term: 'Liquidez', definition: 'Facilidad para entrar y salir sin mover el precio.' },
         { id: 'fc-libro', term: 'Libro de órdenes', definition: 'Lista de todas las órdenes de compra y venta pendientes.' },
       ],
       games: [

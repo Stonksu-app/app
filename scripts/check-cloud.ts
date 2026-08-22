@@ -46,6 +46,7 @@ const sample: CloudState = {
   unlockedAccessories: ['ninguno', 'corona'],
   pendingMistakes: ['fundamentos::f2'],
   nodeStageProgress: { fundamentos: 5, indicadores: 2 },
+  termMastery: { 'fc-soporte': 3, 'fc-resistencia': 1 },
   avatar: {
     body: '#FF5252',
     mask: '#2a0e0e',
@@ -139,11 +140,13 @@ check('migrations are numbered so they apply in order', migrations.every((f) => 
 
 for (const column of Object.keys(row)) {
   if (column === 'id') continue;
-  check(
-    `the profiles table declares "${column}"`,
-    new RegExp(`\\n\\s+${column}\\s`).test(sql),
-    `missing from ${migrationDir}`
-  );
+  // Two shapes count: a column in the original create table, and one bolted
+  // on later by an alter. Only matching the first would push every new field
+  // into 0001, which is what having migrations at all is meant to stop.
+  const declared =
+    new RegExp(String.raw`\n\s+${column}\s`).test(sql) ||
+    new RegExp(String.raw`add column (if not exists )?${column}\s`).test(sql);
+  check(`the profiles table declares "${column}"`, declared, `missing from ${migrationDir}`);
 }
 
 check('row level security is enabled on profiles', /alter table public\.profiles enable row level security/.test(sql));

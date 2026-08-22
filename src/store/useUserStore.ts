@@ -32,6 +32,13 @@ interface UserState {
   virtualBalance: number;
   seenIntroNodeIds: string[];
   nodeStageProgress: Record<string, number>;
+  /**
+   * How well each glossary term is known: termId -> right answers in a row in
+   * the guide's practice, capped at TERM_MASTERY_GOAL. A wrong answer costs
+   * one rather than resetting to zero — a slip on the last question of a term
+   * you've had right five times shouldn't erase the term.
+   */
+  termMastery: Record<string, number>;
   openedChestIds: string[];
   coins: number;
   streakProtectors: number;
@@ -75,6 +82,10 @@ interface UserState {
   getNodeStage: (nodeId: string) => number;
   getNodeMaxStage: (nodeId: string) => number;
   isNodePlatinum: (nodeId: string) => boolean;
+  /** Records one practice answer. Returns the term's new mastery. */
+  recordTermAnswer: (termId: string, correct: boolean) => number;
+  getTermMastery: (termId: string) => number;
+  isTermMastered: (termId: string) => boolean;
   isChestOpened: (chestId: string) => boolean;
   /** Returns whether this chest also gifted a streak protector. */
   openChest: (chestId: string) => boolean;
@@ -89,6 +100,11 @@ interface UserState {
   setHeartsReminder: (enabled: boolean) => void;
   resetProgress: () => void;
 }
+
+/** Right answers in a row before a term counts as mastered and goes platinum.
+ *  Three rather than one so a lucky guess between four options isn't mastery,
+ *  and rather than five so the grid actually fills in. */
+export const TERM_MASTERY_GOAL = 3;
 
 export const COIN_PRICES = { heartRefill: 350, streakProtector: 200 } as const;
 /** Coins minted per correct answer. */
@@ -126,6 +142,7 @@ export const useUserStore = create<UserState>()(
       virtualBalance: 10000,
       seenIntroNodeIds: [],
       nodeStageProgress: {},
+      termMastery: {},
       openedChestIds: [],
       coins: 0,
       streakProtectors: 0,
@@ -283,6 +300,19 @@ export const useUserStore = create<UserState>()(
         return max > 0 && getNodeStage(nodeId) >= max;
       },
 
+      getTermMastery: (termId) => get().termMastery[termId] ?? 0,
+
+      isTermMastered: (termId) => (get().termMastery[termId] ?? 0) >= TERM_MASTERY_GOAL,
+
+      recordTermAnswer: (termId, correct) => {
+        const current = get().termMastery[termId] ?? 0;
+        const next = correct
+          ? Math.min(TERM_MASTERY_GOAL, current + 1)
+          : Math.max(0, current - 1);
+        if (next !== current) set((s) => ({ termMastery: { ...s.termMastery, [termId]: next } }));
+        return next;
+      },
+
       isChestOpened: (chestId) => get().openedChestIds.includes(chestId),
 
       openChest: (chestId) => {
@@ -382,6 +412,7 @@ export const useUserStore = create<UserState>()(
           virtualBalance: 10000,
           seenIntroNodeIds: [],
           nodeStageProgress: {},
+          termMastery: {},
           openedChestIds: [],
           coins: 0,
           streakProtectors: 0,
