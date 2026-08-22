@@ -20,7 +20,7 @@ import {
   showsAds,
   type Plan,
 } from '../src/data/plans';
-import { useUserStore } from '../src/store/useUserStore';
+import { LESSONS_PER_PITCH, useUserStore } from '../src/store/useUserStore';
 import { SKILL_TREE } from '../src/data/lessons';
 
 let failed = 0;
@@ -115,6 +115,20 @@ check(
   'lo ya desbloqueado no se pierde al cancelar',
   useUserStore.getState().unlockedAccessories.includes('corona')
 );
+
+// ---------------------------------------- how often Ultra gets pitched
+useUserStore.setState({ plan: 'free', lessonsSincePitch: 0 });
+check('no se ofrece Ultra nada más empezar', !store.shouldPitchUltra());
+
+useUserStore.setState({ lessonsSincePitch: LESSONS_PER_PITCH });
+check(`se ofrece cada ${LESSONS_PER_PITCH} lecciones`, store.shouldPitchUltra());
+
+store.markUltraPitched();
+check('tras ofrecerlo, el contador vuelve a empezar', !store.shouldPitchUltra());
+
+useUserStore.setState({ plan: 'ultra', lessonsSincePitch: 99 });
+check('a quien ya paga no se le ofrece nunca', !store.shouldPitchUltra());
+useUserStore.setState({ plan: 'free', lessonsSincePitch: 0 });
 
 // ------------------------------------- what the tree marks as ultra-only
 const ultraNodes = SKILL_TREE.filter((n) => n.ultra);

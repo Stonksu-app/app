@@ -116,6 +116,7 @@ const LOCAL_ONLY = new Set([
   'testMode',
   'practiceDay',
   'practiceRoundsToday',
+  'lessonsSincePitch',
   'reminderEnabled',
   'reminderHour',
   'heartsReminderEnabled',

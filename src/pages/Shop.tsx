@@ -5,7 +5,8 @@ import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/Button';
-import { PLAN_OFFERS, formatPrice, planName } from '../data/plans';
+import { planName } from '../data/plans';
+import UltraPromo from '../components/UltraPromo';
 import {
   COIN_PRICES,
   MAX_HEARTS,
@@ -112,25 +113,20 @@ export default function Shop() {
 
           {/* Above the coin purchases on purpose: this is the one thing here
               that changes how the app behaves rather than topping something
-              up, and burying it under two consumables hides it. */}
-          <Link
-            to="/planes"
-            className="mt-6 block relative overflow-hidden rounded-3xl border-2 border-sky-500/40 bg-carbon-850 p-5 platinum-banner hover:border-sky-500/70 transition"
-          >
-            <p className="text-[12px] font-black uppercase tracking-[0.8px] text-sky-400">
-              {plan === 'free' ? 'Stonksu Ultra' : `Tu plan · ${planName(plan)}`}
-            </p>
-            <p className="mt-1.5 text-[19px] font-black text-carbon-50 leading-tight">
-              {plan === 'free'
-                ? 'Vidas infinitas, repaso sin límite y sin anuncios'
-                : 'Gestiona tu suscripción'}
-            </p>
-            <p className="mt-1 text-sm text-carbon-400">
-              {plan === 'free'
-                ? `Desde ${formatPrice(Math.min(...PLAN_OFFERS.map((o) => o.price)))} al mes`
-                : 'Cambia de plan o vuelve al gratuito cuando quieras'}
-            </p>
-          </Link>
+              up, and burying it under two consumables hides it. On Ultra the
+              card removes itself and the shop is just the shop. */}
+          <UltraPromo className="mt-6" />
+          {plan === 'ultra' && (
+            <Link
+              to="/planes"
+              className="mt-6 block rounded-3xl border-2 border-carbon-800 bg-carbon-850 px-5 py-4 hover:border-carbon-700 transition"
+            >
+              <p className="text-[12px] font-black uppercase tracking-[0.8px] text-sky-400">
+                Tu plan · {planName(plan)}
+              </p>
+              <p className="mt-1 text-sm text-carbon-400">Gestiona tu suscripción</p>
+            </Link>
+          )}
 
           <h2 className="mt-8 text-[13px] font-black text-carbon-400 uppercase tracking-widest">Vidas</h2>
           <ShopRow

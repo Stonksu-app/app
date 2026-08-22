@@ -54,6 +54,13 @@ interface UserState {
    */
   practiceDay: string | null;
   practiceRoundsToday: number;
+  /**
+   * Lessons finished since the Ultra pitch was last shown.
+   *
+   * Local for the same reason as the practice counter: it paces an advert, and
+   * the worst a cleared storage buys you is seeing one fewer.
+   */
+  lessonsSincePitch: number;
   openedChestIds: string[];
   coins: number;
   streakProtectors: number;
@@ -102,6 +109,9 @@ interface UserState {
   getTermMastery: (termId: string) => number;
   isTermMastered: (termId: string) => boolean;
   setPlan: (plan: Plan) => void;
+  /** True when a lesson has just earned the between-lessons Ultra pitch. */
+  shouldPitchUltra: () => boolean;
+  markUltraPitched: () => void;
   /** Whether another practice round is allowed right now. */
   canPractice: () => boolean;
   /** Consumes one round of the day's allowance. Returns false if none left. */
@@ -125,6 +135,10 @@ interface UserState {
  *  Three rather than one so a lucky guess between four options isn't mastery,
  *  and rather than five so the grid actually fills in. */
 export const TERM_MASTERY_GOAL = 3;
+
+/** Lessons between one Ultra pitch and the next, on the free plan. Two, as
+ *  asked: often enough to be an offer, rare enough not to be a toll booth. */
+export const LESSONS_PER_PITCH = 2;
 
 export const COIN_PRICES = { heartRefill: 350, streakProtector: 200 } as const;
 /** Coins minted per correct answer. */
@@ -167,6 +181,7 @@ export const useUserStore = create<UserState>()(
       planStartedAt: null,
       practiceDay: null,
       practiceRoundsToday: 0,
+      lessonsSincePitch: 0,
       openedChestIds: [],
       coins: 0,
       streakProtectors: 0,
@@ -281,6 +296,9 @@ export const useUserStore = create<UserState>()(
           streak,
           lastActiveDate,
           nodeStageProgress,
+          // Counts every lesson, repeats included: the pitch paces itself on
+          // time spent in lessons, not on new ground covered.
+          lessonsSincePitch: s.lessonsSincePitch + 1,
         });
 
         return gifted;
@@ -341,6 +359,14 @@ export const useUserStore = create<UserState>()(
         if (next !== current) set((s) => ({ termMastery: { ...s.termMastery, [termId]: next } }));
         return next;
       },
+
+      shouldPitchUltra: () => {
+        const s = get();
+        // Never to somebody who already pays: they've bought the thing.
+        return s.plan === 'free' && s.lessonsSincePitch >= LESSONS_PER_PITCH;
+      },
+
+      markUltraPitched: () => set({ lessonsSincePitch: 0 }),
 
       setPlan: (plan) =>
         set((s) => ({
@@ -474,6 +500,7 @@ export const useUserStore = create<UserState>()(
           planStartedAt: null,
           practiceDay: null,
           practiceRoundsToday: 0,
+          lessonsSincePitch: 0,
           openedChestIds: [],
           coins: 0,
           streakProtectors: 0,

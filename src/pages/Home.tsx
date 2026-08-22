@@ -6,6 +6,7 @@ import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
 import NodeRing from '../components/NodeRing';
 import AdSlot from '../components/AdSlot';
+import UltraPromo from '../components/UltraPromo';
 import { Button } from '../components/Button';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import { SKILL_TREE } from '../data/lessons';
@@ -85,6 +86,7 @@ function StatRail({
 
   return (
     <aside className="hidden xl:block w-[368px] shrink-0 p-6 space-y-4">
+      <UltraPromo />
       {/* Hovering a counter reveals its panel, pointed at by a small arrow —
           the desktop counterpart to tapping it open on a phone. */}
       <div className="relative" onMouseLeave={() => setHovered(null)}>

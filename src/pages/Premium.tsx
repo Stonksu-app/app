@@ -34,11 +34,13 @@ function PlanCard({
         offer.featured ? 'platinum-banner border-sky-500/40 bg-carbon-850' : 'border-carbon-800 bg-carbon-850'
       }`}
     >
-      {offer.featured && (
-        <span className="inline-block rounded-lg bg-sky-500/15 px-2.5 py-1 text-[12px] font-black uppercase tracking-[0.8px] text-sky-400">
-          El más completo
-        </span>
-      )}
+      <span
+        className={`inline-block rounded-lg px-2.5 py-1 text-[12px] font-black uppercase tracking-[0.8px] ${
+          offer.accent === 'sky' ? 'bg-sky-500/15 text-sky-400' : 'bg-lime-500/15 text-lime-400'
+        }`}
+      >
+        {offer.label}
+      </span>
 
       <div className="mt-3 flex items-baseline gap-2">
         <h2 className="text-2xl font-black text-carbon-50">Stonksu {offer.name}</h2>
@@ -56,7 +58,7 @@ function PlanCard({
             <Icon
               name={perk.icon}
               size={18}
-              className={`mt-0.5 shrink-0 ${offer.featured ? 'text-sky-400' : 'text-lime-500'}`}
+              className={`mt-0.5 shrink-0 ${offer.accent === 'sky' ? 'text-sky-400' : 'text-lime-500'}`}
             />
             <span className="text-sm font-bold text-carbon-200 leading-snug">{perk.text}</span>
           </li>
@@ -65,11 +67,17 @@ function PlanCard({
 
       <div className="mt-6">
         {current ? (
-          <p className="flex items-center justify-center gap-2 h-[50px] rounded-xl bg-carbon-800 text-sm font-black uppercase tracking-wide text-carbon-400">
+          <p
+            className={`flex items-center justify-center gap-2 h-[50px] rounded-xl text-sm font-black uppercase tracking-wide ${
+              offer.accent === 'sky'
+                ? 'bg-sky-500/15 text-sky-400'
+                : 'bg-lime-500/15 text-lime-400'
+            }`}
+          >
             <Icon name="check" size={18} strokeWidth={3} /> Tu plan actual
           </p>
         ) : (
-          <Button variant={offer.featured ? 'platinum' : 'primary'} onClick={onChoose}>
+          <Button variant={offer.accent === 'sky' ? 'platinum' : 'primary'} onClick={onChoose}>
             Elegir {offer.name}
           </Button>
         )}

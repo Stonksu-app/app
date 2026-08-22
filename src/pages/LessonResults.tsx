@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import ResultsScreen from '../components/ResultsScreen';
 import { BADGES } from '../data/badges';
+import { useUserStore } from '../store/useUserStore';
 
 interface ResultsState {
   correctCount: number;
@@ -19,6 +20,7 @@ export default function LessonResults() {
   const location = useLocation();
   const navigate = useNavigate();
   const state = location.state as ResultsState | null;
+  const { shouldPitchUltra, markUltraPitched } = useUserStore();
 
   useEffect(() => {
     if (!state) navigate('/home', { replace: true });
@@ -39,7 +41,17 @@ export default function LessonResults() {
       xpEarned={state.xpEarned ?? 0}
       correctCount={correctCount}
       totalQuestions={totalQuestions}
-      onContinue={() => navigate('/home')}
+      // The pitch replaces the trip back to the map rather than interrupting
+      // one: you finish, you're congratulated, and only then are you shown
+      // something. Its own "ahora no" is what continues to the map.
+      onContinue={() => {
+        if (shouldPitchUltra()) {
+          markUltraPitched();
+          navigate('/ultra');
+          return;
+        }
+        navigate('/home');
+      }}
     >
       {maxStage > 0 && (
         <div className="mt-4 pt-4 border-t border-carbon-800">

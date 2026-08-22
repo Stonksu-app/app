@@ -5,6 +5,7 @@ import Landing from './pages/Landing';
 import Guide from './pages/Guide';
 import GuidePractice from './pages/GuidePractice';
 import Premium from './pages/Premium';
+import UltraPitch from './pages/UltraPitch';
 import Shop from './pages/Shop';
 import Achievements from './pages/Achievements';
 import AvatarEditor from './pages/AvatarEditor';
@@ -120,6 +121,14 @@ function App() {
         element={
           <RequireOnboarded>
             <GuidePractice />
+          </RequireOnboarded>
+        }
+      />
+      <Route
+        path="/ultra"
+        element={
+          <RequireOnboarded>
+            <UltraPitch />
           </RequireOnboarded>
         }
       />
