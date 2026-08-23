@@ -6,6 +6,7 @@ import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
 import Mascot from '../components/Mascot';
 import { Button } from '../components/Button';
+import ConfirmModal from '../components/ConfirmModal';
 import { PLAN_OFFERS, formatPrice, planName, type PlanOffer } from '../data/plans';
 import { useUserStore } from '../store/useUserStore';
 
@@ -93,6 +94,7 @@ export default function Premium() {
    *  Ultra's violet reads as being about the other card. */
   const [notice, setNotice] = useState<{ text: string; accent: PlanOffer['accent'] } | null>(null);
   const noticeRef = useRef<HTMLParagraphElement>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   /*
    * The answer lives above the cards, and on a phone the button you pressed is
@@ -150,10 +152,7 @@ export default function Premium() {
             </div>
             {plan !== 'free' && (
               <button
-                onClick={() => {
-                  setPlan('free');
-                  setNotice({ text: 'Has vuelto al plan gratuito.', accent: 'lime' });
-                }}
+                onClick={() => setConfirmCancel(true)}
                 className="ml-auto shrink-0 text-[13px] font-black uppercase tracking-wide text-carbon-500 hover:text-carbon-300 transition"
               >
                 Cancelar
@@ -193,6 +192,21 @@ export default function Premium() {
           </p>
         </div>
       </div>
+
+      {confirmCancel && (
+        <ConfirmModal
+          title={`¿Cancelar ${planName(plan)}?`}
+          message="Volverás al plan gratuito ahora mismo y perderás sus ventajas. Los pagos todavía no están conectados, así que no hay nada que reembolsar: puedes reactivarlo cuando quieras."
+          confirmLabel="Sí, cancelar"
+          cancelLabel="Seguir con el plan"
+          onConfirm={() => {
+            setPlan('free');
+            setNotice({ text: 'Has vuelto al plan gratuito.', accent: 'lime' });
+            setConfirmCancel(false);
+          }}
+          onCancel={() => setConfirmCancel(false)}
+        />
+      )}
     </div>
   );
 }
