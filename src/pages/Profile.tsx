@@ -10,6 +10,7 @@ import ReminderSetting from '../components/ReminderSetting';
 import HeartsReminderSetting from '../components/HeartsReminderSetting';
 import PasswordSetting from '../components/PasswordSetting';
 import ConfirmModal from '../components/ConfirmModal';
+import FriendsPanel from '../components/FriendsPanel';
 import { byRelevance, computeAchievements } from '../data/achievements';
 import { getLessonById } from '../data/lessons';
 import { useUserStore, xpToLevel } from '../store/useUserStore';
@@ -138,6 +139,9 @@ export default function Profile() {
             <StatTile icon="medal" value={level} label="Nivel actual" />
             <StatTile icon="target" value={flawless} label="Lecciones perfectas" />
           </div>
+
+          {/* Friends */}
+          <FriendsPanel />
 
           {/* Achievements */}
           <div className="mt-8 flex items-center justify-between gap-3">
