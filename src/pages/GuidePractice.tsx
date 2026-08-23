@@ -52,7 +52,7 @@ export default function GuidePractice() {
   const topic = params.get('tema');
   const topicTitle = topic ? (SKILL_TREE.find((n) => n.id === topic)?.title ?? null) : null;
 
-  const { isNodeUnlocked, getNodeStage, getNodeMaxStage, termMastery, recordTermAnswer, addXp } =
+  const { isNodeUnlocked, getNodeStage, getNodeMaxStage, termMastery, recordTermAnswer, addXp, completeReview } =
     useUserStore();
 
   /**
@@ -184,6 +184,10 @@ export default function GuidePractice() {
     locked.current = false;
     if (index + 1 >= questions.length) {
       addXp(XP_PER_SESSION);
+      // A repaso is revision, not a lesson, but it should still count as
+      // today's activity — otherwise a day spent purely reviewing terms
+      // silently breaks the streak.
+      completeReview();
       setDone(true);
       return;
     }

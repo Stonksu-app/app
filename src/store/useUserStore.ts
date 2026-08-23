@@ -94,6 +94,9 @@ interface UserState {
   refillHearts: () => void;
   tickHeartRegen: () => void;
   addXp: (amount: number) => void;
+  /** Counts today toward the streak on its own, for activities (like guide
+   *  revision) that should keep a streak alive without being a lesson. */
+  completeReview: () => void;
   /** Returns whether this completion also gifted a streak protector. */
   completeLesson: (attempt: LessonAttempt) => boolean;
   isNodeUnlocked: (nodeId: string) => boolean;
@@ -246,6 +249,34 @@ export const useUserStore = create<UserState>()(
       },
 
       addXp: (amount) => set((s) => ({ xp: s.xp + amount })),
+
+      /**
+       * Marks today as active for streak purposes without touching lesson
+       * bookkeeping (no XP here — callers already award their own, no
+       * completedLessonIds, no protector gifting). Used by revision flows
+       * like the guide's flashcard practice, so a day spent reviewing keeps
+       * the streak alive even with zero lessons finished.
+       */
+      completeReview: () => {
+        const s = get();
+        const today = todayStr();
+        const { streak, lastActiveDate, protectorsUsed } = computeStreakUpdate(
+          s.lastActiveDate,
+          s.streak,
+          s.streakProtectors,
+          today
+        );
+        const frozenDates =
+          protectorsUsed > 0 && s.lastActiveDate
+            ? [...new Set([...s.frozenDates, ...datesBetween(s.lastActiveDate, today)])]
+            : s.frozenDates;
+        set({
+          streak,
+          lastActiveDate,
+          frozenDates,
+          streakProtectors: s.streakProtectors - protectorsUsed,
+        });
+      },
 
       completeLesson: (attempt) => {
         const s = get();
