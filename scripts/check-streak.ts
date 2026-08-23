@@ -2,6 +2,7 @@
 // Run with: node --experimental-strip-types scripts/check-streak.ts
 import { computeStreakUpdate, daysBetween } from '../src/utils/streak.ts';
 import { useUserStore } from '../src/store/useUserStore';
+import { streakFromHistory, shiftDay } from '../src/utils/streak';
 
 const cases: {
   name: string;
@@ -109,3 +110,62 @@ if (reviewFailed > 0) {
   process.exit(1);
 }
 console.log('\nRepaso: todo correcto.');
+
+/*
+ * The streak can be rebuilt from what the app already knows.
+ *
+ * It normally lives in two fields and nothing recomputes it, so losing them —
+ * a cloud row with no last_active_date, an older profile syncing in — drops
+ * the number to 1 while the lesson history still lists every day played. That
+ * looked like a bug to the person holding the phone, and it was.
+ */
+const hoy = '2026-08-23';
+const d = (n: number) => shiftDay(hoy, -n);
+
+let repairFailed = 0;
+const check2 = (name: string, cond: boolean, detail = '') => {
+  if (cond) console.log(`OK   ${name}`);
+  else {
+    repairFailed++;
+    console.log(`FALLA ${name}${detail ? ` — ${detail}` : ''}`);
+  }
+};
+
+check2('cuatro días seguidos hasta hoy son racha de 4',
+  streakFromHistory([d(3), d(2), d(1), hoy], hoy) === 4,
+  `${streakFromHistory([d(3), d(2), d(1), hoy], hoy)}`);
+check2('una racha que acaba ayer sigue viva',
+  streakFromHistory([d(2), d(1)], hoy) === 2);
+check2('si el último día fue anteayer, ya no cuenta',
+  streakFromHistory([d(3), d(2)], hoy) === 0);
+check2('un hueco corta por el hueco',
+  streakFromHistory([d(5), d(4), d(1), hoy], hoy) === 2);
+check2('días repetidos no inflan el número',
+  streakFromHistory([hoy, hoy, d(1)], hoy) === 2);
+check2('sin historial no hay racha', streakFromHistory([], hoy) === 0);
+
+// And the store action that uses it.
+reset({ streak: 1, lastActiveDate: null });
+useUserStore.setState({
+  attempts: [
+    { lessonId: 'a', nodeId: 'n', completedAt: `${shiftDay(new Date().toISOString().slice(0, 10), -2)}T10:00:00.000Z`, xpEarned: 10, correctCount: 1, totalQuestions: 1 },
+    { lessonId: 'b', nodeId: 'n', completedAt: `${shiftDay(new Date().toISOString().slice(0, 10), -1)}T10:00:00.000Z`, xpEarned: 10, correctCount: 1, totalQuestions: 1 },
+  ],
+  reviewDates: [new Date().toISOString().slice(0, 10)],
+});
+store.repairStreak();
+check2('repairStreak sube la racha a lo que prueba el historial',
+  useUserStore.getState().streak === 3,
+  `quedó en ${useUserStore.getState().streak}`);
+
+useUserStore.setState({ streak: 40 });
+store.repairStreak();
+check2('y nunca la baja: un día ausente no prueba nada',
+  useUserStore.getState().streak === 40,
+  `quedó en ${useUserStore.getState().streak}`);
+
+if (repairFailed > 0) {
+  console.log(`\n${repairFailed} caso(s) de reparación fallando.`);
+  process.exit(1);
+}
+console.log('\nReparación: todo correcto.');

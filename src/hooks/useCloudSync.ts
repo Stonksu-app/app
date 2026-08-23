@@ -160,6 +160,11 @@ export function useCloudSync(): void {
         // so it wins over whatever this device happens to hold.
         applying.current = true;
         useUserStore.setState(remote.state);
+        // The profile carries the streak as two fields; the attempts carry the
+        // days themselves. A row written before those fields existed — or one
+        // that lost them — arrives claiming a streak of nothing while the
+        // history beside it says otherwise. Believe the history.
+        useUserStore.getState().repairStreak();
         applying.current = false;
       } else {
         // Genuinely empty account. Anything already on this device — progress

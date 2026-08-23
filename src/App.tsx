@@ -67,6 +67,13 @@ function App() {
   const initAuth = useAuthStore((s) => s.init);
   useEffect(() => initAuth(), [initAuth]);
 
+  // Also on a cold start, not only after a cloud read: a device that never
+  // signs in can lose the pair the streak lives in just as easily, and the
+  // history sitting next to it is enough to put the number back.
+  useEffect(() => {
+    useUserStore.getState().repairStreak();
+  }, []);
+
   return (
     <>
       {booting && <SplashScreen onDone={() => setBooting(false)} />}

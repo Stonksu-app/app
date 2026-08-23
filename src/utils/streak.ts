@@ -48,3 +48,43 @@ export function computeStreakUpdate(
   }
   return { streak: 1, lastActiveDate: today, protectorsUsed: 0 };
 }
+
+/**
+ * The streak the history proves, counting back from today.
+ *
+ * The streak normally lives in two fields — the number and the last active
+ * date — and nothing recomputes it. That's fine until those two are lost or
+ * overwritten: a profile arriving from the cloud with no last_active_date, a
+ * device syncing an older row, a reset. The number collapses to 1 while the
+ * app is still holding every day you played in its lesson history.
+ *
+ * So: count consecutive days back from today. A run that ends yesterday counts
+ * too — the streak is alive, you just haven't practised yet today.
+ *
+ * @param days  active days as YYYY-MM-DD, in the same UTC domain as lastActiveDate
+ */
+export function streakFromHistory(days: Iterable<string>, today: string): number {
+  const set = new Set(days);
+  // Start from today if it's there, otherwise yesterday: anything older means
+  // the streak is already broken and there's nothing to prove.
+  const yesterday = shiftDay(today, -1);
+  let cursor = set.has(today) ? today : set.has(yesterday) ? yesterday : null;
+  if (!cursor) return 0;
+
+  let run = 0;
+  while (set.has(cursor)) {
+    run++;
+    cursor = shiftDay(cursor, -1);
+  }
+  return run;
+}
+
+/** YYYY-MM-DD shifted by whole days, in UTC. */
+export function shiftDay(day: string, delta: number): string {
+  const d = new Date(
+    Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10)) + delta * 86_400_000
+  );
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(
+    d.getUTCDate()
+  ).padStart(2, '0')}`;
+}

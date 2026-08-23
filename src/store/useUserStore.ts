@@ -5,7 +5,7 @@ import { findMission } from '../data/missions';
 import { DEFAULT_LOOK } from '../components/Mascot';
 import { SKILL_TREE } from '../data/lessons';
 import { stagesForDifficulty } from '../utils/mastery';
-import { computeStreakUpdate, datesBetween } from '../utils/streak';
+import { computeStreakUpdate, datesBetween, streakFromHistory } from '../utils/streak';
 import { DEFAULT_REMINDER_HOUR } from '../lib/notifications';
 import { FREE_PRACTICE_PER_DAY, hasAllAccessories, hasUnlimitedHearts, hasUnlimitedPractice, type Plan } from '../data/plans';
 
@@ -108,6 +108,12 @@ interface UserState {
   /** Counts today toward the streak on its own, for activities (like guide
    *  revision) that should keep a streak alive without being a lesson. */
   completeReview: () => void;
+  /**
+   * Raises the streak to whatever the history proves, if the stored number is
+   * lower. Never lowers it: an absent day proves nothing — history can be
+   * incomplete — but a day you played is evidence you did.
+   */
+  repairStreak: () => void;
   /** Returns whether this completion also gifted a streak protector. */
   completeLesson: (attempt: LessonAttempt) => boolean;
   isNodeUnlocked: (nodeId: string) => boolean;
@@ -167,8 +173,8 @@ export const MAX_PROTECTORS = 2;
  *  alive. Doesn't count repeats of an already-completed lesson. */
 export const LESSON_PROTECTOR_GIFT_EVERY = 3;
 
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+function todayStr(offsetDays = 0): string {
+  return new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10);
 }
 
 
@@ -290,6 +296,26 @@ export const useUserStore = create<UserState>()(
           reviewDates: [...new Set([...s.reviewDates, today])],
           streakProtectors: s.streakProtectors - protectorsUsed,
         });
+      },
+
+      repairStreak: () => {
+        const s = get();
+        // Every day the app can prove was active, in the streak's own UTC
+        // domain: lessons finished, repasos done, and days a protector
+        // already covered.
+        const days = [
+          ...s.attempts.map((a) => a.completedAt.slice(0, 10)),
+          ...s.reviewDates,
+          ...s.frozenDates,
+        ];
+        const today = todayStr();
+        const proven = streakFromHistory(days, today);
+        if (proven <= s.streak) return;
+
+        // The last day of the proven run — today if it's in there, otherwise
+        // yesterday, which is what streakFromHistory counted back from.
+        const lastDay = days.includes(today) ? today : todayStr(-1);
+        set({ streak: proven, lastActiveDate: s.lastActiveDate ?? lastDay });
       },
 
       completeLesson: (attempt) => {
