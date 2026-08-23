@@ -8,6 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "check": "node scripts/check-all.mjs",
+    "graph": "graphify update .",
+    "postbuild": "graphify update . || echo \"[graphify] no instalado; el grafo queda como estaba\"",
     "preview": "vite preview",
     "icons": "node scripts/make-app-icons.mjs && capacitor-assets generate --ios --android",
     "ios:sync": "npm run build && cap sync ios",
