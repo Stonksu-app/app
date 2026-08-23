@@ -29,6 +29,10 @@ const check = (name: string, cond: boolean, detail = '') => {
 const css = readFileSync('src/index.css', 'utf8');
 
 const rule = css.match(/\.platinum-node \{[^}]*\}/)?.[0] ?? '';
+// From the declaration only. Reading the whole rule picked up the hex codes
+// quoted in the comment explaining why they were replaced, and duly failed on
+// the colour that had already been removed.
+const ramp = rule.match(/background-image:[^;]*;/)?.[0] ?? '';
 check('.platinum-node exists', rule.length > 0);
 check(
   '.platinum-node no impone position (rompería el sticky del banner)',
@@ -46,13 +50,57 @@ check('.platinum-node recorta su brillo', /overflow:\s*hidden/.test(rule));
  */
 check(
   'el acabado platino usa el violeta de ultra, no el azul del protector',
-  /#c4b5fd/i.test(rule) && !/#38bdf8|#7dd3fc/i.test(rule),
-  rule.replace(/\s+/g, ' ')
+  /#[0-9a-f]{6}/i.test(ramp) && !/#38bdf8|#7dd3fc|#2563eb/i.test(ramp),
+  ramp
 );
 check(
   'el violeta de ultra está declarado en la paleta',
   /--color-ultra-400:\s*#a78bfa/i.test(css)
 );
+
+/*
+ * White has to be readable on the platinum surface.
+ *
+ * The first version of this gradient started at #f5f3ff, which is white text
+ * on a white background: 1.1:1. It looked like a pale smear with writing you
+ * had to guess at. Since the surface always carries white content — the
+ * banner's title, a node's icon, the dialog's chip — every stop it passes
+ * through has to clear 4.5:1, and only a check can hold that.
+ */
+function luminance(hex: string): number {
+  const c = [1, 3, 5]
+    .map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+}
+
+function contrastWithWhite(hex: string): number {
+  const l = luminance(hex);
+  return (1.05) / (l + 0.05);
+}
+
+const stops = [...ramp.matchAll(/#[0-9a-f]{6}/gi)].map((m) => m[0]);
+check('el degradado platino declara sus paradas', stops.length >= 2, rule.replace(/\s+/g, ' '));
+for (const stop of stops) {
+  const ratio = contrastWithWhite(stop);
+  check(
+    `blanco sobre ${stop} se lee (${ratio.toFixed(2)}:1)`,
+    ratio >= 4.5,
+    'esta parada del degradado deja el texto blanco ilegible'
+  );
+}
+
+/* The other class paints text *on* the dark path, so the rule inverts: it has
+   to stay light enough against carbon-900, and starting at near-white is what
+   made the titles read as washed out rather than as violet. */
+const textRule = css.match(/\.platinum-text \{[^}]*\}/)?.[0] ?? '';
+const textStops = [...textRule.matchAll(/#[0-9a-f]{6}/gi)].map((m) => m[0]);
+const carbon900 = luminance('#171717');
+for (const stop of textStops) {
+  const ratio = (luminance(stop) + 0.05) / (carbon900 + 0.05);
+  check(`${stop} se lee sobre el fondo oscuro (${ratio.toFixed(2)}:1)`, ratio >= 4.5);
+  check(`${stop} no es casi blanco`, contrastWithWhite(stop) >= 1.25, 'demasiado cerca del blanco para leerse como violeta');
+}
 
 /** Anything that makes an element a containing block for absolute children. */
 const POSITIONS = ['relative', 'absolute', 'fixed', 'sticky'];

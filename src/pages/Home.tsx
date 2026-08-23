@@ -51,7 +51,7 @@ const PLATINUM_STYLE = {
   // establishes the containing block the shine needs.
   bg: 'platinum-node platinum-banner',
   text: 'text-white',
-  sub: 'text-white/75',
+  sub: 'text-white/85',
   chip: 'bg-carbon-900/25 hover:bg-carbon-900/40 text-white',
 };
 

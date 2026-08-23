@@ -388,7 +388,15 @@ html::-webkit-scrollbar,
    positioning; all this needs is for the sweep to be clipped. */
 .platinum-node {
   overflow: hidden;
-  background-image: linear-gradient(150deg, #f5f3ff 0%, #c4b5fd 38%, #7c3aed 100%);
+  /*
+   * Every stop is dark enough for white to sit on it: measured against #fff,
+   * the darkest is 10.9:1 and the lightest 5.7:1. The old gradient started at
+   * #f5f3ff, where white text scores 1.1:1 — which is why the banner read as
+   * a white smear with white writing on it.
+   *
+   * The metal comes from the sweep on top, not from the base being pale.
+   */
+  background-image: linear-gradient(150deg, #7c3aed 0%, #6d28d9 45%, #4c1d95 100%);
   box-shadow:
     inset 0 2px 6px rgba(255, 255, 255, 0.55),
     inset 0 -3px 8px rgba(0, 0, 0, 0.25);
@@ -449,7 +457,10 @@ html::-webkit-scrollbar,
    start than the node gradient: this sits on the dark path, where the violet
    end alone would read as unlit rather than as metal. */
 .platinum-text {
-  background-image: linear-gradient(100deg, #f5f3ff 0%, #c4b5fd 45%, #a78bfa 100%);
+  /* The other direction: this paints letters *on* the dark path, so it stays
+     light — 12.9:1 down to 6.6:1 — but starts at violet rather than at white,
+     because a title that begins almost white just reads as washed-out text. */
+  background-image: linear-gradient(100deg, #ddd6fe 0%, #c4b5fd 45%, #a78bfa 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
