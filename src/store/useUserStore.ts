@@ -5,7 +5,13 @@ import { findMission } from '../data/missions';
 import { DEFAULT_LOOK } from '../components/Mascot';
 import { SKILL_TREE } from '../data/lessons';
 import { stagesForDifficulty } from '../utils/mastery';
-import { computeStreakUpdate, datesBetween, streakFromHistory } from '../utils/streak';
+import {
+  computeStreakUpdate,
+  datesBetween,
+  localDayKey,
+  streakFromHistory,
+  todayLocal,
+} from '../utils/streak';
 import { DEFAULT_REMINDER_HOUR } from '../lib/notifications';
 import { FREE_PRACTICE_PER_DAY, hasAllAccessories, hasUnlimitedHearts, hasUnlimitedPractice, type Plan } from '../data/plans';
 
@@ -173,8 +179,9 @@ export const MAX_PROTECTORS = 2;
  *  alive. Doesn't count repeats of an already-completed lesson. */
 export const LESSON_PROTECTOR_GIFT_EVERY = 3;
 
+/** The streak's day, in the player's timezone — see localDayKey. */
 function todayStr(offsetDays = 0): string {
-  return new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10);
+  return todayLocal(offsetDays);
 }
 
 
@@ -304,7 +311,9 @@ export const useUserStore = create<UserState>()(
         // domain: lessons finished, repasos done, and days a protector
         // already covered.
         const days = [
-          ...s.attempts.map((a) => a.completedAt.slice(0, 10)),
+          // Converted, not sliced: the timestamp is UTC and the streak counts
+          // local days, so slicing would misfile anything played near midnight.
+          ...s.attempts.map((a) => localDayKey(new Date(a.completedAt))),
           ...s.reviewDates,
           ...s.frozenDates,
         ];

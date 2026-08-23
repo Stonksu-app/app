@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { localDayKey } from '../utils/streak';
 import { MAX_HEARTS, useUserStore, xpToLevel } from '../store/useUserStore';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import Icon from './Icon';
@@ -18,11 +19,7 @@ const MONTHS = [
 /** Attempts are stored as UTC timestamps but the grids are built from local
  *  dates, so slicing the ISO string would put a late-evening lesson on the
  *  previous day for anyone east of UTC. Derive the key locally on both sides. */
-export function localDayKey(date: Date) {
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${m}-${d}`;
-}
+
 
 function useActiveDays() {
   const attempts = useUserStore((s) => s.attempts);

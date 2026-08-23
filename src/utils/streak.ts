@@ -1,3 +1,25 @@
+/**
+ * The day a moment belongs to, in the player's own timezone.
+ *
+ * The streak used to be kept in UTC while the calendar drew local days, so a
+ * session at half past midnight in Madrid landed on today's square and
+ * yesterday's streak. Four squares could be two days. Everything about the
+ * streak now speaks this one domain — the one the player is actually living
+ * in, because that's the one they count with.
+ */
+export function localDayKey(date: Date): string {
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${m}-${d}`;
+}
+
+/** Today as a local YYYY-MM-DD. `offsetDays` shifts by whole days. */
+export function todayLocal(offsetDays = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return localDayKey(d);
+}
+
 /** Whole days between two YYYY-MM-DD strings. */
 export function daysBetween(from: string, to: string): number {
   const a = Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10));

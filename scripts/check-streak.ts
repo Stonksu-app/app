@@ -2,7 +2,7 @@
 // Run with: node --experimental-strip-types scripts/check-streak.ts
 import { computeStreakUpdate, daysBetween } from '../src/utils/streak.ts';
 import { useUserStore } from '../src/store/useUserStore';
-import { streakFromHistory, shiftDay } from '../src/utils/streak';
+import { streakFromHistory, shiftDay, localDayKey, todayLocal } from '../src/utils/streak';
 
 const cases: {
   name: string;
@@ -169,3 +169,86 @@ if (repairFailed > 0) {
   process.exit(1);
 }
 console.log('\nReparación: todo correcto.');
+
+/*
+ * A repaso and a lesson are the same day's work.
+ *
+ * Not "similar": the same. If revising nudged the streak differently from
+ * finishing a lesson, the honest advice to a player short on time would be to
+ * open a lesson and quit it, which is nobody's idea of learning.
+ */
+let sameFailed = 0;
+const check3 = (name: string, cond: boolean, detail = '') => {
+  if (cond) console.log(`OK   ${name}`);
+  else {
+    sameFailed++;
+    console.log(`FALLA ${name}${detail ? ` — ${detail}` : ''}`);
+  }
+};
+
+const ayer = todayLocal(-1);
+const attempt = (day: string) => ({
+  lessonId: `l-${day}`,
+  nodeId: 'fundamentos',
+  completedAt: new Date(`${day}T12:00:00`).toISOString(),
+  xpEarned: 10,
+  correctCount: 1,
+  totalQuestions: 1,
+});
+
+reset({ streak: 4, lastActiveDate: ayer });
+store.completeReview();
+const porRepaso = useUserStore.getState();
+
+reset({ streak: 4, lastActiveDate: ayer });
+store.completeLesson(attempt(todayLocal()));
+const porLeccion = useUserStore.getState();
+
+check3(
+  'repasar suma igual que terminar una lección',
+  porRepaso.streak === porLeccion.streak && porRepaso.streak === 5,
+  `repaso ${porRepaso.streak}, lección ${porLeccion.streak}`
+);
+check3(
+  'y ambos dejan el mismo último día activo',
+  porRepaso.lastActiveDate === porLeccion.lastActiveDate
+);
+
+// Alternating between the two across days has to build one run, not two.
+reset({ streak: 0, lastActiveDate: null });
+useUserStore.setState({
+  attempts: [attempt(todayLocal(-3)), attempt(todayLocal(-1))],
+  reviewDates: [todayLocal(-2), todayLocal()],
+});
+store.repairStreak();
+check3(
+  'alternar lección y repaso cuenta como una sola racha',
+  useUserStore.getState().streak === 4,
+  `quedó en ${useUserStore.getState().streak}`
+);
+
+/*
+ * And the day itself is the player's, not the server's.
+ *
+ * The streak used to be kept in UTC while the calendar drew local days, so in
+ * Madrid anything played between midnight and 02:00 counted for the previous
+ * day: four squares on the calendar, two days of streak, and no way for
+ * anyone to tell why.
+ */
+const medianoche = new Date();
+medianoche.setHours(0, 30, 0, 0);
+check3(
+  'una sesión de madrugada cuenta para el día que ve el jugador',
+  localDayKey(medianoche) === todayLocal(),
+  `${localDayKey(medianoche)} vs ${todayLocal()}`
+);
+check3(
+  'el calendario y la racha usan la misma clave de día',
+  localDayKey(new Date(attempt(todayLocal()).completedAt)) === todayLocal()
+);
+
+if (sameFailed > 0) {
+  console.log(`\n${sameFailed} caso(s) de equivalencia fallando.`);
+  process.exit(1);
+}
+console.log('\nRepaso y lección: cuentan igual.');

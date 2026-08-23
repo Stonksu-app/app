@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { ensureChannel, notificationsSupported, planStreakReminders } from '../lib/notifications';
 import { useUserStore } from '../store/useUserStore';
+import { todayLocal } from '../utils/streak';
 
 /**
  * Keeps the scheduled streak reminders in step with the state they describe.
@@ -22,12 +23,11 @@ export function useStreakReminders(): void {
       await planStreakReminders({
         enabled,
         hour,
-        // Derived exactly as the store derives lastActiveDate, in UTC. Mixing
-        // a local day key with a UTC one here would make the two disagree for
-        // an hour or two around midnight and silence — or repeat — a reminder
-        // on the wrong day. Matching the store is what matters, not which
-        // clock is philosophically right.
-        practisedToday: lastActiveDate === new Date().toISOString().slice(0, 10),
+        // Derived exactly as the store derives lastActiveDate: the player's
+        // local day. Mixing domains here would make the two disagree for an
+        // hour or two around midnight and silence — or repeat — a reminder on
+        // the wrong day.
+        practisedToday: lastActiveDate === todayLocal(),
       });
     })();
   }, [enabled, hour, lastActiveDate]);
