@@ -50,3 +50,8 @@ android/app/release
 *.aab
 
 graphify-out/
+
+# Claude Code hooks: the graphify guard hard-codes this machine's path to the
+# CLI, so sharing it would fire a missing binary on anyone else's checkout.
+# CLAUDE.md is shared on purpose; the wiring behind it is not.
+.claude/
