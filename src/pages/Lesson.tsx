@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, optionLip } from '../components/Button';
 import CandleChart from '../components/CandleChart';
-import ComboCelebration from '../components/ComboCelebration';
 import DirectionBadge from '../components/DirectionBadge';
 import Icon from '../components/Icon';
 import LessonHeader from '../components/LessonHeader';
@@ -52,7 +51,7 @@ export default function Lesson() {
   const {
     hearts,
     combo,
-    celebration,
+    tier,
     heartsLost,
     outOfHearts,
     registerResult,
@@ -247,7 +246,6 @@ export default function Lesson() {
 
   return (
     <div className={`h-dvh bg-carbon-900 flex flex-col relative overflow-hidden ${zoomPulse} ${shakeClass}`}>
-      {celebration && <ComboCelebration tier={celebration} />}
 
       {lastResult && (
         <div
@@ -258,7 +256,7 @@ export default function Lesson() {
         />
       )}
 
-      <LessonHeader progressPct={progressPct} hearts={hearts} />
+      <LessonHeader progressPct={progressPct} hearts={hearts} comboTier={tier} combo={combo} />
 
       {/* min-h-0 lets this flex child actually shrink so it scrolls instead of
           pushing the footer button off-screen on short phone viewports. */}

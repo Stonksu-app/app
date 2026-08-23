@@ -5,7 +5,31 @@ import Icon from './Icon';
 import HeartsDisplay from './HeartsDisplay';
 import Avatar from './Avatar';
 
-export default function LessonHeader({ progressPct, hearts }: { progressPct: number; hearts: number }) {
+/**
+ * Where the answer streak now shows up.
+ *
+ * Three states, in the bar the player is already watching: the app's lime,
+ * then gold at three in a row, then gold running into orange at six. Red is
+ * left alone on purpose — in a lesson it means a wrong answer, and a bar that
+ * turned red while you were doing well would read as a warning.
+ */
+const COMBO_FILL: Record<number, string> = {
+  0: 'bg-lime-500',
+  1: 'bg-[#FFC93C]',
+  2: 'bg-[linear-gradient(90deg,#FFC93C_0%,#FF8A3D_100%)] combo-glow',
+};
+
+export default function LessonHeader({
+  progressPct,
+  hearts,
+  comboTier = 0,
+  combo = 0,
+}: {
+  progressPct: number;
+  hearts: number;
+  comboTier?: number;
+  combo?: number;
+}) {
   const navigate = useNavigate();
   // Leaving mid-lesson throws the session away — nothing is recorded until the
   // last activity — so the exit is confirmed rather than immediate.
@@ -21,11 +45,27 @@ export default function LessonHeader({ progressPct, hearts }: { progressPct: num
         >
           <Icon name="close" size={24} />
         </button>
-        <div className="flex-1 h-3 bg-carbon-800 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-lime-500 rounded-full transition-all duration-300"
-            style={{ width: `${progressPct}%` }}
-          />
+        <div className="flex-1 flex items-center gap-2 min-w-0">
+          <div className="flex-1 h-3 bg-carbon-800 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${
+                COMBO_FILL[comboTier] ?? COMBO_FILL[0]
+              }`}
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+          {/* The count, small and beside the bar rather than over the question.
+              Only from the first tier: "x1" would be noise on every answer. */}
+          {comboTier > 0 && (
+            <span
+              key={combo}
+              className={`shrink-0 flex items-center gap-0.5 text-[11px] font-black tabular-nums animate-count-pop ${
+                comboTier >= 2 ? 'text-[#FF8A3D]' : 'text-[#FFC93C]'
+              }`}
+            >
+              <Icon name="flame" size={12} className="animate-flame-flicker" />x{combo}
+            </span>
+          )}
         </div>
         <HeartsDisplay hearts={hearts} />
       </div>

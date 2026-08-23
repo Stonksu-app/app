@@ -465,3 +465,42 @@ html::-webkit-scrollbar,
   background-clip: text;
   color: transparent;
 }
+
+/* The top combo tier: a slow travelling highlight over the gold-to-orange
+   fill, so "on a run" reads at a glance without another element on screen.
+   Slow on purpose — a fast shimmer next to a question is a distraction. */
+.combo-glow {
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(255, 138, 61, 0.45);
+}
+
+.combo-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.5) 50%,
+    transparent 65%
+  );
+  animation: combo-sweep 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes combo-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  60%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .combo-glow::after {
+    animation: none;
+  }
+}
