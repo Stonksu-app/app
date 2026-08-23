@@ -107,7 +107,8 @@ const cloudKeys = new Set(Object.keys(sample));
  *
  * - testMode: a debugging switch, not progress.
  * - reminder*: the notification permission behind them is granted per device.
- * - frozenDates: cosmetic annotation on this device's streak calendar.
+ * - frozenDates, reviewDates: cosmetic annotations on this device's streak
+ *   calendar.
  * - practice*: a daily rate limit, not progress. Syncing a counter that
  *   resets at midnight would need columns and a timezone argument, and the
  *   worst it buys is one extra round of revision.
@@ -117,6 +118,7 @@ const LOCAL_ONLY = new Set([
   'practiceDay',
   'practiceRoundsToday',
   'lessonsSincePitch',
+  'reviewDates',
   'reminderEnabled',
   'reminderHour',
   'heartsReminderEnabled',

@@ -55,6 +55,17 @@ interface UserState {
   practiceDay: string | null;
   practiceRoundsToday: number;
   /**
+   * Days finished with a repaso and no lesson.
+   *
+   * The streak calendar reads lesson attempts, so without this a day spent
+   * reviewing keeps the streak alive and still shows up as an empty square —
+   * the calendar contradicting the number above it.
+   *
+   * Local, for the same reason as frozenDates: it annotates this device's
+   * calendar rather than being progress in its own right.
+   */
+  reviewDates: string[];
+  /**
    * Lessons finished since the Ultra pitch was last shown.
    *
    * Local for the same reason as the practice counter: it paces an advert, and
@@ -184,6 +195,7 @@ export const useUserStore = create<UserState>()(
       planStartedAt: null,
       practiceDay: null,
       practiceRoundsToday: 0,
+      reviewDates: [],
       lessonsSincePitch: 0,
       openedChestIds: [],
       coins: 0,
@@ -274,6 +286,8 @@ export const useUserStore = create<UserState>()(
           streak,
           lastActiveDate,
           frozenDates,
+          // Deduped: two repasos in one day are one day on the calendar.
+          reviewDates: [...new Set([...s.reviewDates, today])],
           streakProtectors: s.streakProtectors - protectorsUsed,
         });
       },
@@ -535,6 +549,7 @@ export const useUserStore = create<UserState>()(
           planStartedAt: null,
           practiceDay: null,
           practiceRoundsToday: 0,
+          reviewDates: [],
           lessonsSincePitch: 0,
           openedChestIds: [],
           coins: 0,

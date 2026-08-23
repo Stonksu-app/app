@@ -1,6 +1,7 @@
 // Exercises the streak rules against the real module.
 // Run with: node --experimental-strip-types scripts/check-streak.ts
 import { computeStreakUpdate, daysBetween } from '../src/utils/streak.ts';
+import { useUserStore } from '../src/store/useUserStore';
 
 const cases: {
   name: string;
@@ -35,4 +36,76 @@ for (const c of cases) {
 
 console.log(`\ndaysBetween 2026-08-16 -> 2026-08-19 = ${daysBetween('2026-08-16', '2026-08-19')} (esperado 3)`);
 console.log(failed === 0 ? '\nTodo correcto.' : `\n${failed} caso(s) fallando.`);
-process.exit(failed === 0 ? 0 : 1);
+if (failed > 0) process.exit(1);
+
+/*
+ * A repaso is a day's activity too.
+ *
+ * completeReview exists so a day spent only revising doesn't silently break
+ * the streak — and, just as importantly, so it doesn't hand out the things a
+ * lesson hands out. Revision that paid XP and gifted protectors would make
+ * finishing lessons the slower way to play.
+ */
+const store = useUserStore.getState();
+const today = new Date().toISOString().slice(0, 10);
+const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+
+function reset(patch: Partial<ReturnType<typeof useUserStore.getState>>) {
+  useUserStore.setState({
+    streak: 0,
+    lastActiveDate: null,
+    frozenDates: [],
+    reviewDates: [],
+    streakProtectors: 0,
+    xp: 0,
+    completedLessonIds: [],
+    attempts: [],
+    ...patch,
+  });
+}
+
+let reviewFailed = 0;
+const expect = (name: string, cond: boolean, detail = '') => {
+  if (cond) console.log(`OK   ${name}`);
+  else {
+    reviewFailed++;
+    console.log(`FALLA ${name}${detail ? ` — ${detail}` : ''}`);
+  }
+};
+
+reset({});
+store.completeReview();
+expect('un repaso sin lecciones arranca la racha', useUserStore.getState().streak === 1);
+expect('y marca hoy en el calendario', useUserStore.getState().reviewDates.includes(today));
+
+reset({ streak: 4, lastActiveDate: yesterday });
+store.completeReview();
+expect('un repaso al día siguiente continúa la racha', useUserStore.getState().streak === 5);
+
+store.completeReview();
+expect('dos repasos el mismo día no suman dos', useUserStore.getState().streak === 5);
+expect(
+  'ni pintan el día dos veces',
+  useUserStore.getState().reviewDates.filter((d) => d === today).length === 1
+);
+
+reset({ streak: 9, lastActiveDate: '2020-01-01', streakProtectors: 1 });
+store.completeReview();
+expect(
+  'un repaso puede gastar un protector para salvar la racha',
+  useUserStore.getState().streakProtectors === 0 || useUserStore.getState().streak === 1,
+  `racha ${useUserStore.getState().streak}, protectores ${useUserStore.getState().streakProtectors}`
+);
+
+reset({ xp: 100 });
+store.completeReview();
+const after = useUserStore.getState();
+expect('un repaso no paga XP por su cuenta', after.xp === 100, `xp ${after.xp}`);
+expect('no cuenta como lección completada', after.completedLessonIds.length === 0);
+expect('y no regala protectores', after.streakProtectors === 0);
+
+if (reviewFailed > 0) {
+  console.log(`\n${reviewFailed} caso(s) de repaso fallando.`);
+  process.exit(1);
+}
+console.log('\nRepaso: todo correcto.');
