@@ -142,3 +142,31 @@ export function shiftDay(day: string, delta: number): string {
 export function practisedToday(lastActiveDate: string | null): boolean {
   return lastActiveDate === todayLocal();
 }
+
+/**
+ * The frozen days the streak itself implies.
+ *
+ * frozenDates is only written at the moment a protector is spent, and it lives
+ * on the device — so a restored streak, a reinstall, or a second device all
+ * end up with a number that counts days the calendar draws as blank. The
+ * calendar then contradicts the number printed right above it, which is
+ * exactly how "why aren't my days blue" starts.
+ *
+ * A streak of N ending on a given day spans those N days by definition. Any
+ * of them without activity had to be covered by something, or the streak
+ * wouldn't be standing. So the calendar can work them out rather than needing
+ * to have witnessed them.
+ */
+export function inferredFrozenDays(
+  streak: number,
+  lastActiveDate: string | null,
+  activeDays: Set<string>
+): string[] {
+  if (!lastActiveDate || streak <= 1) return [];
+  const out: string[] = [];
+  for (let back = 1; back < streak; back++) {
+    const day = shiftDay(lastActiveDate, -back);
+    if (!activeDays.has(day)) out.push(day);
+  }
+  return out;
+}

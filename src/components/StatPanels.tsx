@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { localDayKey, practisedToday } from '../utils/streak';
+import { inferredFrozenDays, localDayKey, practisedToday } from '../utils/streak';
 import { MAX_HEARTS, useUserStore, xpToLevel } from '../store/useUserStore';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import Icon from './Icon';
@@ -30,9 +30,13 @@ function useActiveDays() {
   return new Set([...attempts.map((a) => localDayKey(new Date(a.completedAt))), ...reviewDates]);
 }
 
-function useFrozenDays() {
+function useFrozenDays(activeDays: Set<string>) {
   const frozenDates = useUserStore((s) => s.frozenDates);
-  return new Set(frozenDates);
+  const streak = useUserStore((s) => s.streak);
+  const lastActiveDate = useUserStore((s) => s.lastActiveDate);
+  // Recorded plus implied — see inferredFrozenDays. The union means the
+  // calendar agrees with the streak beside it however the streak got there.
+  return new Set([...frozenDates, ...inferredFrozenDays(streak, lastActiveDate, activeDays)]);
 }
 
 function DayDot({
@@ -157,7 +161,7 @@ export default function StatPanel({ stat, compact = false }: { stat: StatKey; co
   const streakProtectors = useUserStore((s) => s.streakProtectors);
   const lastStreakLoss = useUserStore((s) => s.lastStreakLoss);
   const activeDays = useActiveDays();
-  const frozenDays = useFrozenDays();
+  const frozenDays = useFrozenDays(activeDays);
   const { level, xpIntoLevel, xpForNext } = xpToLevel(xp);
 
   if (stat === 'streak') {

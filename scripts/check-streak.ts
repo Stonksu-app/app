@@ -2,7 +2,13 @@
 // Run with: node --experimental-strip-types scripts/check-streak.ts
 import { computeStreakUpdate, daysBetween } from '../src/utils/streak.ts';
 import { useUserStore } from '../src/store/useUserStore';
-import { streakFromHistory, shiftDay, localDayKey, todayLocal } from '../src/utils/streak';
+import {
+  streakFromHistory,
+  shiftDay,
+  localDayKey,
+  todayLocal,
+  inferredFrozenDays,
+} from '../src/utils/streak';
 
 const cases: {
   name: string;
@@ -325,3 +331,48 @@ if (lossFailed > 0) {
   process.exit(1);
 }
 console.log('Protectores: todo correcto.');
+
+/*
+ * The calendar agrees with the number above it.
+ *
+ * frozenDates is written the moment a protector is spent and never leaves the
+ * device, so a restored streak — or a reinstall, or a second phone — leaves a
+ * number counting days the calendar draws blank. The days a standing streak
+ * spans are implied by the streak itself, so they can be worked out.
+ */
+let blueFailed = 0;
+const check5 = (name: string, cond: boolean, detail = '') => {
+  if (cond) console.log(`OK   ${name}`);
+  else {
+    blueFailed++;
+    console.log(`FALLA ${name}${detail ? ` — ${detail}` : ''}`);
+  }
+};
+
+// Exactly the case reported: played the 20th–23rd, back on the 27th, streak 5.
+const jugados = new Set(['2026-08-20', '2026-08-21', '2026-08-22', '2026-08-23', '2026-08-27']);
+const azules = inferredFrozenDays(5, '2026-08-27', jugados);
+check5(
+  'los días que la racha cruzó salen congelados',
+  azules.join(',') === '2026-08-26,2026-08-25,2026-08-24',
+  azules.join(',')
+);
+check5('los días jugados no se pintan de azul', !azules.includes('2026-08-23'));
+check5(
+  'fuera de la racha no se inventa nada',
+  !azules.includes('2026-08-19') && !azules.includes('2026-08-28')
+);
+check5('una racha de 1 no implica ningún día helado', inferredFrozenDays(1, '2026-08-27', jugados).length === 0);
+check5('sin fecha de actividad tampoco', inferredFrozenDays(9, null, jugados).length === 0);
+
+const seguidos = new Set(['2026-08-25', '2026-08-26', '2026-08-27']);
+check5(
+  'una racha jugada día a día no tiene días helados',
+  inferredFrozenDays(3, '2026-08-27', seguidos).length === 0
+);
+
+if (blueFailed > 0) {
+  console.log(`${blueFailed} caso(s) de calendario fallando.`);
+  process.exit(1);
+}
+console.log('Calendario: todo correcto.');
