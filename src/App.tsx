@@ -12,6 +12,7 @@ import AvatarEditor from './pages/AvatarEditor';
 import Missions from './pages/Missions';
 import Login from './pages/Login';
 import Friends from './pages/Friends';
+import FriendProfile from './pages/FriendProfile';
 import Sections from './pages/Sections';
 import Onboarding from './pages/Onboarding';
 import Home from './pages/Home';
@@ -136,6 +137,14 @@ function App() {
         element={
           <RequireOnboarded>
             <UltraPitch />
+          </RequireOnboarded>
+        }
+      />
+      <Route
+        path="/amigos/:id"
+        element={
+          <RequireOnboarded>
+            <FriendProfile />
           </RequireOnboarded>
         }
       />

@@ -7,7 +7,6 @@ import Icon from '../components/Icon';
 import Mascot from '../components/Mascot';
 import { Button } from '../components/Button';
 import ConfirmModal from '../components/ConfirmModal';
-import FriendProfileCard from '../components/FriendProfileCard';
 import PlanBadge from '../components/PlanBadge';
 import { formatCountdown } from '../hooks/useHeartRegen';
 import {
@@ -27,11 +26,9 @@ function FriendRow({
   onChanged,
   flash,
   onRequestRemove,
-  onOpenProfile,
 }: {
   friend: Friend;
   onChanged: () => void;
-  onOpenProfile: (id: string) => void;
   flash: (message: string) => void;
   onRequestRemove: (friend: Friend) => void;
 }) {
@@ -62,6 +59,8 @@ function FriendRow({
     return () => clearInterval(id);
   }, [isCoolingDown]);
 
+  const navigate = useNavigate();
+
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     await fn();
@@ -80,7 +79,7 @@ function FriendRow({
       <button
         type="button"
         disabled={friend.relation !== 'friend'}
-        onClick={() => onOpenProfile(friend.id)}
+        onClick={() => navigate(`/amigos/${friend.id}`)}
         className="flex-1 min-w-0 text-left disabled:cursor-default"
       >
         <p className="flex items-center gap-1.5 min-w-0">
@@ -173,7 +172,6 @@ export default function Friends() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [openProfile, setOpenProfile] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<Friend | null>(null);
   const [removing, setRemoving] = useState(false);
 
@@ -278,7 +276,7 @@ export default function Friends() {
                   </h2>
                   <div className="mt-2 bg-carbon-850 border-2 border-carbon-800 rounded-2xl px-4">
                     {incoming.map((f) => (
-                      <FriendRow key={f.id} friend={f} onChanged={reload} flash={flash} onRequestRemove={setConfirmRemove} onOpenProfile={setOpenProfile} />
+                      <FriendRow key={f.id} friend={f} onChanged={reload} flash={flash} onRequestRemove={setConfirmRemove} />
                     ))}
                   </div>
                 </>
@@ -298,7 +296,7 @@ export default function Friends() {
               ) : (
                 <div className="mt-2 bg-carbon-850 border-2 border-carbon-800 rounded-2xl px-4">
                   {friends.map((f) => (
-                    <FriendRow key={f.id} friend={f} onChanged={reload} flash={flash} onRequestRemove={setConfirmRemove} onOpenProfile={setOpenProfile} />
+                    <FriendRow key={f.id} friend={f} onChanged={reload} flash={flash} onRequestRemove={setConfirmRemove} />
                   ))}
                 </div>
               )}
@@ -308,7 +306,7 @@ export default function Friends() {
                   <h2 className="mt-8 text-[19px] font-black text-carbon-50">Esperando respuesta</h2>
                   <div className="mt-2 bg-carbon-850 border-2 border-carbon-800 rounded-2xl px-4">
                     {outgoing.map((f) => (
-                      <FriendRow key={f.id} friend={f} onChanged={reload} flash={flash} onRequestRemove={setConfirmRemove} onOpenProfile={setOpenProfile} />
+                      <FriendRow key={f.id} friend={f} onChanged={reload} flash={flash} onRequestRemove={setConfirmRemove} />
                     ))}
                   </div>
                 </>
@@ -317,10 +315,6 @@ export default function Friends() {
           )}
         </div>
       </div>
-
-      {openProfile && (
-        <FriendProfileCard friendId={openProfile} onClose={() => setOpenProfile(null)} />
-      )}
 
       {confirmRemove && (
         <ConfirmModal
