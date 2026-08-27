@@ -11,6 +11,7 @@
 import { SKILL_TREE } from '../src/data/lessons';
 import { buildStage } from '../src/utils/buildActivityStream';
 import { stagesForDifficulty } from '../src/utils/mastery';
+import { shuffleUnsolved } from '../src/utils/shuffle';
 
 const BATCH_SIZE = 5;
 
@@ -83,6 +84,26 @@ for (const node of SKILL_TREE) {
         fail(where, `a sequence has orders [${orders.join(', ')}], expected 1..${game.steps.length}`);
       }
       if (dupes(game.steps.map((s) => s.id)).length) fail(where, 'duplicate sequence step ids');
+
+      /*
+       * Four steps, no more.
+       *
+       * Six steps is 720 possible answers, and the ones people actually
+       * struggled with were the sequences whose middle steps described the
+       * same moment twice — unorderable, because the answer lived in our
+       * phrasing rather than in the market. Four leaves 24, and every step
+       * has to be a distinct event.
+       */
+      if (game.steps.length !== 4) {
+        fail(where, `a sequence has ${game.steps.length} steps, expected 4`);
+      }
+      // Two lines on a 375px phone. Longer and the row clips the sentence
+      // you're being asked to place.
+      for (const step of game.steps) {
+        if (step.label.length > 52) {
+          fail(where, `a sequence step is ${step.label.length} chars: "${step.label}"`);
+        }
+      }
     }
 
     if (game.type === 'sort-classify') {
@@ -137,6 +158,29 @@ for (const node of SKILL_TREE) {
     `  ${node.id.padEnd(24)} ${String(questions.length).padStart(2)} preguntas  ` +
       `${String(games.length)} juegos  ${maxStage} etapas  actividades por etapa: ${lens.join('-')}`
   );
+}
+
+/*
+ * The ordering game never opens on the answer.
+ *
+ * One shuffle in 24 lands solved with four steps, and from the player's side
+ * that's indistinguishable from a broken exercise: press check, it's right,
+ * learn nothing.
+ */
+{
+  const solved = ['a', 'b', 'c', 'd'];
+  let everSolved = false;
+  for (let i = 0; i < 2000; i++) {
+    const got = shuffleUnsolved(solved, solved);
+    if (got.join('') === solved.join('')) everSolved = true;
+    if ([...got].sort().join('') !== solved.join('')) {
+      fail('sequence', 'a shuffle lost or duplicated a step');
+      break;
+    }
+  }
+  if (everSolved) fail('sequence', 'the shuffle handed back the solved order');
+  const single = shuffleUnsolved(['solo'], ['solo']);
+  if (single.length !== 1) fail('sequence', 'a one-step list should come back untouched');
 }
 
 console.log(failures === 0 ? '\nAll content checks passed.\n' : `\n${failures} problem(s) found.\n`);

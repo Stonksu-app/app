@@ -459,10 +459,8 @@ export const SKILL_TREE: SkillNode[] = [
           steps: [
             { id: 'seq-1', label: 'El precio cae hacia la zona de soporte', order: 1 },
             { id: 'seq-2', label: 'Los compradores entran con fuerza', order: 2 },
-            { id: 'seq-3', label: 'La presión compradora frena la caída', order: 3 },
-            { id: 'seq-4', label: 'El precio rebota hacia arriba', order: 4 },
-            { id: 'seq-5', label: 'Se forma una vela alcista de confirmación', order: 5 },
-            { id: 'seq-6', label: 'El precio inicia una nueva tendencia alcista', order: 6 },
+            { id: 'seq-4', label: 'El precio rebota hacia arriba', order: 3 },
+            { id: 'seq-6', label: 'El precio inicia una nueva tendencia alcista', order: 4 },
           ],
         },
         {
@@ -482,9 +480,8 @@ export const SKILL_TREE: SkillNode[] = [
           steps: [
             { id: 'seqb-1', label: 'El precio se acerca a la resistencia con fuerza', order: 1 },
             { id: 'seqb-2', label: 'El precio rompe la resistencia con volumen alto', order: 2 },
-            { id: 'seqb-3', label: 'La resistencia rota se convierte en nuevo soporte', order: 3 },
-            { id: 'seqb-4', label: 'El precio retesta la zona desde arriba', order: 4 },
-            { id: 'seqb-5', label: 'El precio rebota y continúa subiendo', order: 5 },
+            { id: 'seqb-4', label: 'El precio retesta la zona desde arriba', order: 3 },
+            { id: 'seqb-5', label: 'El precio rebota y continúa subiendo', order: 4 },
           ],
         },
         {
@@ -675,11 +672,9 @@ export const SKILL_TREE: SkillNode[] = [
           instructions: 'Ordena cómo se lee un cruce de medias sin precipitarse.',
           steps: [
             { id: 'i-seq-1', label: 'Dibujas una media rápida y una media lenta', order: 1 },
-            { id: 'i-seq-2', label: 'El precio sube y la media rápida gira hacia arriba', order: 2 },
-            { id: 'i-seq-3', label: 'La media rápida cruza por encima de la lenta', order: 3 },
-            { id: 'i-seq-4', label: 'Esperas al cierre de la vela para dar el cruce por bueno', order: 4 },
-            { id: 'i-seq-5', label: 'Compruebas que el volumen acompaña al movimiento', order: 5 },
-            { id: 'i-seq-6', label: 'Solo entonces consideras válida la señal', order: 6 },
+            { id: 'i-seq-3', label: 'La media rápida cruza por encima de la lenta', order: 2 },
+            { id: 'i-seq-4', label: 'Esperas al cierre de la vela para darlo por bueno', order: 3 },
+            { id: 'i-seq-6', label: 'Solo entonces consideras válida la señal', order: 4 },
           ],
         },
         {
@@ -688,9 +683,8 @@ export const SKILL_TREE: SkillNode[] = [
           steps: [
             { id: 'i-seqb-1', label: 'El precio marca un máximo', order: 1 },
             { id: 'i-seqb-2', label: 'Más adelante marca un máximo todavía más alto', order: 2 },
-            { id: 'i-seqb-3', label: 'Miras el RSI justo en esos dos máximos', order: 3 },
-            { id: 'i-seqb-4', label: 'El segundo máximo del RSI es más bajo que el primero', order: 4 },
-            { id: 'i-seqb-5', label: 'El impulso se está agotando aunque el precio suba', order: 5 },
+            { id: 'i-seqb-4', label: 'El segundo máximo del RSI es más bajo que el primero', order: 3 },
+            { id: 'i-seqb-5', label: 'El impulso se está agotando aunque el precio suba', order: 4 },
           ],
         },
         {
@@ -939,10 +933,8 @@ export const SKILL_TREE: SkillNode[] = [
           steps: [
             { id: 'g-seq-1', label: 'Decides qué porcentaje de la cuenta arriesgas', order: 1 },
             { id: 'g-seq-2', label: 'Lo conviertes en una cantidad concreta de dinero', order: 2 },
-            { id: 'g-seq-3', label: 'Eliges el precio de entrada', order: 3 },
-            { id: 'g-seq-4', label: 'Colocas el stop loss en un nivel técnico', order: 4 },
-            { id: 'g-seq-5', label: 'Mides la distancia entre la entrada y el stop', order: 5 },
-            { id: 'g-seq-6', label: 'Divides el dinero en riesgo entre esa distancia', order: 6 },
+            { id: 'g-seq-5', label: 'Mides la distancia entre la entrada y el stop', order: 3 },
+            { id: 'g-seq-6', label: 'Divides el dinero en riesgo entre esa distancia', order: 4 },
           ],
         },
         {
@@ -952,8 +944,7 @@ export const SKILL_TREE: SkillNode[] = [
             { id: 'g-seqb-1', label: 'El precio se mueve en tu contra', order: 1 },
             { id: 'g-seqb-2', label: 'Alcanza el nivel donde pusiste el stop', order: 2 },
             { id: 'g-seqb-3', label: 'La orden se ejecuta y cierra la posición', order: 3 },
-            { id: 'g-seqb-4', label: 'La pérdida queda en lo que ya habías aceptado', order: 4 },
-            { id: 'g-seqb-5', label: 'Tu cuenta sigue viva para la siguiente operación', order: 5 },
+            { id: 'g-seqb-5', label: 'Tu cuenta sigue viva para la siguiente operación', order: 4 },
           ],
         },
         {
@@ -1202,9 +1193,7 @@ export const SKILL_TREE: SkillNode[] = [
             { id: 'ps-seq-1', label: 'Encajas una pérdida mayor de la que esperabas', order: 1 },
             { id: 'ps-seq-2', label: 'Sientes que el mercado te debe algo', order: 2 },
             { id: 'ps-seq-3', label: 'Entras enseguida sin que se cumpla tu señal', order: 3 },
-            { id: 'ps-seq-4', label: 'Subes el tamaño para recuperar más rápido', order: 4 },
-            { id: 'ps-seq-5', label: 'La segunda pérdida es mayor que la primera', order: 5 },
-            { id: 'ps-seq-6', label: 'El día se te ha ido de las manos', order: 6 },
+            { id: 'ps-seq-5', label: 'La segunda pérdida es mayor que la primera', order: 4 },
           ],
         },
         {
@@ -1215,7 +1204,6 @@ export const SKILL_TREE: SkillNode[] = [
             { id: 'ps-seqb-2', label: 'Cierras la plataforma', order: 2 },
             { id: 'ps-seqb-3', label: 'Anotas en el diario qué pasó y qué sentiste', order: 3 },
             { id: 'ps-seqb-4', label: 'Vuelves al día siguiente con el plan delante', order: 4 },
-            { id: 'ps-seqb-5', label: 'Operas con tu tamaño normal, no con el doble', order: 5 },
           ],
         },
         {
@@ -1463,10 +1451,8 @@ export const SKILL_TREE: SkillNode[] = [
           steps: [
             { id: 'o-seq-1', label: 'Pulsas comprar en la plataforma', order: 1 },
             { id: 'o-seq-2', label: 'El bróker envía la orden al mercado', order: 2 },
-            { id: 'o-seq-3', label: 'La orden busca contrapartida en el libro', order: 3 },
-            { id: 'o-seq-4', label: 'Se casa con las mejores ventas disponibles', order: 4 },
-            { id: 'o-seq-5', label: 'Recibes el precio medio al que se ejecutó', order: 5 },
-            { id: 'o-seq-6', label: 'La posición aparece abierta en tu cuenta', order: 6 },
+            { id: 'o-seq-4', label: 'Se casa con las mejores ventas disponibles', order: 3 },
+            { id: 'o-seq-6', label: 'La posición aparece abierta en tu cuenta', order: 4 },
           ],
         },
         {
@@ -1476,8 +1462,7 @@ export const SKILL_TREE: SkillNode[] = [
             { id: 'o-seqb-1', label: 'Ves un precio en pantalla y lanzas la orden', order: 1 },
             { id: 'o-seqb-2', label: 'En ese instante llega una noticia', order: 2 },
             { id: 'o-seqb-3', label: 'Las órdenes de venta a ese precio desaparecen', order: 3 },
-            { id: 'o-seqb-4', label: 'Tu orden se casa con el siguiente precio disponible', order: 4 },
-            { id: 'o-seqb-5', label: 'Entras algo peor de lo que esperabas', order: 5 },
+            { id: 'o-seqb-5', label: 'Entras algo peor de lo que esperabas', order: 4 },
           ],
         },
         {
@@ -1728,9 +1713,7 @@ export const SKILL_TREE: SkillNode[] = [
             { id: 'f-seq-1', label: 'El mercado llega con unas expectativas ya formadas', order: 1 },
             { id: 'f-seq-2', label: 'La empresa publica sus cifras fuera de horario', order: 2 },
             { id: 'f-seq-3', label: 'Se comparan las cifras con lo que se esperaba', order: 3 },
-            { id: 'f-seq-4', label: 'La directiva da su previsión para los próximos meses', order: 4 },
-            { id: 'f-seq-5', label: 'El precio se mueve fuerte en el fuera de horas', order: 5 },
-            { id: 'f-seq-6', label: 'Al día siguiente abre con un hueco respecto al cierre', order: 6 },
+            { id: 'f-seq-6', label: 'Al día siguiente abre con un hueco', order: 4 },
           ],
         },
         {
@@ -1741,7 +1724,6 @@ export const SKILL_TREE: SkillNode[] = [
             { id: 'f-seqb-2', label: 'Pedir dinero prestado se vuelve más caro', order: 2 },
             { id: 'f-seqb-3', label: 'Las empresas recortan inversión y gasto', order: 3 },
             { id: 'f-seqb-4', label: 'Se esperan beneficios futuros más bajos', order: 4 },
-            { id: 'f-seqb-5', label: 'Las acciones de crecimiento suelen ser las más castigadas', order: 5 },
           ],
         },
         {

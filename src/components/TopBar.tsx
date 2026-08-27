@@ -5,12 +5,15 @@ import { useHeartRegen } from '../hooks/useHeartRegen';
 import StatPanel, { type StatKey } from './StatPanels';
 import Icon from './Icon';
 import Mascot from './Mascot';
+import { practisedToday } from '../utils/streak';
 
 /* Stats only, the way the phone app works: each counter taps open a panel
  * underneath. Navigation lives in BottomNav / NavRail, not here. */
 
 export default function TopBar() {
-  const { streak, xp, coins, testMode } = useUserStore();
+  const { streak, xp, coins, testMode, lastActiveDate } = useUserStore();
+  // Dim, but keep the number: the streak is still yours until midnight.
+  const streakDone = practisedToday(lastActiveDate);
   const { hearts, unlimited } = useHeartRegen();
   const [open, setOpen] = useState<StatKey | null>(null);
 
@@ -63,9 +66,14 @@ export default function TopBar() {
             <Icon
               name="flame"
               size={20}
-              className={streak > 0 ? 'text-lime-500 animate-flame-flicker' : 'text-carbon-600'}
+              className={
+                streak > 0 && streakDone
+                  ? 'text-lime-500 animate-flame-flicker'
+                  : 'text-carbon-600'
+              }
             />,
-            streak
+            streak,
+            streak > 0 && !streakDone ? 'text-carbon-400' : 'text-carbon-50'
           )}
           {stat('xp', <Icon name="star" size={20} className="text-lime-500" />, xp)}
           {stat('coins', <Icon name="coins" size={20} className="text-lime-500" />, coins)}

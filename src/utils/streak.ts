@@ -110,3 +110,15 @@ export function shiftDay(day: string, delta: number): string {
     d.getUTCDate()
   ).padStart(2, '0')}`;
 }
+
+/**
+ * Whether today's activity is already in the bag.
+ *
+ * The flame used to go grey only at zero, so a streak of nine looked
+ * identical whether you'd practised today or were about to lose it at
+ * midnight. Grey with the number still on it says both things at once: what
+ * you have, and that it isn't safe yet.
+ */
+export function practisedToday(lastActiveDate: string | null): boolean {
+  return lastActiveDate === todayLocal();
+}

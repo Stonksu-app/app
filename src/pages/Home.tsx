@@ -13,6 +13,7 @@ import { SKILL_TREE } from '../data/lessons';
 import StatPanel, { type StatKey } from '../components/StatPanels';
 import { CHEST_REWARD, useUserStore, xpToLevel } from '../store/useUserStore';
 import { canPlayUltraLessons, hasUnlimitedHearts } from '../data/plans';
+import { practisedToday } from '../utils/streak';
 import type { IconName, SkillNode } from '../types';
 
 /* Three-column learn layout, in the shape Duolingo uses: nav rail on the left,
@@ -64,7 +65,9 @@ function StatRail({
   msUntilNextHeart: number | null;
   active: { node: SkillNode; stage: number; maxStage: number } | null;
 }) {
-  const { streak, xp, coins, plan } = useUserStore();
+  const { streak, xp, coins, plan, lastActiveDate } = useUserStore();
+  // Grey until today's activity lands, number intact — same rule as the phone.
+  const streakDone = practisedToday(lastActiveDate);
   const { level } = xpToLevel(xp);
   const [hovered, setHovered] = useState<StatKey | null>(null);
   // Measured rather than derived from the index: the counters are laid out with
@@ -83,7 +86,7 @@ function StatRail({
     dim?: boolean;
     tone?: string;
   }[] = [
-    { key: 'streak', icon: 'flame', value: streak, dim: streak === 0 },
+    { key: 'streak', icon: 'flame', value: streak, dim: !streakDone || streak === 0 },
     { key: 'xp', icon: 'star', value: xp },
     { key: 'coins', icon: 'coins', value: coins },
     {
@@ -120,7 +123,11 @@ function StatRail({
               onBlur={() => setHovered(null)}
               aria-expanded={hovered === s.key}
               className={`flex items-center gap-1.5 font-black px-3 py-1 rounded-lg transition ${
-                s.tone === 'ultra' ? 'text-ultra-300' : 'text-carbon-50'
+                s.tone === 'ultra'
+                  ? 'text-ultra-300'
+                  : s.dim && s.key === 'streak'
+                  ? 'text-carbon-400'
+                  : 'text-carbon-50'
               } ${hovered === s.key ? 'bg-carbon-800' : ''}`}
             >
               <Icon

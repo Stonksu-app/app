@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { localDayKey } from '../utils/streak';
+import { localDayKey, practisedToday } from '../utils/streak';
 import { MAX_HEARTS, useUserStore, xpToLevel } from '../store/useUserStore';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import Icon from './Icon';
@@ -153,6 +153,7 @@ function MonthGrid({ activeDays, frozenDays }: { activeDays: Set<string>; frozen
 export default function StatPanel({ stat, compact = false }: { stat: StatKey; compact?: boolean }) {
   const { streak, xp, coins } = useUserStore();
   const { hearts, msUntilNextHeart, unlimited } = useHeartRegen();
+  const lastActiveDate = useUserStore((s) => s.lastActiveDate);
   const activeDays = useActiveDays();
   const frozenDays = useFrozenDays();
   const { level, xpIntoLevel, xpForNext } = xpToLevel(xp);
@@ -164,7 +165,11 @@ export default function StatPanel({ stat, compact = false }: { stat: StatKey; co
           {streak} {streak === 1 ? 'día' : 'días'} de racha
         </p>
         <p className="text-sm text-carbon-400 mt-0.5">
-          {streak === 0 ? 'Haz una lección hoy y empieza tu racha.' : 'No la sueltes.'}
+          {streak === 0
+            ? 'Haz una lección hoy y empieza tu racha.'
+            : practisedToday(lastActiveDate)
+            ? 'Hoy ya está. No la sueltes.'
+            : 'Aún no has practicado hoy: una lección o un repaso la mantienen.'}
         </p>
         {compact ? (
           <WeekStrip activeDays={activeDays} frozenDays={frozenDays} />

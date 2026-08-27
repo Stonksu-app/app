@@ -1,9 +1,12 @@
 import { useMemo, useRef, useState } from 'react';
 import type { SequenceGame as SequenceGameType } from '../types';
 import { Button } from './Button';
-import { shuffle } from '../utils/shuffle';
+import Icon from './Icon';
+import { shuffleUnsolved } from '../utils/shuffle';
 
-const ROW_HEIGHT = 82;
+/** Tall enough for three lines of a long step. The labels are sentences, and
+ *  a step you can only half-read is a step you can only guess at. */
+const ROW_HEIGHT = 92;
 
 export default function SequenceGame({
   steps,
@@ -17,9 +20,30 @@ export default function SequenceGame({
   onResult?: (correct: boolean) => void;
 }) {
   const stepsById = useMemo(() => new Map(steps.map((s) => [s.id, s])), [steps]);
-  const [order, setOrder] = useState(() => shuffle(steps).map((s) => s.id));
+  /**
+   * Shuffled, and never handed to you already solved.
+   *
+   * A shuffle that lands on the answer — one time in 24 with four steps —
+   * turns the exercise into a button you press, and the player can't tell
+   * that's what happened. Reshuffles until at least one step is out of place.
+   */
+  /** Shuffled, and never handed to you already solved — see shuffleUnsolved. */
+  const [order, setOrder] = useState(() => {
+    const solved = [...steps].sort((a, b) => a.order - b.order).map((s) => s.id);
+    return shuffleUnsolved(steps.map((s) => s.id), solved);
+  });
+
   const [checked, setChecked] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
+  /**
+   * Which rows were in the right place at the last check.
+   *
+   * Ordering six things has 720 answers and the game used to reply "no" to
+   * all but one of them, which leaves guessing as the only strategy. Marking
+   * the ones already in place turns it into a puzzle you can reason about —
+   * and it's the same information a teacher would give.
+   */
+  const [placed, setPlaced] = useState<Set<string>>(new Set());
 
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragDelta, setDragDelta] = useState(0);
@@ -43,11 +67,29 @@ export default function SequenceGame({
     return 0;
   };
 
+  /** Reordering without dragging. On a phone, hauling a row across a
+   *  six-item list is the hard part of this exercise, and it isn't the part
+   *  that teaches anything. */
+  const move = (id: string, delta: number) => {
+    if (checked && isCorrect) return;
+    const from = order.indexOf(id);
+    const to = from + delta;
+    if (to < 0 || to >= order.length) return;
+    const next = [...order];
+    next.splice(to, 0, next.splice(from, 1)[0]);
+    setOrder(next);
+    setChecked(false);
+    setPlaced(new Set());
+  };
+
   const handlePointerDown = (e: React.PointerEvent, id: string) => {
     // Only a solved order should freeze the boxes — after a wrong guess you
     // still need to be able to drag them into a new order to try again.
     if (checked && isCorrect) return;
-    (e.target as Element).setPointerCapture(e.pointerId);
+    // The row, not the child the finger landed on: capturing on an inner
+    // span meant a drag that started on the arrows or the text behaved
+    // differently from one that started on the card.
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
     setDragId(id);
     dragFromIndexRef.current = order.indexOf(id);
     startYRef.current = e.clientY;
@@ -72,10 +114,13 @@ export default function SequenceGame({
     setDragId(null);
     setDragDelta(0);
     setChecked(false);
+    setPlaced(new Set());
   };
 
   const handleCheck = () => {
-    const correct = order.every((id, i) => stepsById.get(id)!.order === i + 1);
+    const rightPlaces = order.filter((id, i) => stepsById.get(id)!.order === i + 1);
+    const correct = rightPlaces.length === order.length;
+    setPlaced(new Set(rightPlaces));
     setIsCorrect(correct);
     setChecked(true);
     onResult?.(correct);
@@ -84,7 +129,9 @@ export default function SequenceGame({
   return (
     <div className="w-full">
       <p className="text-sm text-carbon-400 font-medium text-center mb-1">{instructions}</p>
-      <p className="text-xs text-carbon-500 text-center mb-4">Arrastra para ordenar</p>
+      <p className="text-xs text-carbon-500 text-center mb-4">
+        Arrastra, o usa las flechas para mover cada paso
+      </p>
 
       <div
         className={`relative select-none ${checked && !isCorrect ? 'animate-shake' : ''}`}
@@ -102,26 +149,69 @@ export default function SequenceGame({
               onPointerMove={(e) => handlePointerMove(e, id)}
               onPointerUp={() => endDrag(id)}
               onPointerCancel={() => endDrag(id)}
-              className={`absolute left-0 right-0 flex items-center gap-3 px-3 py-3 rounded-xl border-2 text-sm font-bold touch-none cursor-grab active:cursor-grabbing overflow-hidden ${
+              className={`absolute left-0 right-0 flex items-center gap-2.5 pl-3 pr-1.5 py-3 rounded-xl border-2 text-sm font-bold touch-none overflow-hidden ${
                 isDragging ? 'z-10 shadow-lg' : 'transition-transform duration-200'
               } ${
-                checked && isCorrect
+                checked && placed.has(id)
                   ? 'border-lime-500 bg-lime-500/10 text-lime-300'
                   : 'border-carbon-800 bg-carbon-850 text-carbon-100'
               }`}
               style={{ top, height: ROW_HEIGHT - 8, transform: `translateY(${offset}px)` }}
             >
-              <span className="w-6 h-6 rounded-full bg-carbon-800 text-carbon-300 text-xs font-black flex items-center justify-center shrink-0">
-                {i + 1}
+              <span
+                className={`w-6 h-6 rounded-full text-xs font-black flex items-center justify-center shrink-0 ${
+                  checked && placed.has(id)
+                    ? 'bg-lime-500 text-carbon-900'
+                    : 'bg-carbon-800 text-carbon-300'
+                }`}
+              >
+                {checked && placed.has(id) ? <Icon name="check" size={13} strokeWidth={3.5} /> : i + 1}
               </span>
-              <span className="flex-1 line-clamp-2 leading-snug">{step.label}</span>
+              <span className="flex-1 line-clamp-3 leading-snug cursor-grab active:cursor-grabbing">
+                {step.label}
+              </span>
+
+              {/* Big enough to hit with a thumb, and stacked so the pair takes
+                  one row's height rather than widening the card. */}
+              <span className="flex flex-col shrink-0">
+                <button
+                  onClick={() => move(id, -1)}
+                  disabled={i === 0 || (checked && isCorrect)}
+                  aria-label={`Subir: ${step.label}`}
+                  className="w-9 h-[30px] flex items-center justify-center rounded-t-lg text-carbon-400 hover:text-carbon-100 hover:bg-carbon-800 disabled:opacity-25 disabled:hover:bg-transparent transition"
+                >
+                  <Icon name="chevron-up" size={18} strokeWidth={2.6} />
+                </button>
+                <button
+                  onClick={() => move(id, 1)}
+                  disabled={i === order.length - 1 || (checked && isCorrect)}
+                  aria-label={`Bajar: ${step.label}`}
+                  className="w-9 h-[30px] flex items-center justify-center rounded-b-lg text-carbon-400 hover:text-carbon-100 hover:bg-carbon-800 disabled:opacity-25 disabled:hover:bg-transparent transition"
+                >
+                  <Icon name="chevron-down" size={18} strokeWidth={2.6} />
+                </button>
+              </span>
             </div>
           );
         })}
       </div>
 
+      {/* Says how close you are, not just that you're wrong. Zero right is
+          worth saying plainly too — it usually means the whole thing is
+          upside down, which is a much easier fix than it looks. */}
       {checked && !isCorrect && (
-        <p className="text-center text-danger-400 text-sm font-bold mt-3">Ese orden no es correcto, ¡sigue intentando!</p>
+        <p className="text-center text-sm font-bold mt-3 text-carbon-300">
+          {placed.size === 0 ? (
+            <span className="text-danger-400">Ninguno está en su sitio todavía. Prueba a darle la vuelta.</span>
+          ) : (
+            <>
+              <span className="text-lime-400">
+                {placed.size} de {order.length}
+              </span>{' '}
+              en su sitio. Mueve los demás.
+            </>
+          )}
+        </p>
       )}
 
       <div className="mt-6">
