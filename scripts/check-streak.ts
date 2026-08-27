@@ -57,6 +57,7 @@ function reset(patch: Partial<ReturnType<typeof useUserStore.getState>>) {
     lastActiveDate: null,
     frozenDates: [],
     reviewDates: [],
+    lastStreakLoss: null,
     streakProtectors: 0,
     xp: 0,
     completedLessonIds: [],
@@ -252,3 +253,51 @@ if (sameFailed > 0) {
   process.exit(1);
 }
 console.log('\nRepaso y lección: cuentan igual.');
+
+/*
+ * Losing a streak with protectors in hand.
+ *
+ * Two protectors against three missed days can't save it, and burning them
+ * anyway would leave you with neither. The rule is all-or-nothing — which is
+ * the friendlier half of the trade, but only if the app says so, because from
+ * the outside "streak gone, protectors untouched" reads as a bug.
+ */
+let lossFailed = 0;
+const check4 = (name: string, cond: boolean, detail = '') => {
+  if (cond) console.log(`OK   ${name}`);
+  else {
+    lossFailed++;
+    console.log(`FALLA ${name}${detail ? ` — ${detail}` : ''}`);
+  }
+};
+
+const tres = computeStreakUpdate('2026-08-23', 4, 2, '2026-08-27');
+check4('tres días saltados con dos protectores: la racha se pierde', tres.streak === 1);
+check4('y los protectores no se gastan', tres.protectorsUsed === 0);
+check4('el hueco se informa para poder explicarlo', tres.missed === 3, `${tres.missed}`);
+
+const dos = computeStreakUpdate('2026-08-24', 4, 2, '2026-08-27');
+check4('dos días saltados con dos protectores: se salva', dos.streak === 5);
+check4('y se gastan los dos', dos.protectorsUsed === 2);
+
+const seguido = computeStreakUpdate('2026-08-26', 4, 2, '2026-08-27');
+check4('un día seguido no gasta nada', seguido.protectorsUsed === 0 && seguido.missed === 0);
+
+// And the store writes down why, so the panel can say it once.
+reset({ streak: 6, lastActiveDate: '2026-08-23', streakProtectors: 2 });
+store.completeReview();
+const loss = useUserStore.getState().lastStreakLoss;
+check4('la racha rota queda anotada', !!loss, 'no se anotó nada');
+check4('con la racha que había', loss?.streak === 6, `${loss?.streak}`);
+check4('y con los protectores que tenías', loss?.protectors === 2, `${loss?.protectors}`);
+
+// A streak that survives must not leave a note claiming it broke.
+reset({ streak: 3, lastActiveDate: todayLocal(-1), streakProtectors: 0 });
+store.completeReview();
+check4('una racha que continúa no anota ninguna pérdida', useUserStore.getState().lastStreakLoss === null);
+
+if (lossFailed > 0) {
+  console.log(`${lossFailed} caso(s) de protectores fallando.`);
+  process.exit(1);
+}
+console.log('Protectores: todo correcto.');

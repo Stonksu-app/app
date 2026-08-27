@@ -51,24 +51,38 @@ export function computeStreakUpdate(
   currentStreak: number,
   protectors: number,
   today: string
-): { streak: number; lastActiveDate: string; protectorsUsed: number } {
+): {
+  streak: number;
+  lastActiveDate: string;
+  protectorsUsed: number;
+  /** Days skipped since the last active one. Reported so a lost streak can
+   *  say why it was lost, instead of the number silently becoming 1. */
+  missed: number;
+} {
   if (lastActiveDate === today) {
-    return { streak: currentStreak, lastActiveDate: today, protectorsUsed: 0 };
+    return { streak: currentStreak, lastActiveDate: today, protectorsUsed: 0, missed: 0 };
   }
   if (!lastActiveDate) {
-    return { streak: 1, lastActiveDate: today, protectorsUsed: 0 };
+    return { streak: 1, lastActiveDate: today, protectorsUsed: 0, missed: 0 };
   }
 
   const gap = daysBetween(lastActiveDate, today);
   if (gap === 1) {
-    return { streak: currentStreak + 1, lastActiveDate: today, protectorsUsed: 0 };
+    return { streak: currentStreak + 1, lastActiveDate: today, protectorsUsed: 0, missed: 0 };
   }
 
   const missed = gap - 1;
   if (missed > 0 && missed <= protectors) {
-    return { streak: currentStreak + 1, lastActiveDate: today, protectorsUsed: missed };
+    return { streak: currentStreak + 1, lastActiveDate: today, protectorsUsed: missed, missed };
   }
-  return { streak: 1, lastActiveDate: today, protectorsUsed: 0 };
+  /*
+   * Not enough protectors, so none are spent.
+   *
+   * Two protectors against three missed days can't save the streak, and
+   * burning them anyway would leave you with nothing and no streak — the
+   * worst of both. They stay for a gap they can actually cover.
+   */
+  return { streak: 1, lastActiveDate: today, protectorsUsed: 0, missed };
 }
 
 /**

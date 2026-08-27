@@ -72,6 +72,16 @@ interface UserState {
    */
   reviewDates: string[];
   /**
+   * The last streak that broke, and why.
+   *
+   * Losing a streak while holding protectors that didn't cover the gap looks
+   * exactly like a bug from the outside: the number resets, the protectors
+   * are still there, and nothing says a word. Kept so the streak panel can
+   * explain it once. Local — it's an explanation of this device's history,
+   * not progress.
+   */
+  lastStreakLoss: { date: string; streak: number; missed: number; protectors: number } | null;
+  /**
    * Lessons finished since the Ultra pitch was last shown.
    *
    * Local for the same reason as the practice counter: it paces an advert, and
@@ -179,6 +189,24 @@ export const MAX_PROTECTORS = 2;
  *  alive. Doesn't count repeats of an already-completed lesson. */
 export const LESSON_PROTECTOR_GIFT_EVERY = 3;
 
+/**
+ * Notes a broken streak, and only a broken one.
+ *
+ * A streak that survives — or one that was never running — leaves whatever was
+ * there before, so the panel doesn't announce an old loss on top of a run you
+ * are currently building.
+ */
+function recordLoss(
+  s: { streak: number; streakProtectors: number; lastStreakLoss: UserState['lastStreakLoss'] },
+  newStreak: number,
+  missed: number,
+  today: string
+): UserState['lastStreakLoss'] {
+  const broke = missed > 0 && newStreak === 1 && s.streak > 1;
+  if (!broke) return s.lastStreakLoss;
+  return { date: today, streak: s.streak, missed, protectors: s.streakProtectors };
+}
+
 /** The streak's day, in the player's timezone — see localDayKey. */
 function todayStr(offsetDays = 0): string {
   return todayLocal(offsetDays);
@@ -209,6 +237,7 @@ export const useUserStore = create<UserState>()(
       practiceDay: null,
       practiceRoundsToday: 0,
       reviewDates: [],
+      lastStreakLoss: null,
       lessonsSincePitch: 0,
       openedChestIds: [],
       coins: 0,
@@ -285,7 +314,7 @@ export const useUserStore = create<UserState>()(
       completeReview: () => {
         const s = get();
         const today = todayStr();
-        const { streak, lastActiveDate, protectorsUsed } = computeStreakUpdate(
+        const { streak, lastActiveDate, protectorsUsed, missed } = computeStreakUpdate(
           s.lastActiveDate,
           s.streak,
           s.streakProtectors,
@@ -302,6 +331,7 @@ export const useUserStore = create<UserState>()(
           // Deduped: two repasos in one day are one day on the calendar.
           reviewDates: [...new Set([...s.reviewDates, today])],
           streakProtectors: s.streakProtectors - protectorsUsed,
+          lastStreakLoss: recordLoss(s, streak, missed, today),
         });
       },
 
@@ -330,7 +360,7 @@ export const useUserStore = create<UserState>()(
       completeLesson: (attempt) => {
         const s = get();
         const today = todayStr();
-        const { streak, lastActiveDate, protectorsUsed } = computeStreakUpdate(
+        const { streak, lastActiveDate, protectorsUsed, missed } = computeStreakUpdate(
           s.lastActiveDate,
           s.streak,
           s.streakProtectors,
@@ -379,6 +409,7 @@ export const useUserStore = create<UserState>()(
           // Counts every lesson, repeats included: the pitch paces itself on
           // time spent in lessons, not on new ground covered.
           lessonsSincePitch: s.lessonsSincePitch + 1,
+          lastStreakLoss: recordLoss(s, streak, missed, today),
         });
 
         return gifted;
@@ -585,6 +616,7 @@ export const useUserStore = create<UserState>()(
           practiceDay: null,
           practiceRoundsToday: 0,
           reviewDates: [],
+          lastStreakLoss: null,
           lessonsSincePitch: 0,
           openedChestIds: [],
           coins: 0,

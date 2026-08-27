@@ -154,6 +154,8 @@ export default function StatPanel({ stat, compact = false }: { stat: StatKey; co
   const { streak, xp, coins } = useUserStore();
   const { hearts, msUntilNextHeart, unlimited } = useHeartRegen();
   const lastActiveDate = useUserStore((s) => s.lastActiveDate);
+  const streakProtectors = useUserStore((s) => s.streakProtectors);
+  const lastStreakLoss = useUserStore((s) => s.lastStreakLoss);
   const activeDays = useActiveDays();
   const frozenDays = useFrozenDays();
   const { level, xpIntoLevel, xpForNext } = xpToLevel(xp);
@@ -175,6 +177,42 @@ export default function StatPanel({ stat, compact = false }: { stat: StatKey; co
           <WeekStrip activeDays={activeDays} frozenDays={frozenDays} />
         ) : (
           <MonthGrid activeDays={activeDays} frozenDays={frozenDays} />
+        )}
+
+        {/*
+          What the protectors you're holding actually buy you.
+          Saying it up front is the only way the arithmetic isn't a surprise
+          on the day it matters — one protector per day missed, and they're
+          only spent when they can cover the whole gap.
+        */}
+        <p className="mt-3 flex items-start gap-1.5 text-[13px] text-carbon-400 leading-snug">
+          <Icon name="shield" size={14} className="mt-0.5 shrink-0 text-sky-400" />
+          {streakProtectors === 0 ? (
+            <span>
+              Sin protectores: un solo día sin practicar y la racha vuelve a empezar.
+            </span>
+          ) : (
+            <span>
+              {streakProtectors === 1 ? 'Tienes 1 protector' : `Tienes ${streakProtectors} protectores`}:
+              cubren hasta {streakProtectors} {streakProtectors === 1 ? 'día seguido' : 'días seguidos'} sin
+              practicar.
+            </span>
+          )}
+        </p>
+
+        {/* And why the last one broke — but only while the streak is still
+            back at the beginning. Once you've built a new one the old loss
+            has stopped explaining anything on screen, and a note about it
+            would just be the app sulking. */}
+        {lastStreakLoss && lastStreakLoss.missed > lastStreakLoss.protectors && streak <= 1 && (
+          <p className="mt-2 rounded-xl bg-carbon-800 px-3 py-2 text-[13px] text-carbon-300 leading-snug">
+            Perdiste una racha de {lastStreakLoss.streak}{' '}
+            {lastStreakLoss.streak === 1 ? 'día' : 'días'}: faltaron {lastStreakLoss.missed} días
+            seguidos y {lastStreakLoss.protectors === 0
+              ? 'no tenías protectores'
+              : `tenías ${lastStreakLoss.protectors}`}
+            . Se quedaron sin gastar para un hueco que sí puedan cubrir.
+          </p>
         )}
       </>
     );

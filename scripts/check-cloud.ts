@@ -109,6 +109,9 @@ const cloudKeys = new Set(Object.keys(sample));
  * - reminder*: the notification permission behind them is granted per device.
  * - frozenDates, reviewDates: cosmetic annotations on this device's streak
  *   calendar.
+ * - lastStreakLoss: an explanation of what happened on this device, not
+ *   progress. Syncing it would mean explaining a phone's lost streak on a
+ *   laptop that never saw it.
  * - practice*: a daily rate limit, not progress. Syncing a counter that
  *   resets at midnight would need columns and a timezone argument, and the
  *   worst it buys is one extra round of revision.
@@ -119,6 +122,7 @@ const LOCAL_ONLY = new Set([
   'practiceRoundsToday',
   'lessonsSincePitch',
   'reviewDates',
+  'lastStreakLoss',
   'reminderEnabled',
   'reminderHour',
   'heartsReminderEnabled',
