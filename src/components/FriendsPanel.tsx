@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Mascot from './Mascot';
+import PlanBadge from './PlanBadge';
 import Icon from './Icon';
 import { Button, ButtonLink } from './Button';
 import { listFriends, type Friend } from '../lib/friends';
@@ -27,13 +28,24 @@ const PREVIEW = 3;
 /** How long the invite confirmation stays on screen. */
 const FLASH_MS = 3000;
 
+/* A whole row is the target, not a name inside it: on a phone the difference
+   between hitting a link and hitting the gap beside it is the difference
+   between the feature existing and not. */
 function FriendPreviewRow({ friend }: { friend: Friend }) {
   return (
-    <div className="flex items-center gap-3 py-4 border-b-2 border-carbon-800 last:border-b-0">
+    <Link
+      to={`/amigos/${friend.id}`}
+      className="flex items-center gap-3 py-4 border-b-2 border-carbon-800 last:border-b-0 -mx-4 px-4 hover:bg-carbon-800/40 transition"
+    >
       <Mascot size={44} look={friend.avatar} />
 
       <div className="flex-1 min-w-0">
-        <p className="text-[20px] font-black text-carbon-50 leading-tight truncate">{friend.name}</p>
+        <p className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[20px] font-black text-carbon-50 leading-tight truncate">
+            {friend.name}
+          </span>
+          <PlanBadge plan={friend.plan} size="sm" />
+        </p>
         <p className="text-sm text-carbon-400 tabular-nums">{friend.xp} XP</p>
       </div>
 
@@ -43,7 +55,9 @@ function FriendPreviewRow({ friend }: { friend: Friend }) {
           {friend.streak}
         </span>
       )}
-    </div>
+
+      <Icon name="chevron-left" size={18} className="shrink-0 text-carbon-600 rotate-180" />
+    </Link>
   );
 }
 
