@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { useSyncStore } from '../store/useSyncStore';
 import type { MascotLook } from '../types';
+import type { Plan } from '../data/plans';
 
 /**
  * The friends API.
@@ -20,8 +21,25 @@ export interface Friend {
   avatar: MascotLook;
   streak: number;
   xp: number;
+  plan: Plan;
   relation: Relation;
   since: string;
+}
+
+/** What one player may see about another. Aggregated on the server — the
+ *  attempts themselves never leave their owner. */
+export interface FriendProfile {
+  id: string;
+  name: string;
+  avatar: MascotLook;
+  streak: number;
+  xp: number;
+  plan: Plan;
+  lessons: number;
+  /** Percentage of answers correct, or null if they've never answered one. */
+  accuracy: number | null;
+  memberSince: string;
+  lastActive: string | null;
 }
 
 export interface Ping {
@@ -126,9 +144,41 @@ export async function listFriends(): Promise<Friend[]> {
     avatar: r.avatar as MascotLook,
     streak: (r.streak as number) ?? 0,
     xp: (r.xp as number) ?? 0,
+    // A list served by a database that predates the plan column reads free,
+    // which is the safe way to be wrong: it under-promises a badge.
+    plan: (r.plan as Plan) ?? 'free',
     relation: r.relation as Relation,
     since: r.since as string,
   }));
+}
+
+/**
+ * A friend's profile card.
+ *
+ * Returns null for anyone who isn't an accepted friend — the server decides
+ * that, not this function, so a hand-crafted call gets the same answer.
+ */
+export async function fetchFriendProfile(friendId: string): Promise<FriendProfile | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('friend_profile', { other: friendId });
+  if (error) {
+    console.warn('[friends] could not load profile:', error.message);
+    return null;
+  }
+  const row = (data ?? [])[0] as Record<string, unknown> | undefined;
+  if (!row) return null;
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    avatar: row.avatar as MascotLook,
+    streak: (row.streak as number) ?? 0,
+    xp: (row.xp as number) ?? 0,
+    plan: ((row.plan as Plan) ?? 'free'),
+    lessons: (row.lessons as number) ?? 0,
+    accuracy: row.accuracy === null || row.accuracy === undefined ? null : Number(row.accuracy),
+    memberSince: row.member_since as string,
+    lastActive: (row.last_active as string) ?? null,
+  };
 }
 
 export async function requestFriend(nickname: string): Promise<{ ok: boolean; message: string }> {

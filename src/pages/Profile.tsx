@@ -5,6 +5,7 @@ import NavRail from '../components/NavRail';
 import BottomNav from '../components/BottomNav';
 import Mascot from '../components/Mascot';
 import Icon from '../components/Icon';
+import PlanBadge from '../components/PlanBadge';
 import AchievementRow from '../components/AchievementRow';
 import ReminderSetting from '../components/ReminderSetting';
 import HeartsReminderSetting from '../components/HeartsReminderSetting';
@@ -62,6 +63,7 @@ export default function Profile() {
     nodeStageProgress,
     openedChestIds,
     avatar,
+    plan,
     resetProgress,
   } = useUserStore();
   const { level } = xpToLevel(xp);
@@ -115,7 +117,12 @@ export default function Profile() {
               <Icon name="pencil" size={18} />
             </Link>
             <Mascot size={110} mood="happy" look={avatar} />
-            <h1 className="mt-3 text-[25px] sm:text-[28px] font-black text-carbon-50">{name || 'Trader'}</h1>
+            {/* The badge sits with the name, here and on a friend's card, so
+                the thing being paid for is the same thing wherever it shows. */}
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <h1 className="text-[25px] sm:text-[28px] font-black text-carbon-50">{name || 'Trader'}</h1>
+              <PlanBadge plan={plan} />
+            </div>
             <p className="text-carbon-400 text-sm font-medium">
               {EXPERIENCE_LABELS[onboardingAnswers.experience ?? ''] ?? 'Explorando el mercado'}
             </p>

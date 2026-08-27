@@ -5,6 +5,7 @@ import Avatar from '../components/Avatar';
 import DirectionBadge from '../components/DirectionBadge';
 import ParticleBurst from '../components/ParticleBurst';
 import ResultsScreen from '../components/ResultsScreen';
+import ConfirmModal from '../components/ConfirmModal';
 import { randomLine } from '../components/Mascot';
 import { Button } from '../components/Button';
 import { SKILL_TREE } from '../data/lessons';
@@ -112,6 +113,7 @@ export default function GuidePractice() {
   /** Bumped on every answer so the full-screen flash replays even when two
    *  answers in a row land the same way. */
   const [flash, setFlash] = useState<{ correct: boolean; nonce: number } | null>(null);
+  const [confirmExit, setConfirmExit] = useState(false);
 
   if (!allowed) {
     return (
@@ -239,7 +241,7 @@ export default function GuidePractice() {
       <div className="px-4 pt-safe">
         <div className="max-w-2xl mx-auto flex items-center gap-3 py-3">
           <button
-            onClick={() => navigate('/guia')}
+            onClick={() => setConfirmExit(true)}
             aria-label="Salir del repaso"
             className="text-carbon-500 hover:text-carbon-200 transition p-1 -ml-1"
           >
@@ -293,6 +295,20 @@ export default function GuidePractice() {
           </div>
         </div>
       </div>
+
+      {/* Leaving costs the round, and on the free plan it costs the day's
+          only round — nothing here is saved until the last question. Worth a
+          question rather than a tap. */}
+      {confirmExit && (
+        <ConfirmModal
+          title="¿Seguro que quieres salir?"
+          message="Perderás este repaso y lo que llevas acertado. Si estás en el plan gratuito, hoy ya no te queda otro."
+          confirmLabel="Salir del repaso"
+          cancelLabel="Seguir repasando"
+          onConfirm={() => navigate('/guia')}
+          onCancel={() => setConfirmExit(false)}
+        />
+      )}
 
       {/* The same footer a lesson shows, mascot included. Revision that looked
           plainer than the lessons would read as the lesser activity, which is

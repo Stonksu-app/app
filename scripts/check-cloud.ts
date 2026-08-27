@@ -181,6 +181,18 @@ check('the superseded trigger from 0001 is dropped, not left duplicating work', 
 check('the account summary view cannot leak other players', /security_invoker = true/.test(sql));
 check('the migrations never mention the service_role key', !/service_role/.test(sql));
 
+// ------------------------------- what a friend is allowed to see about you
+// The numbers on a friend's card come from tables the caller cannot read, so
+// the function is the only door. If it ever stops checking the friendship, or
+// starts returning the attempt rows instead of an aggregate, anybody could
+// read anybody.
+const friendSql = readFileSync('supabase/migrations/0007_friend_profile.sql', 'utf8');
+check('friend_profile only answers for accepted friends', /are_friends\(auth\.uid\(\), other\)/.test(friendSql));
+check('it runs as definer, since the caller cannot read those tables', /security definer/.test(friendSql));
+check('it pins the search path, like every other definer function', /set search_path = ''/.test(friendSql));
+check('accuracy leaves as a percentage, not as the answers behind it', /round\(100\.0 \* sum/.test(friendSql));
+check('anonymous callers cannot execute it', /revoke all on function public\.friend_profile/.test(friendSql));
+
 // ------------------------------------------ how a failed write is classified
 // Both of these fail identically on every later attempt too, so getting the
 // mapping wrong means progress stops syncing with nothing on screen saying so.

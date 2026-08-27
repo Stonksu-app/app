@@ -30,9 +30,12 @@ const VARIANTS: Record<Variant, { classes: string; lip: string }> = {
   },
 };
 
-const SIZES: Record<Size, string> = {
-  md: 'h-[50px] text-[15px]',
-  sm: 'h-[42px] text-[13px]',
+/* Padding belongs to the size, not to the layout: a small button padded like
+   a big one ends up wider than the sentence inside it, which is how "Guardar"
+   grew into a slab. Only applies when the button isn't stretching anyway. */
+const SIZES: Record<Size, { height: string; padding: string }> = {
+  md: { height: 'h-[50px] text-[15px]', padding: 'px-8' },
+  sm: { height: 'h-[42px] text-[13px]', padding: 'px-4' },
 };
 
 /** Disabled buttons lose the lip — a button you can't press shouldn't look
@@ -42,10 +45,10 @@ const DISABLED = 'disabled:bg-carbon-800 disabled:text-carbon-500 disabled:borde
 function classesFor(variant: Variant, size: Size, fullWidth: boolean, extra: string) {
   return [
     'btn-3d inline-flex items-center justify-center gap-2 rounded-xl font-bold uppercase tracking-[0.8px] text-center',
-    SIZES[size],
+    SIZES[size].height,
     VARIANTS[variant].classes,
     DISABLED,
-    fullWidth ? 'w-full' : 'px-8',
+    fullWidth ? 'w-full' : SIZES[size].padding,
     extra,
   ].join(' ');
 }
