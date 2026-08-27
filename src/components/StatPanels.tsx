@@ -208,10 +208,21 @@ export default function StatPanel({ stat, compact = false }: { stat: StatKey; co
           <p className="mt-2 rounded-xl bg-carbon-800 px-3 py-2 text-[13px] text-carbon-300 leading-snug">
             Perdiste una racha de {lastStreakLoss.streak}{' '}
             {lastStreakLoss.streak === 1 ? 'día' : 'días'}: faltaron {lastStreakLoss.missed} días
-            seguidos y {lastStreakLoss.protectors === 0
-              ? 'no tenías protectores'
-              : `tenías ${lastStreakLoss.protectors}`}
-            . Se quedaron sin gastar para un hueco que sí puedan cubrir.
+            seguidos
+            {lastStreakLoss.used > 0 ? (
+              <>
+                {' '}
+                y tus {lastStreakLoss.used}{' '}
+                {lastStreakLoss.used === 1 ? 'protector cubrió' : 'protectores cubrieron'} los{' '}
+                {lastStreakLoss.used === 1 ? 'primeros' : lastStreakLoss.used} pero no{' '}
+                {lastStreakLoss.missed - lastStreakLoss.used === 1
+                  ? 'el último'
+                  : `los ${lastStreakLoss.missed - lastStreakLoss.used} últimos`}
+                .
+              </>
+            ) : (
+              <> y no tenías protectores.</>
+            )}
           </p>
         )}
       </>

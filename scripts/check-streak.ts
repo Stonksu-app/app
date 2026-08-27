@@ -17,7 +17,9 @@ const cases: {
   { name: 'día seguido suma', last: '2026-08-18', streak: 4, protectors: 0, today: '2026-08-19', expect: { streak: 5, protectorsUsed: 0 } },
   { name: 'falta 1 día sin protector: se pierde', last: '2026-08-17', streak: 9, protectors: 0, today: '2026-08-19', expect: { streak: 1, protectorsUsed: 0 } },
   { name: 'falta 1 día con protector: se salva y gasta 1', last: '2026-08-17', streak: 9, protectors: 1, today: '2026-08-19', expect: { streak: 10, protectorsUsed: 1 } },
-  { name: 'faltan 2 días con 1 protector: no alcanza', last: '2026-08-16', streak: 9, protectors: 1, today: '2026-08-19', expect: { streak: 1, protectorsUsed: 0 } },
+  // Spent even though they fall short: the protector pays for the 17th, and
+  // the streak breaks on the 18th, which is the day nothing covered.
+  { name: 'faltan 2 días con 1 protector: cubre uno y se pierde igual', last: '2026-08-16', streak: 9, protectors: 1, today: '2026-08-19', expect: { streak: 1, protectorsUsed: 1 } },
   { name: 'faltan 2 días con 2 protectores: se salva', last: '2026-08-16', streak: 9, protectors: 2, today: '2026-08-19', expect: { streak: 10, protectorsUsed: 2 } },
   { name: 'cruce de mes', last: '2026-07-31', streak: 3, protectors: 0, today: '2026-08-01', expect: { streak: 4, protectorsUsed: 0 } },
   { name: 'cruce de año', last: '2025-12-31', streak: 3, protectors: 0, today: '2026-01-01', expect: { streak: 4, protectorsUsed: 0 } },
@@ -273,15 +275,36 @@ const check4 = (name: string, cond: boolean, detail = '') => {
 
 const tres = computeStreakUpdate('2026-08-23', 4, 2, '2026-08-27');
 check4('tres días saltados con dos protectores: la racha se pierde', tres.streak === 1);
-check4('y los protectores no se gastan', tres.protectorsUsed === 0);
+check4('pero los protectores se gastan igual', tres.protectorsUsed === 2, `${tres.protectorsUsed}`);
 check4('el hueco se informa para poder explicarlo', tres.missed === 3, `${tres.missed}`);
 
 const dos = computeStreakUpdate('2026-08-24', 4, 2, '2026-08-27');
 check4('dos días saltados con dos protectores: se salva', dos.streak === 5);
 check4('y se gastan los dos', dos.protectorsUsed === 2);
 
+const sinNinguno = computeStreakUpdate('2026-08-25', 4, 0, '2026-08-27');
+check4('sin protectores, un día saltado la rompe', sinNinguno.streak === 1);
+check4('y no se gasta nada que no exista', sinNinguno.protectorsUsed === 0);
+
+const deSobra = computeStreakUpdate('2026-08-25', 4, 5, '2026-08-27');
+check4('con protectores de sobra solo se gasta lo que hace falta', deSobra.protectorsUsed === 1);
+check4('y la racha sigue', deSobra.streak === 5);
+
 const seguido = computeStreakUpdate('2026-08-26', 4, 2, '2026-08-27');
 check4('un día seguido no gasta nada', seguido.protectorsUsed === 0 && seguido.missed === 0);
+
+// The calendar has to show exactly the days that were paid for.
+reset({ streak: 4, lastActiveDate: '2026-08-23', streakProtectors: 2 });
+store.completeReview();
+const tras = useUserStore.getState();
+check4('quedas sin protectores', tras.streakProtectors === 0, `${tras.streakProtectors}`);
+check4(
+  'y solo se congelan los días que cubrieron',
+  tras.frozenDates.length === 2,
+  `congelados: ${tras.frozenDates.join(', ')}`
+);
+check4('los dos primeros del hueco, no los últimos', tras.frozenDates.includes('2026-08-24') && tras.frozenDates.includes('2026-08-25'));
+check4('el día que rompió la racha no sale congelado', !tras.frozenDates.includes('2026-08-26'));
 
 // And the store writes down why, so the panel can say it once.
 reset({ streak: 6, lastActiveDate: '2026-08-23', streakProtectors: 2 });
@@ -290,6 +313,7 @@ const loss = useUserStore.getState().lastStreakLoss;
 check4('la racha rota queda anotada', !!loss, 'no se anotó nada');
 check4('con la racha que había', loss?.streak === 6, `${loss?.streak}`);
 check4('y con los protectores que tenías', loss?.protectors === 2, `${loss?.protectors}`);
+check4('y con los que se gastaron', loss?.used === 2, `${loss?.used}`);
 
 // A streak that survives must not leave a note claiming it broke.
 reset({ streak: 3, lastActiveDate: todayLocal(-1), streakProtectors: 0 });

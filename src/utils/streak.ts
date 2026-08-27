@@ -71,18 +71,24 @@ export function computeStreakUpdate(
     return { streak: currentStreak + 1, lastActiveDate: today, protectorsUsed: 0, missed: 0 };
   }
 
-  const missed = gap - 1;
-  if (missed > 0 && missed <= protectors) {
-    return { streak: currentStreak + 1, lastActiveDate: today, protectorsUsed: missed, missed };
-  }
   /*
-   * Not enough protectors, so none are spent.
+   * One protector per missed day, spent as those days go by.
    *
-   * Two protectors against three missed days can't save the streak, and
-   * burning them anyway would leave you with nothing and no streak — the
-   * worst of both. They stay for a gap they can actually cover.
+   * They're spent even when they can't cover the whole gap. Holding them back
+   * kept them safe, but from the outside it looked like they had never
+   * existed: the streak vanished, the protectors sat untouched, and the
+   * calendar showed nothing. Now they cover the days they can, those days
+   * show frozen, and running out is something you watch happen.
    */
-  return { streak: 1, lastActiveDate: today, protectorsUsed: 0, missed };
+  const missed = gap - 1;
+  const protectorsUsed = Math.min(missed, Math.max(0, protectors));
+
+  return {
+    streak: protectorsUsed === missed ? currentStreak + 1 : 1,
+    lastActiveDate: today,
+    protectorsUsed,
+    missed,
+  };
 }
 
 /**

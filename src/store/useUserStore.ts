@@ -80,7 +80,15 @@ interface UserState {
    * explain it once. Local — it's an explanation of this device's history,
    * not progress.
    */
-  lastStreakLoss: { date: string; streak: number; missed: number; protectors: number } | null;
+  lastStreakLoss: {
+    date: string;
+    streak: number;
+    missed: number;
+    /** Protectors held when the gap started. */
+    protectors: number;
+    /** How many of them the gap ate before the streak broke. */
+    used: number;
+  } | null;
   /**
    * Lessons finished since the Ultra pitch was last shown.
    *
@@ -190,6 +198,23 @@ export const MAX_PROTECTORS = 2;
 export const LESSON_PROTECTOR_GIFT_EVERY = 3;
 
 /**
+ * The days a protector actually covered, in order.
+ *
+ * Not the whole gap: when the protectors run out mid-gap they pay for the
+ * first days and the streak breaks on the first one they couldn't reach. Only
+ * the paid-for days turn blue, so the calendar shows exactly where the cover
+ * ran out.
+ */
+function coveredDays(
+  lastActiveDate: string | null,
+  today: string,
+  protectorsUsed: number
+): string[] {
+  if (!lastActiveDate || protectorsUsed <= 0) return [];
+  return datesBetween(lastActiveDate, today).slice(0, protectorsUsed);
+}
+
+/**
  * Notes a broken streak, and only a broken one.
  *
  * A streak that survives — or one that was never running — leaves whatever was
@@ -200,11 +225,18 @@ function recordLoss(
   s: { streak: number; streakProtectors: number; lastStreakLoss: UserState['lastStreakLoss'] },
   newStreak: number,
   missed: number,
+  protectorsUsed: number,
   today: string
 ): UserState['lastStreakLoss'] {
   const broke = missed > 0 && newStreak === 1 && s.streak > 1;
   if (!broke) return s.lastStreakLoss;
-  return { date: today, streak: s.streak, missed, protectors: s.streakProtectors };
+  return {
+    date: today,
+    streak: s.streak,
+    missed,
+    protectors: s.streakProtectors,
+    used: protectorsUsed,
+  };
 }
 
 /** The streak's day, in the player's timezone — see localDayKey. */
@@ -320,10 +352,9 @@ export const useUserStore = create<UserState>()(
           s.streakProtectors,
           today
         );
-        const frozenDates =
-          protectorsUsed > 0 && s.lastActiveDate
-            ? [...new Set([...s.frozenDates, ...datesBetween(s.lastActiveDate, today)])]
-            : s.frozenDates;
+        const frozenDates = [
+          ...new Set([...s.frozenDates, ...coveredDays(s.lastActiveDate, today, protectorsUsed)]),
+        ];
         set({
           streak,
           lastActiveDate,
@@ -331,7 +362,7 @@ export const useUserStore = create<UserState>()(
           // Deduped: two repasos in one day are one day on the calendar.
           reviewDates: [...new Set([...s.reviewDates, today])],
           streakProtectors: s.streakProtectors - protectorsUsed,
-          lastStreakLoss: recordLoss(s, streak, missed, today),
+          lastStreakLoss: recordLoss(s, streak, missed, protectorsUsed, today),
         });
       },
 
@@ -368,10 +399,9 @@ export const useUserStore = create<UserState>()(
         );
         // The exact days a protector bridged, so the calendar can mark them
         // "congelado" instead of leaving a gap that looks like a broken streak.
-        const frozenDates =
-          protectorsUsed > 0 && s.lastActiveDate
-            ? [...new Set([...s.frozenDates, ...datesBetween(s.lastActiveDate, today)])]
-            : s.frozenDates;
+        const frozenDates = [
+          ...new Set([...s.frozenDates, ...coveredDays(s.lastActiveDate, today, protectorsUsed)]),
+        ];
         const isNewCompletion = !s.completedLessonIds.includes(attempt.lessonId);
         const completedLessonIds = isNewCompletion
           ? [...s.completedLessonIds, attempt.lessonId]
@@ -409,7 +439,7 @@ export const useUserStore = create<UserState>()(
           // Counts every lesson, repeats included: the pitch paces itself on
           // time spent in lessons, not on new ground covered.
           lessonsSincePitch: s.lessonsSincePitch + 1,
-          lastStreakLoss: recordLoss(s, streak, missed, today),
+          lastStreakLoss: recordLoss(s, streak, missed, protectorsUsed, today),
         });
 
         return gifted;
