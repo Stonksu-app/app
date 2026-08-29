@@ -7,6 +7,7 @@ import Icon from '../components/Icon';
 import AdSlot from '../components/AdSlot';
 import { Button } from '../components/Button';
 import { SKILL_TREE } from '../data/lessons';
+import { buildStage } from '../utils/buildActivityStream';
 import { TERM_MASTERY_GOAL, useUserStore } from '../store/useUserStore';
 import type { Flashcard } from '../types';
 
@@ -44,7 +45,12 @@ export default function Guide() {
         const stage = getNodeStage(node.id);
         const maxStage = getNodeMaxStage(node.id);
         const shown = revealedCount(cards.length, stage, maxStage);
-        return { node, cards, stage, maxStage, shown, locked: cards.length - shown };
+        // What the next unfinished stage will teach, so a topic can be
+        // previewed before it's started — the same terms its lesson intro
+        // shows, just reachable ahead of time instead of once in passing.
+        // The final stage is pure review (no new terms), so nothing to preview there.
+        const preview = stage < maxStage ? buildStage(node, [], stage, maxStage).flashcards : [];
+        return { node, cards, stage, maxStage, shown, locked: cards.length - shown, preview };
       }),
     // nodeStageProgress keeps this fresh; the store getters have stable identities.
     [isNodeUnlocked, getNodeStage, getNodeMaxStage, nodeStageProgress]
@@ -113,7 +119,7 @@ export default function Guide() {
 
           <AdSlot className="mt-4" />
 
-          {ordered.map(({ node, cards, stage, maxStage, shown, locked }) => (
+          {ordered.map(({ node, cards, stage, maxStage, shown, locked, preview }) => (
             <section key={node.id} className="mt-8">
               <div className="flex items-center gap-2">
                 <Icon name={node.icon} size={20} className="text-lime-500" />
@@ -190,6 +196,29 @@ export default function Guide() {
                   <Icon name="lock" size={13} />
                   {locked} {locked === 1 ? 'término más' : 'términos más'} al avanzar de etapa
                 </p>
+              )}
+
+              {/* A preview, not a reveal: same tap-to-see-the-definition tiles
+                  as the unlocked ones, but dashed and dim so "coming up" never
+                  reads as "already yours" — that distinction is the point of
+                  the grid above. */}
+              {preview.length > 0 && (
+                <div className="mt-4">
+                  <p className="flex items-center gap-1.5 text-[11px] font-black text-carbon-500 uppercase tracking-wide">
+                    <Icon name="lock" size={12} /> Se viene en la etapa {stage + 1}
+                  </p>
+                  <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    {preview.map((card) => (
+                      <button
+                        key={card.id}
+                        onClick={() => setOpen(card)}
+                        className="rounded-2xl border-2 border-dashed border-carbon-700 px-3 pt-3 pb-2.5 text-left text-carbon-400 hover:border-carbon-600 hover:text-carbon-200 transition"
+                      >
+                        <span className="block text-[15px] font-black leading-tight">{card.term}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </section>
           ))}
