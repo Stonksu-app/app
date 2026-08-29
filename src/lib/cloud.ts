@@ -40,6 +40,8 @@ export interface CloudState {
   avatar: MascotLook;
   virtualBalance: number;
   attempts: LessonAttempt[];
+  frozenDates: string[];
+  reviewDates: string[];
 }
 
 export interface ProfileRow {
@@ -66,6 +68,8 @@ export interface ProfileRow {
   plan_started_at: string | null;
   avatar: MascotLook;
   virtual_balance: number | string;
+  frozen_dates: string[];
+  review_dates: string[];
 }
 
 /** Exported so scripts/check-cloud.ts can prove the mapping is lossless. */
@@ -95,6 +99,8 @@ export function toRow(s: CloudState, id: string) {
     plan_started_at: s.planStartedAt,
     avatar: s.avatar,
     virtual_balance: s.virtualBalance,
+    frozen_dates: s.frozenDates,
+    review_dates: s.reviewDates,
   };
 }
 
@@ -127,6 +133,9 @@ export function fromRow(row: ProfileRow, attempts: LessonAttempt[]): CloudState 
     // numeric(14,2) comes back as a string from PostgREST to avoid float drift.
     virtualBalance: Number(row.virtual_balance),
     attempts,
+    // A profile written before the columns existed comes back null, not [].
+    frozenDates: row.frozen_dates ?? [],
+    reviewDates: row.review_dates ?? [],
   };
 }
 
@@ -135,7 +144,7 @@ const PROFILE_COLUMNS =
   'last_active_date, streak_protectors, completed_lesson_ids, unlocked_badge_ids, ' +
   'seen_intro_node_ids, opened_chest_ids, claimed_mission_ids, unlocked_accessories, ' +
   'pending_mistakes, node_stage_progress, term_mastery, plan, plan_started_at, avatar, ' +
-  'virtual_balance';
+  'virtual_balance, frozen_dates, review_dates';
 
 /**
  * Signs in, creating an anonymous account on first launch.

@@ -31,9 +31,10 @@ interface UserState {
   streak: number;
   lastActiveDate: string | null;
   /** Calendar dates (YYYY-MM-DD, UTC) a streak protector covered so the streak
-   *  page can mark them "congelado" instead of a plain gap. Kept off the
-   *  cloud on purpose — it's cosmetic history for this device's calendar, not
-   *  something worth a schema change to sync. */
+   *  page can mark them "congelado" instead of a plain gap. Synced — it used
+   *  to be device-local, but that meant a reinstall recovered the streak and
+   *  its protectors from the cloud and silently lost which days had earned
+   *  them, leaving the calendar blank where it should show blue. */
   frozenDates: string[];
   completedLessonIds: string[];
   unlockedBadgeIds: string[];
@@ -69,8 +70,8 @@ interface UserState {
    * reviewing keeps the streak alive and still shows up as an empty square —
    * the calendar contradicting the number above it.
    *
-   * Local, for the same reason as frozenDates: it annotates this device's
-   * calendar rather than being progress in its own right.
+   * Synced, for the same reason as frozenDates: it's a fact about the
+   * calendar, not a device preference.
    */
   reviewDates: string[];
   /**

@@ -68,6 +68,8 @@ const sample: CloudState = {
       totalQuestions: 7,
     },
   ],
+  frozenDates: ['2026-08-15', '2026-08-16'],
+  reviewDates: ['2026-08-17'],
 };
 
 // ------------------------------------------------- the mapping is lossless
@@ -107,26 +109,29 @@ const cloudKeys = new Set(Object.keys(sample));
  *
  * - testMode: a debugging switch, not progress.
  * - reminder*: the notification permission behind them is granted per device.
- * - frozenDates, reviewDates: cosmetic annotations on this device's streak
- *   calendar.
  * - lastStreakLoss: an explanation of what happened on this device, not
  *   progress. Syncing it would mean explaining a phone's lost streak on a
  *   laptop that never saw it.
  * - practice*: a daily rate limit, not progress. Syncing a counter that
  *   resets at midnight would need columns and a timezone argument, and the
  *   worst it buys is one extra round of revision.
+ *
+ * frozenDates and reviewDates used to be here too, kept local so a laptop
+ * never showed a frozen day for a gap it never lived through. That also
+ * meant a reinstall recovered the streak number and the protector count
+ * from the cloud but silently lost which days had earned them — the
+ * calendar going blank where it should have shown blue. They're progress,
+ * the same as the streak they explain, so they're synced now.
  */
 const LOCAL_ONLY = new Set([
   'testMode',
   'practiceDay',
   'practiceRoundsToday',
   'lessonsSincePitch',
-  'reviewDates',
   'lastStreakLoss',
   'reminderEnabled',
   'reminderHour',
   'heartsReminderEnabled',
-  'frozenDates',
 ]);
 
 for (const key of persistedKeys) {

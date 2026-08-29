@@ -50,6 +50,8 @@ function snapshot(): CloudState {
     avatar: s.avatar,
     virtualBalance: s.virtualBalance,
     attempts: s.attempts,
+    frozenDates: s.frozenDates,
+    reviewDates: s.reviewDates,
   };
 }
 
