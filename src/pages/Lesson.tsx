@@ -19,6 +19,7 @@ import { canPlayUltraLessons } from '../data/plans';
 import { useComboFeedback } from '../hooks/useComboFeedback';
 import { useUserStore } from '../store/useUserStore';
 import { buildStage, mistakeKey } from '../utils/buildActivityStream';
+import { shuffle } from '../utils/shuffle';
 import type { Activity, IconName } from '../types';
 
 const XP_PER_CORRECT = 10;
@@ -98,6 +99,15 @@ export default function Lesson() {
   const [mascotLine, setMascotLine] = useState('');
   const [showOutOfHearts, setShowOutOfHearts] = useState(false);
   const [enteredWithNoHearts] = useState(() => hearts <= 0);
+
+  // A fixed answer position is a position to memorise instead of a question
+  // to answer. Shuffled once per question, not on every render, so picking
+  // an option doesn't reorder it out from under the tap.
+  const currentActivity = activities[index];
+  const shuffledOptions = useMemo(
+    () => (currentActivity?.type === 'quiz' ? shuffle(currentActivity.question.options) : []),
+    [currentActivity]
+  );
 
   // Above the early returns below, and it has to stay there: those returns
   // skip everything after them, so a hook placed lower is called on some
@@ -319,7 +329,7 @@ export default function Lesson() {
             )}
 
             <div className="mt-6 grid grid-cols-1 gap-3">
-              {activity.question.options.map((opt) => {
+              {shuffledOptions.map((opt) => {
                 const isSelected = selectedId === opt.id;
                 const showCorrect = checked && opt.id === activity.question.correctOptionId;
                 const showIncorrect = checked && isSelected && opt.id !== activity.question.correctOptionId;

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import type { SortClassifyGame as SortClassifyGameType } from '../types';
+import { shuffle } from '../utils/shuffle';
 import { Button } from './Button';
 import Icon from './Icon';
 
@@ -21,6 +22,12 @@ export default function SortClassifyGame({
   const [placed, setPlaced] = useState<Record<string, 'a' | 'b'>>({});
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [wrongItem, setWrongItem] = useState<string | null>(null);
+  // Shuffled once at mount, not on every render: the authored order is a
+  // fixed pattern (usually alternating buckets), so replaying the same round
+  // meant the answer was the position, not the item. Fixed here rather than
+  // re-shuffling `items` on every placement, which would send the remaining
+  // chips jumping around mid-game.
+  const [order] = useState(() => shuffle(items));
 
   /*
    * Dragging, alongside the tap-then-tap that was already here.
@@ -46,7 +53,7 @@ export default function SortClassifyGame({
     return null;
   };
 
-  const remaining = items.filter((i) => !placed[i.id]);
+  const remaining = order.filter((i) => !placed[i.id]);
   const allDone = remaining.length === 0;
 
   const handlePlace = (bucket: 'a' | 'b', itemId = selectedItem) => {

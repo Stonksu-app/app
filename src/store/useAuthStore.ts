@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Session } from '@supabase/supabase-js';
+import type { Session, User } from '@supabase/supabase-js';
 import { isCloudEnabled, supabase } from '../lib/supabase';
 import type { ProviderId } from '../lib/providers';
 import { authRedirectUrl, isNative, listenForAuthCallback, openAuthUrl } from '../lib/nativeAuth';
@@ -53,15 +53,12 @@ interface AuthState {
   clearError: () => void;
 }
 
-function applySession(session: Session | null): Partial<AuthState> {
-  if (!session) return { status: 'loading', email: null, pendingEmail: null };
-  const user = session.user;
-
-  // Three independent signals rather than trusting is_anonymous alone. The
-  // claim lives in the JWT, so it can lag a freshly linked identity until the
-  // token is refreshed — and a stale "still anonymous" would keep nagging
-  // someone who has just finished signing up, which is the worst moment to
-  // get it wrong. A linked provider or a confirmed address is proof enough.
+// Three independent signals rather than trusting is_anonymous alone. The
+// claim lives in the JWT, so it can lag a freshly linked identity until the
+// token is refreshed — and a stale "still anonymous" would keep nagging
+// someone who has just finished signing up, which is the worst moment to
+// get it wrong. A linked provider or a confirmed address is proof enough.
+function applyUser(user: User): Partial<AuthState> {
   const hasProvider = (user.identities ?? []).some((i) => i.provider !== 'anonymous');
   const hasConfirmedEmail = Boolean(user.email && user.email_confirmed_at);
   const registered = user.is_anonymous === false || hasProvider || hasConfirmedEmail;
@@ -71,6 +68,11 @@ function applySession(session: Session | null): Partial<AuthState> {
     email: user.email || null,
     pendingEmail: user.new_email || null,
   };
+}
+
+function applySession(session: Session | null): Partial<AuthState> {
+  if (!session) return { status: 'loading', email: null, pendingEmail: null };
+  return applyUser(session.user);
 }
 
 /**
@@ -163,6 +165,37 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       if (!session && event !== 'SIGNED_OUT') return;
       set(applySession(session));
     });
+
+    /*
+     * The confirmation link is clicked on a phone; this tab never touches it.
+     *
+     * onAuthStateChange above only fires from something happening in *this*
+     * browser session, so confirming the address on another device changes
+     * the row in auth.users without this tab having any reason to know —
+     * the "confirma tu correo" banner stayed up until something forced a
+     * fresh read, which clearing site data does by accident. getUser()
+     * (unlike getSession()) always asks the server, so it's the one call
+     * that can actually notice. Only worth making while there's a
+     * confirmation to wait for, and run on whatever might mean the tab is
+     * back from doing exactly that — regaining focus, becoming visible again,
+     * or (since neither fires when the tab was never left, only switched away
+     * from at the OS level and back) a slow poll that stops once resolved.
+     */
+    const recheckUser = () => {
+      if (!supabase || get().status === 'registered' || !get().pendingEmail) return;
+      void supabase.auth.getUser().then(({ data, error }) => {
+        if (!error && data.user) set(applyUser(data.user));
+      });
+    };
+    window.addEventListener('focus', recheckUser);
+    document.addEventListener('visibilitychange', recheckUser);
+    const pollId = setInterval(() => {
+      if (get().status === 'registered') {
+        clearInterval(pollId);
+        return;
+      }
+      recheckUser();
+    }, 20_000);
   },
 
   /**
