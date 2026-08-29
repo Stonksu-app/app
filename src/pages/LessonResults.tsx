@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import ResultsScreen from '../components/ResultsScreen';
+import ProtectorCelebration from '../components/ProtectorCelebration';
 import { BADGES } from '../data/badges';
 import { useUserStore } from '../store/useUserStore';
 
@@ -21,6 +22,9 @@ export default function LessonResults() {
   const navigate = useNavigate();
   const state = location.state as ResultsState | null;
   const { shouldPitchUltra, markUltraPitched } = useUserStore();
+  // Its own beat before the results screen, not a line competing with XP and
+  // badges for attention — shown once, then out of the way for good.
+  const [showProtector, setShowProtector] = useState(() => !!state?.protectorGifted);
 
   useEffect(() => {
     if (!state) navigate('/home', { replace: true });
@@ -28,8 +32,12 @@ export default function LessonResults() {
 
   if (!state) return null;
 
-  const { nodeTitle, newBadgeIds, stage, maxStage, protectorGifted, correctCount, totalQuestions } =
-    state;
+  const { nodeTitle, newBadgeIds, stage, maxStage, correctCount, totalQuestions } = state;
+
+  if (showProtector) {
+    return <ProtectorCelebration onContinue={() => setShowProtector(false)} />;
+  }
+
   const perfect = correctCount === totalQuestions;
   const earnedBadges = BADGES.filter((b) => newBadgeIds?.includes(b.id));
   const justPlatinumed = maxStage > 0 && stage >= maxStage;
@@ -74,15 +82,6 @@ export default function LessonResults() {
               </p>
             </>
           )}
-        </div>
-      )}
-
-      {protectorGifted && (
-        <div className="mt-5 pt-4 border-t border-carbon-800 animate-pop-in">
-          <div className="flex items-center justify-center gap-1.5 bg-sky-500/10 border border-sky-500/30 rounded-full px-3 py-1.5 mx-auto w-fit">
-            <Icon name="shield" size={16} className="text-sky-400" />
-            <span className="text-xs font-extrabold text-carbon-100">¡Protector de racha gratis!</span>
-          </div>
         </div>
       )}
 
