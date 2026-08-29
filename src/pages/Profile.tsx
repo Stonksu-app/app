@@ -65,6 +65,10 @@ export default function Profile() {
     avatar,
     plan,
     resetProgress,
+    testMode,
+    lastActiveDate,
+    streakProtectors,
+    debugRewindLastActiveDate,
   } = useUserStore();
   const { level } = xpToLevel(xp);
   const authStatus = useAuthStore((s) => s.status);
@@ -206,6 +210,33 @@ export default function Profile() {
           >
             Cerrar sesión
           </button>
+
+          {/* Test-mode only: rewinds lastActiveDate a day at a time so the
+              streak checks that normally wait for real days to pass can be
+              exercised on demand — no need to actually skip practicing. */}
+          {testMode && (
+            <div className="mt-6 rounded-2xl border-2 border-dashed border-carbon-700 p-3">
+              <p className="text-[11px] font-black text-carbon-400 uppercase tracking-wide">
+                Modo prueba — racha
+              </p>
+              <p className="text-xs text-carbon-500 mt-1 tabular-nums">
+                Último día activo: {lastActiveDate ?? '—'} · protectores: {streakProtectors}
+              </p>
+              <button
+                onClick={() => debugRewindLastActiveDate()}
+                className="mt-2 text-xs font-black text-[#FFC93C] hover:text-[#ffd873]"
+              >
+                Simular un día sin practicar
+              </button>
+              <p className="text-[11px] text-carbon-600 mt-1">
+                Cada toque adelanta el hueco un día. Pasado lo que cubren tus
+                protectores, la racha debería bajar sola a 0 en cuanto la
+                pantalla lo detecte (sin hacer nada más). Dentro de lo que
+                cubren, hacer una lección debería mantenerla y pintar el día
+                de azul.
+              </p>
+            </div>
+          )}
 
           {/* Settles "is the new build actually on my phone?" without guesswork,
               which a sideloaded .ipa otherwise gives you no way to answer. */}

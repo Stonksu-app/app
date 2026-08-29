@@ -11,6 +11,7 @@ import {
   daysBetween,
   isStreakUnrecoverable,
   localDayKey,
+  shiftDay,
   streakFromHistory,
   todayLocal,
 } from '../utils/streak';
@@ -185,6 +186,14 @@ interface UserState {
   isAccessoryUnlocked: (style: AccessoryStyle) => boolean;
   setReminder: (patch: { enabled?: boolean; hour?: number }) => void;
   setHeartsReminder: (enabled: boolean) => void;
+  /**
+   * Test-mode only: pretends the last active day was one earlier, so the
+   * streak checks that normally wait for a real day to pass — settleStreak,
+   * and computeStreakUpdate inside the next lesson — can be exercised on
+   * demand instead. Touches nothing else: coins, protectors and frozenDates
+   * only change once one of those actually runs.
+   */
+  debugRewindLastActiveDate: () => void;
   resetProgress: () => void;
 }
 
@@ -422,6 +431,9 @@ export const useUserStore = create<UserState>()(
           lastStreakLoss: recordLoss(s, 0, missed, protectorsUsed, today),
         });
       },
+
+      debugRewindLastActiveDate: () =>
+        set((s) => (s.lastActiveDate ? { lastActiveDate: shiftDay(s.lastActiveDate, -1) } : s)),
 
       completeLesson: (attempt) => {
         const s = get();
