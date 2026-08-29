@@ -7,7 +7,6 @@ import Icon from '../components/Icon';
 import AdSlot from '../components/AdSlot';
 import { Button } from '../components/Button';
 import { SKILL_TREE } from '../data/lessons';
-import { buildStage } from '../utils/buildActivityStream';
 import { TERM_MASTERY_GOAL, useUserStore } from '../store/useUserStore';
 import type { Flashcard } from '../types';
 
@@ -45,12 +44,7 @@ export default function Guide() {
         const stage = getNodeStage(node.id);
         const maxStage = getNodeMaxStage(node.id);
         const shown = revealedCount(cards.length, stage, maxStage);
-        // What the next unfinished stage will teach, so a topic can be
-        // previewed before it's started — read, not played, the way an
-        // explanation works rather than a deck of cards to tap through.
-        // The final stage is pure review (no new terms), so nothing to preview there.
-        const preview = stage < maxStage ? buildStage(node, [], stage, maxStage).explanation : '';
-        return { node, cards, stage, maxStage, shown, locked: cards.length - shown, preview };
+        return { node, cards, stage, maxStage, shown, locked: cards.length - shown };
       }),
     // nodeStageProgress keeps this fresh; the store getters have stable identities.
     [isNodeUnlocked, getNodeStage, getNodeMaxStage, nodeStageProgress]
@@ -119,7 +113,7 @@ export default function Guide() {
 
           <AdSlot className="mt-4" />
 
-          {ordered.map(({ node, cards, stage, maxStage, shown, locked, preview }) => (
+          {ordered.map(({ node, cards, stage, maxStage, shown, locked }) => (
             <section key={node.id} className="mt-8">
               <div className="flex items-center gap-2">
                 <Icon name={node.icon} size={20} className="text-lime-500" />
@@ -130,9 +124,16 @@ export default function Guide() {
               </div>
 
               {shown === 0 ? (
-                <p className="mt-3 text-sm text-carbon-500 bg-carbon-850 border-2 border-carbon-800 rounded-2xl px-4 py-4">
-                  Completa una etapa de este tema para desbloquear sus términos.
-                </p>
+                <>
+                  <p className="mt-3 text-sm text-carbon-500 bg-carbon-850 border-2 border-carbon-800 rounded-2xl px-4 py-4">
+                    Completa una etapa de este tema para desbloquear sus términos.
+                  </p>
+                  <div className="mt-3 w-[200px]">
+                    <Button size="sm" variant="secondary" onClick={() => navigate(`/guia/leer?tema=${node.id}`)}>
+                      Leer tema
+                    </Button>
+                  </div>
+                </>
               ) : (
                 <>
                   <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -179,13 +180,22 @@ export default function Guide() {
                     })}
                   </div>
 
-                  <div className="mt-3 w-[200px]">
+                  <div className="mt-3 flex gap-2.5">
                     <Button
                       size="sm"
+                      fullWidth={false}
                       variant="secondary"
                       onClick={() => navigate(`/guia/repaso?tema=${node.id}`)}
                     >
                       Repasar este tema
+                    </Button>
+                    <Button
+                      size="sm"
+                      fullWidth={false}
+                      variant="secondary"
+                      onClick={() => navigate(`/guia/leer?tema=${node.id}`)}
+                    >
+                      Leer tema
                     </Button>
                   </div>
                 </>
@@ -196,18 +206,6 @@ export default function Guide() {
                   <Icon name="lock" size={13} />
                   {locked} {locked === 1 ? 'término más' : 'términos más'} al avanzar de etapa
                 </p>
-              )}
-
-              {/* A preview to read, not a deck to tap through: an actual
-                  explanation of what the next stage covers, in the same
-                  quiet, dashed style as anything not yours yet. */}
-              {preview && (
-                <div className="mt-4 rounded-2xl border-2 border-dashed border-carbon-700 px-4 py-3.5">
-                  <p className="flex items-center gap-1.5 text-[11px] font-black text-carbon-500 uppercase tracking-wide">
-                    <Icon name="lock" size={12} /> Se viene en la etapa {stage + 1}
-                  </p>
-                  <p className="mt-2 text-[15px] text-carbon-300 leading-snug">{preview}</p>
-                </div>
               )}
             </section>
           ))}

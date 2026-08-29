@@ -4,6 +4,7 @@ import SplashScreen from './components/SplashScreen';
 import Landing from './pages/Landing';
 import Guide from './pages/Guide';
 import GuidePractice from './pages/GuidePractice';
+import GuideRead from './pages/GuideRead';
 import Premium from './pages/Premium';
 import UltraPitch from './pages/UltraPitch';
 import Shop from './pages/Shop';
@@ -134,6 +135,14 @@ function App() {
         element={
           <RequireOnboarded>
             <GuidePractice />
+          </RequireOnboarded>
+        }
+      />
+      <Route
+        path="/guia/leer"
+        element={
+          <RequireOnboarded>
+            <GuideRead />
           </RequireOnboarded>
         }
       />
