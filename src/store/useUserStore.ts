@@ -157,8 +157,9 @@ interface UserState {
   isNodeUnlocked: (nodeId: string) => boolean;
   isLessonCompleted: (lessonId: string) => boolean;
   unlockBadge: (badgeId: string) => void;
-  hasSeenIntro: (nodeId: string) => boolean;
-  markIntroSeen: (nodeId: string) => void;
+  /** Keyed by introKey(nodeId, stage) — each teaching stage has its own intro. */
+  hasSeenIntro: (key: string) => boolean;
+  markIntroSeen: (key: string) => void;
   getNodeStage: (nodeId: string) => number;
   getNodeMaxStage: (nodeId: string) => number;
   isNodePlatinum: (nodeId: string) => boolean;
@@ -515,11 +516,11 @@ export const useUserStore = create<UserState>()(
             : { unlockedBadgeIds: [...s.unlockedBadgeIds, badgeId] }
         ),
 
-      hasSeenIntro: (nodeId) => get().seenIntroNodeIds.includes(nodeId),
+      hasSeenIntro: (key) => get().seenIntroNodeIds.includes(key),
 
-      markIntroSeen: (nodeId) =>
+      markIntroSeen: (key) =>
         set((s) =>
-          s.seenIntroNodeIds.includes(nodeId) ? s : { seenIntroNodeIds: [...s.seenIntroNodeIds, nodeId] }
+          s.seenIntroNodeIds.includes(key) ? s : { seenIntroNodeIds: [...s.seenIntroNodeIds, key] }
         ),
 
       getNodeStage: (nodeId) => get().nodeStageProgress[nodeId] ?? 0,

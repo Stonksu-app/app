@@ -14,6 +14,7 @@ import StatPanel, { type StatKey } from '../components/StatPanels';
 import { CHEST_REWARD, useUserStore, xpToLevel } from '../store/useUserStore';
 import { canPlayUltraLessons, hasUnlimitedHearts } from '../data/plans';
 import { practisedToday } from '../utils/streak';
+import { introKey } from '../utils/mastery';
 import type { IconName, SkillNode } from '../types';
 
 /* Three-column learn layout, in the shape Duolingo uses: nav rail on the left,
@@ -816,7 +817,8 @@ export default function Home() {
                   <Button
                     onClick={() => {
                       const lessonId = selected.lessons[0].id;
-                      const needsIntro = !!selected.intro && !hasSeenIntro(selected.id);
+                      const needsIntro =
+                        !!selected.intro && !hasSeenIntro(introKey(selected.id, getNodeStage(selected.id)));
                       navigate(needsIntro ? `/lesson/${lessonId}/intro` : `/lesson/${lessonId}`);
                     }}
                   >
