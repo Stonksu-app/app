@@ -65,7 +65,6 @@ export default function Profile() {
     avatar,
     plan,
     resetProgress,
-    testMode,
     lastActiveDate,
     streakProtectors,
     debugRewindLastActiveDate,
@@ -211,10 +210,11 @@ export default function Profile() {
             Cerrar sesión
           </button>
 
-          {/* Test-mode only: rewinds lastActiveDate a day at a time so the
+          {/* Dev builds only: rewinds lastActiveDate a day at a time so the
               streak checks that normally wait for real days to pass can be
-              exercised on demand — no need to actually skip practicing. */}
-          {testMode && (
+              exercised on demand — no need to actually skip practicing, and
+              no need to re-run onboarding as "test" just to see it. */}
+          {appEnv === 'dev' && (
             <div className="mt-6 rounded-2xl border-2 border-dashed border-carbon-700 p-3">
               <p className="text-[11px] font-black text-carbon-400 uppercase tracking-wide">
                 Modo prueba — racha
