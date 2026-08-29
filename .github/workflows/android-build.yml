@@ -57,6 +57,19 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
+      # Gradle's debug signing config reads ~/.android/debug.keystore, which
+      # a fresh runner otherwise generates fresh every run — a different
+      # random key each time. Android refuses to install a debug APK signed
+      # by a different key over one already on the phone ("app not installed"
+      # or a silent no-op depending on the installer), so every build looked
+      # like a fresh app rather than an update, and testing an old build
+      # while believing it was the new one was the easy way to not notice.
+      - name: Restore (or start) a stable debug keystore
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore-v1
+
       - name: Install dependencies
         run: npm ci
 

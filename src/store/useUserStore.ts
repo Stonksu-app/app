@@ -444,14 +444,25 @@ export const useUserStore = create<UserState>()(
       addXp: (amount) => {
         const s = get();
         const today = todayStr();
-        const daily = rollDailyStats(s, today);
-        const levelUp = computeLevelUp(s.xp, s.xp + amount, s.streakProtectors);
+        let levelUp: LevelUpInfo | null = null;
+        let daily: DailyMissionInput & { dailyStatsDate: string } = {
+          dailyStatsDate: today,
+          dailyXp: s.dailyStatsDate === today ? s.dailyXp : 0,
+          dailyLessons: s.dailyStatsDate === today ? s.dailyLessons : 0,
+          dailyPerfectLessons: s.dailyStatsDate === today ? s.dailyPerfectLessons : 0,
+          dailyCorrect: s.dailyStatsDate === today ? s.dailyCorrect : 0,
+          dailyReviews: s.dailyStatsDate === today ? s.dailyReviews : 0,
+        };
+        try {
+          levelUp = computeLevelUp(s.xp, s.xp + amount, s.streakProtectors);
+          daily = rollDailyStats(s, today);
+        } catch (err) {
+          console.error('[addXp] level-up/daily-mission bonus failed, paying the XP without it:', err);
+        }
         set({
           xp: s.xp + amount,
           coins: s.coins + (levelUp?.coins ?? 0),
-          streakProtectors: levelUp
-            ? Math.min(MAX_PROTECTORS, s.streakProtectors + levelUp.protectors)
-            : s.streakProtectors,
+          streakProtectors: s.streakProtectors + (levelUp?.protectors ?? 0),
           ...daily,
           dailyXp: daily.dailyXp + amount,
         });
@@ -575,11 +586,29 @@ export const useUserStore = create<UserState>()(
           completedLessonIds.length % LESSON_PROTECTOR_GIFT_EVERY === 0 &&
           streakProtectorsAfterUse < MAX_PROTECTORS;
         const protectorsAfterGift = gifted ? streakProtectorsAfterUse + 1 : streakProtectorsAfterUse;
-        const levelUp = computeLevelUp(s.xp, s.xp + attempt.xpEarned, protectorsAfterGift);
-        const streakProtectors = protectorsAfterGift + (levelUp?.protectors ?? 0);
 
+        // Levels and daily missions are new, additive rewards layered on top
+        // of a lesson that already, always, has to pay out XP, coins and
+        // stage progress — the part that worked before either existed. Kept
+        // behind its own try so a bug in the new arithmetic can degrade to
+        // "no bonus this time" instead of silently cancelling the lesson.
+        let levelUp: LevelUpInfo | null = null;
+        let daily: DailyMissionInput & { dailyStatsDate: string } = {
+          dailyStatsDate: today,
+          dailyXp: s.dailyStatsDate === today ? s.dailyXp : 0,
+          dailyLessons: s.dailyStatsDate === today ? s.dailyLessons : 0,
+          dailyPerfectLessons: s.dailyStatsDate === today ? s.dailyPerfectLessons : 0,
+          dailyCorrect: s.dailyStatsDate === today ? s.dailyCorrect : 0,
+          dailyReviews: s.dailyStatsDate === today ? s.dailyReviews : 0,
+        };
+        try {
+          levelUp = computeLevelUp(s.xp, s.xp + attempt.xpEarned, protectorsAfterGift);
+          daily = rollDailyStats(s, today);
+        } catch (err) {
+          console.error('[completeLesson] level-up/daily-mission bonus failed, paying the lesson without it:', err);
+        }
+        const streakProtectors = protectorsAfterGift + (levelUp?.protectors ?? 0);
         const isPerfect = attempt.totalQuestions > 0 && attempt.correctCount === attempt.totalQuestions;
-        const daily = rollDailyStats(s, today);
 
         set({
           xp: s.xp + attempt.xpEarned,
@@ -711,9 +740,22 @@ export const useUserStore = create<UserState>()(
         // so it always tops up a protector (still capped at MAX_PROTECTORS).
         const gifted = s.streakProtectors < MAX_PROTECTORS;
         const protectorsAfterGift = gifted ? s.streakProtectors + 1 : s.streakProtectors;
-        const levelUp = computeLevelUp(s.xp, s.xp + CHEST_REWARD.xp, protectorsAfterGift);
         const today = todayStr();
-        const daily = rollDailyStats(s, today);
+        let levelUp: LevelUpInfo | null = null;
+        let daily: DailyMissionInput & { dailyStatsDate: string } = {
+          dailyStatsDate: today,
+          dailyXp: s.dailyStatsDate === today ? s.dailyXp : 0,
+          dailyLessons: s.dailyStatsDate === today ? s.dailyLessons : 0,
+          dailyPerfectLessons: s.dailyStatsDate === today ? s.dailyPerfectLessons : 0,
+          dailyCorrect: s.dailyStatsDate === today ? s.dailyCorrect : 0,
+          dailyReviews: s.dailyStatsDate === today ? s.dailyReviews : 0,
+        };
+        try {
+          levelUp = computeLevelUp(s.xp, s.xp + CHEST_REWARD.xp, protectorsAfterGift);
+          daily = rollDailyStats(s, today);
+        } catch (err) {
+          console.error('[openChest] level-up/daily-mission bonus failed, paying the chest without it:', err);
+        }
         set({
           openedChestIds: [...s.openedChestIds, chestId],
           xp: s.xp + CHEST_REWARD.xp,
