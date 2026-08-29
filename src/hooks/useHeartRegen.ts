@@ -18,9 +18,15 @@ export function useHeartRegen() {
 
   useEffect(() => {
     tickHeartRegen();
+    // Piggybacks on this hook's existing second-by-second tick — mounted on
+    // TopBar, so it reaches nearly every screen — to catch a streak dying
+    // from time alone (a session left open past midnight) without waiting
+    // for the next app cold start.
+    useUserStore.getState().settleStreak();
     const id = setInterval(() => {
       setNow(Date.now());
       tickHeartRegen();
+      useUserStore.getState().settleStreak();
     }, 1000);
     return () => clearInterval(id);
   }, [tickHeartRegen]);

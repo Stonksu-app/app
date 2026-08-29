@@ -8,6 +8,7 @@ import {
   localDayKey,
   todayLocal,
   inferredFrozenDays,
+  isStreakUnrecoverable,
 } from '../src/utils/streak';
 
 const cases: {
@@ -376,3 +377,76 @@ if (blueFailed > 0) {
   process.exit(1);
 }
 console.log('Calendario: todo correcto.');
+
+/*
+ * A streak dies from time alone, not just from the next lesson.
+ *
+ * Nothing recomputed it just because a day was opened without playing, so a
+ * streak that had already, provably, broken kept showing its old number —
+ * in grey, since today wasn't done yet — until the player acted. Reported as:
+ * open the app after losing a streak and it still reads e.g. "5" in grey,
+ * where it should read "0".
+ */
+let settleFailed = 0;
+const check6 = (name: string, cond: boolean, detail = '') => {
+  if (cond) console.log(`OK   ${name}`);
+  else {
+    settleFailed++;
+    console.log(`FALLA ${name}${detail ? ` — ${detail}` : ''}`);
+  }
+};
+
+check6(
+  'un hueco que ni con protectores se cubre ya está muerto',
+  isStreakUnrecoverable(todayLocal(-4), 2, todayLocal())
+);
+check6(
+  'un hueco que los protectores sí cubrirían no cuenta como muerto',
+  !isStreakUnrecoverable(todayLocal(-2), 2, todayLocal())
+);
+check6('ayer todavía no es un hueco', !isStreakUnrecoverable(todayLocal(-1), 0, todayLocal()));
+check6('hoy mismo tampoco', !isStreakUnrecoverable(todayLocal(), 0, todayLocal()));
+check6('sin fecha previa no hay nada que sentenciar', !isStreakUnrecoverable(null, 0, todayLocal()));
+
+reset({ streak: 5, lastActiveDate: todayLocal(-4), streakProtectors: 2 });
+store.settleStreak();
+const settled = useUserStore.getState();
+check6('la racha muerta se pone a 0, no a 1: hoy tampoco se ha jugado', settled.streak === 0, `${settled.streak}`);
+check6('grey, no verde: lastActiveDate no se toca', settled.lastActiveDate === todayLocal(-4));
+check6('los protectores se gastan igual que si hubieras jugado hoy', settled.streakProtectors === 0);
+check6(
+  'y quedan anotados los días que sí llegaron a cubrir',
+  settled.frozenDates.includes(todayLocal(-3)) && settled.frozenDates.includes(todayLocal(-2)),
+  settled.frozenDates.join(', ')
+);
+check6('la pérdida queda explicada', settled.lastStreakLoss?.streak === 5, `${settled.lastStreakLoss?.streak}`);
+
+reset({ streak: 4, lastActiveDate: todayLocal(-2), streakProtectors: 2 });
+store.settleStreak();
+check6(
+  'una racha que los protectores todavía salvarían no se toca',
+  useUserStore.getState().streak === 4
+);
+
+reset({ streak: 1, lastActiveDate: todayLocal(-7), streakProtectors: 0 });
+store.settleStreak();
+check6('una racha ya en 1 no tiene nada que sentenciar', useUserStore.getState().streak === 1);
+
+// Settled once, a real lesson today still starts a clean day-one streak
+// instead of double-recording the same loss.
+reset({ streak: 5, lastActiveDate: todayLocal(-4), streakProtectors: 2 });
+store.settleStreak();
+store.completeLesson(attempt(todayLocal()));
+const afterReal = useUserStore.getState();
+check6('tras sentenciarla, jugar hoy arranca una racha de 1', afterReal.streak === 1, `${afterReal.streak}`);
+check6(
+  'y la pérdida no se reescribe con la racha ya a 0',
+  afterReal.lastStreakLoss?.streak === 5,
+  `${afterReal.lastStreakLoss?.streak}`
+);
+
+if (settleFailed > 0) {
+  console.log(`${settleFailed} caso(s) de sentencia de racha fallando.`);
+  process.exit(1);
+}
+console.log('Sentencia de racha: todo correcto.');

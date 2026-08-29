@@ -8,6 +8,8 @@ import { stagesForDifficulty } from '../utils/mastery';
 import {
   computeStreakUpdate,
   datesBetween,
+  daysBetween,
+  isStreakUnrecoverable,
   localDayKey,
   streakFromHistory,
   todayLocal,
@@ -138,6 +140,16 @@ interface UserState {
    * incomplete — but a day you played is evidence you did.
    */
   repairStreak: () => void;
+  /**
+   * Zeroes a streak that has already, provably, died — without waiting for
+   * the next lesson to notice. Only touches state once, the same way
+   * completing a lesson today would: spends whatever protectors couldn't
+   * have saved it anyway, marks the days they did cover, and writes down why
+   * it broke. `lastActiveDate` is left as it was — today still isn't earned —
+   * so the flame reads 0 and grey instead of an old number that hasn't
+   * practised today either.
+   */
+  settleStreak: () => void;
   /** Returns whether this completion also gifted a streak protector. */
   completeLesson: (attempt: LessonAttempt) => boolean;
   isNodeUnlocked: (nodeId: string) => boolean;
@@ -228,7 +240,7 @@ function recordLoss(
   protectorsUsed: number,
   today: string
 ): UserState['lastStreakLoss'] {
-  const broke = missed > 0 && newStreak === 1 && s.streak > 1;
+  const broke = missed > 0 && newStreak <= 1 && s.streak > 1;
   if (!broke) return s.lastStreakLoss;
   return {
     date: today,
@@ -386,6 +398,28 @@ export const useUserStore = create<UserState>()(
         // yesterday, which is what streakFromHistory counted back from.
         const lastDay = days.includes(today) ? today : todayStr(-1);
         set({ streak: proven, lastActiveDate: s.lastActiveDate ?? lastDay });
+      },
+
+      settleStreak: () => {
+        const s = get();
+        const today = todayStr();
+        // A streak already at 0 or 1 has nothing left to settle, and one that
+        // just got raised by repairStreak (which runs first) is live by
+        // definition — recomputing here would only repeat that work.
+        if (s.streak <= 1) return;
+        if (!isStreakUnrecoverable(s.lastActiveDate, s.streakProtectors, today)) return;
+
+        const missed = daysBetween(s.lastActiveDate as string, today) - 1;
+        const protectorsUsed = s.streakProtectors;
+        const frozenDates = [
+          ...new Set([...s.frozenDates, ...coveredDays(s.lastActiveDate, today, protectorsUsed)]),
+        ];
+        set({
+          streak: 0,
+          streakProtectors: 0,
+          frozenDates,
+          lastStreakLoss: recordLoss(s, 0, missed, protectorsUsed, today),
+        });
       },
 
       completeLesson: (attempt) => {

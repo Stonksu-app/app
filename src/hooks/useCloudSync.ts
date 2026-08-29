@@ -165,6 +165,10 @@ export function useCloudSync(): void {
         // that lost them — arrives claiming a streak of nothing while the
         // history beside it says otherwise. Believe the history.
         useUserStore.getState().repairStreak();
+        // The pulled row can be a stale snapshot from before a streak broke
+        // on this or another device — the cloud wins on write, not on the
+        // passage of time. Settle it the same way a cold start would.
+        useUserStore.getState().settleStreak();
         applying.current = false;
       } else {
         // Genuinely empty account. Anything already on this device — progress

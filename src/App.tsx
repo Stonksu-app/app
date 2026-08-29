@@ -73,6 +73,11 @@ function App() {
   // history sitting next to it is enough to put the number back.
   useEffect(() => {
     useUserStore.getState().repairStreak();
+    // A streak can die purely from time passing while the app was closed;
+    // nothing else notices that until the next lesson. Settle it now so a
+    // cold start shows the real number instead of the one from before the
+    // gap.
+    useUserStore.getState().settleStreak();
   }, []);
 
   return (

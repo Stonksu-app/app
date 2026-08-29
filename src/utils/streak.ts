@@ -92,6 +92,29 @@ export function computeStreakUpdate(
 }
 
 /**
+ * Whether the gap since lastActiveDate has already grown past anything the
+ * held protectors could cover — true the moment the streak is provably dead,
+ * even before any activity happens today.
+ *
+ * Nothing recomputes the streak just from time passing; only completing a
+ * lesson or a repaso does. So a streak that broke while the app was closed
+ * keeps showing its old, higher number — in grey, since today isn't done
+ * yet — until the player acts. This is the check that lets the app notice
+ * the break on its own, without waiting for that next action.
+ */
+export function isStreakUnrecoverable(
+  lastActiveDate: string | null,
+  protectors: number,
+  today: string
+): boolean {
+  if (!lastActiveDate || lastActiveDate === today) return false;
+  const gap = daysBetween(lastActiveDate, today);
+  if (gap <= 1) return false;
+  const missed = gap - 1;
+  return missed > protectors;
+}
+
+/**
  * The streak the history proves, counting back from today.
  *
  * The streak normally lives in two fields — the number and the last active
