@@ -150,8 +150,33 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       set({ errorCode: failure.code, error: translate(failure.message || failure.code) });
     }
 
+    /*
+     * The confirmation link is clicked on a phone; this tab never touches it.
+     *
+     * onAuthStateChange below only fires from something happening in *this*
+     * browser session, so confirming the address on another device changes
+     * the row in auth.users without this tab having any reason to know —
+     * the "confirma tu correo" banner stayed up even across a reload, since
+     * getSession() reads the session cached at sign-up time rather than
+     * asking anything. getUser() always asks the server, so it's the one
+     * call that can actually notice. Only worth making while there's a
+     * confirmation to wait for, and run on whatever might mean it's worth
+     * checking again — a cold start (including the reload someone tries
+     * exactly because they expect it to have changed), regaining focus,
+     * becoming visible again, or (since none of those fire when the tab was
+     * never left, only switched away from at the OS level and back) a slow
+     * poll that stops once resolved.
+     */
+    const recheckUser = () => {
+      if (!supabase || get().status === 'registered' || !get().pendingEmail) return;
+      void supabase.auth.getUser().then(({ data, error }) => {
+        if (!error && data.user) set(applyUser(data.user));
+      });
+    };
+
     void supabase.auth.getSession().then(({ data }) => {
       if (data.session) set(applySession(data.session));
+      recheckUser();
     });
 
     // Fires when the confirmation link is clicked in another tab, or when an
@@ -166,27 +191,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       set(applySession(session));
     });
 
-    /*
-     * The confirmation link is clicked on a phone; this tab never touches it.
-     *
-     * onAuthStateChange above only fires from something happening in *this*
-     * browser session, so confirming the address on another device changes
-     * the row in auth.users without this tab having any reason to know —
-     * the "confirma tu correo" banner stayed up until something forced a
-     * fresh read, which clearing site data does by accident. getUser()
-     * (unlike getSession()) always asks the server, so it's the one call
-     * that can actually notice. Only worth making while there's a
-     * confirmation to wait for, and run on whatever might mean the tab is
-     * back from doing exactly that — regaining focus, becoming visible again,
-     * or (since neither fires when the tab was never left, only switched away
-     * from at the OS level and back) a slow poll that stops once resolved.
-     */
-    const recheckUser = () => {
-      if (!supabase || get().status === 'registered' || !get().pendingEmail) return;
-      void supabase.auth.getUser().then(({ data, error }) => {
-        if (!error && data.user) set(applyUser(data.user));
-      });
-    };
     window.addEventListener('focus', recheckUser);
     document.addEventListener('visibilitychange', recheckUser);
     const pollId = setInterval(() => {
