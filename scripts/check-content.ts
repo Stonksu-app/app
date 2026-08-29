@@ -144,6 +144,9 @@ for (const node of SKILL_TREE) {
     if (!plan.isReview && plan.flashcards.length === 0) {
       fail(where, `teaching stage ${stage + 1} introduces no flashcards`);
     }
+    if (!plan.isReview && !plan.explanation.trim()) {
+      fail(where, `teaching stage ${stage + 1} has no explanation for the guide preview`);
+    }
   }
 }
 

@@ -127,6 +127,13 @@ export type Activity =
 export interface NodeIntro {
   flashcards: Flashcard[];
   games: IntroGame[];
+  /**
+   * One short paragraph per teaching stage (so index 0 is stage 0, and so on
+   * — the review stage has no entry, since it teaches nothing new), covering
+   * that stage's flashcard terms in context instead of as isolated
+   * definitions. Optional so content can land node by node.
+   */
+  explanations?: string[];
 }
 
 export type NodeDifficulty = 'easy' | 'medium' | 'hard';

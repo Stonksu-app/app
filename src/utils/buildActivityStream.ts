@@ -161,6 +161,9 @@ export interface StagePlan {
   reviewIds: string[];
   /** Only the terms this stage introduces, so the intro stays short too. */
   flashcards: Flashcard[];
+  /** This stage's terms explained in context, not as isolated definitions.
+   *  Empty on a review stage — see NodeIntro.explanations. */
+  explanation: string;
 }
 
 /**
@@ -232,6 +235,7 @@ export function buildStage(
       replayIds: [...replayIds],
       reviewIds,
       flashcards: [],
+      explanation: '',
     };
   }
 
@@ -249,5 +253,6 @@ export function buildStage(
     replayIds: [...replayIds],
     reviewIds,
     flashcards: cardSlice,
+    explanation: node.intro?.explanations?.[stage] ?? '',
   };
 }

@@ -91,6 +91,12 @@ export const SKILL_TREE: SkillNode[] = [
           ],
         },
       ],
+      explanations: [
+        'Para operar necesitas un bróker: la plataforma que te conecta con el mercado, el sitio donde se compran y venden los activos. Cuando compras esperando que el precio suba, estás yendo largo — la operación más básica de todas.',
+        'También puedes ir corto: vender primero esperando que el precio baje después. El apalancamiento te deja mover más dinero del que tienes, multiplicando ganancias y pérdidas por igual, y el spread es la pequeña diferencia entre el precio de compra y el de venta que el bróker se queda en cada operación.',
+        'La volatilidad mide qué tan rápido y cuánto se mueve el precio; a más volatilidad, más riesgo y más oportunidad. La liquidez es lo fácil que resulta entrar o salir de una operación sin mover tú mismo el precio. Y un mercado alcista es, simplemente, uno donde los precios llevan tiempo subiendo.',
+        'Un mercado bajista es lo contrario: precios que caen de forma sostenida. Y el drawdown es la caída desde el punto más alto que ha tenido tu cuenta hasta el más bajo — la métrica que de verdad dice cuánto duele una mala racha.',
+      ],
     },
     lessons: [
       {
@@ -313,6 +319,11 @@ export const SKILL_TREE: SkillNode[] = [
           ],
         },
       ],
+      explanations: [
+        'Cada vela resume lo que hizo el precio en un periodo. Es alcista (verde) si cerró por encima de donde abrió, y bajista (roja) si cerró por debajo. Las líneas finas que sobresalen del cuerpo son las mechas: precios que se tocaron un instante pero no se mantuvieron.',
+        'El cuerpo de la vela es la diferencia entre apertura y cierre — cuanto más grande, más fuerza tuvo ese movimiento. Cuando apertura y cierre casi coinciden aparece un doji, señal de que compradores y vendedores están en tablas. Y una tendencia alcista es una serie de máximos y mínimos cada vez más altos.',
+        'Una tendencia bajista es la misma idea al revés: máximos y mínimos cada vez más bajos. Y el marco temporal es el período que representa cada vela — un minuto, una hora, un día — así que el mismo gráfico cuenta historias distintas según el marco que elijas.',
+      ],
     },
     lessons: [
       {
@@ -518,6 +529,10 @@ export const SKILL_TREE: SkillNode[] = [
             },
           ],
         },
+      ],
+      explanations: [
+        'Un soporte es una zona donde el precio, al caer, tiende a frenar; una resistencia es lo mismo pero al subir. Cuando el precio atraviesa uno de esos niveles con fuerza, hablamos de ruptura. Y lo interesante es que los papeles pueden cambiar: una resistencia rota suele convertirse en soporte, y viceversa — es el cambio de polaridad.',
+        'Ningún nivel es una línea perfecta: son zonas, bandas de precio donde suele reaccionar el mercado. Un rebote es cuando el precio toca esa zona y se devuelve en la dirección contraria; una falsa ruptura es cuando parece atravesarla pero enseguida regresa. Y los niveles psicológicos son esos números redondos — como 100 — donde mucha gente coloca sus órdenes sin más motivo que ser una cifra fácil de recordar.',
       ],
     },
     lessons: [
@@ -728,6 +743,11 @@ export const SKILL_TREE: SkillNode[] = [
             },
           ],
         },
+      ],
+      explanations: [
+        'La media móvil suaviza el ruido del precio promediando sus últimas velas. La EMA hace lo mismo pero da más peso a lo reciente, así que reacciona antes a los cambios. Y el RSI es un oscilador de 0 a 100 que mide qué tan fuerte ha sido el movimiento último del precio.',
+        'Cuando el RSI supera 70 se dice que hay sobrecompra: el precio ha subido mucho y muy rápido. Por debajo de 30 es sobreventa: ha caído igual de rápido. El MACD, por su parte, mide el impulso comparando dos medias móviles entre sí.',
+        'Un cruce dorado ocurre cuando la media corta pasa por encima de la larga, una señal que muchos leen como alcista. Y una divergencia aparece cuando el precio marca un nuevo extremo pero el indicador no lo acompaña — una pista de que el movimiento podría estar quedándose sin fuerza.',
       ],
     },
     lessons: [
@@ -989,6 +1009,11 @@ export const SKILL_TREE: SkillNode[] = [
           ],
         },
       ],
+      explanations: [
+        'El stop loss es la orden que cierra tu operación en la pérdida máxima que tú decides de antemano; el take profit hace lo mismo al alcanzar tu objetivo de ganancia. Entre ambos define tu ratio riesgo/beneficio — cuánto arriesgas frente a cuánto esperas ganar, algo como 1:2 o 1:3.',
+        'El tamaño de posición es cuántas unidades compras, y se calcula a partir del riesgo que estás dispuesto a aceptar, no al revés. La regla del 1% dice que no deberías arriesgar más de ese 1-2% de tu cuenta en una sola operación. Y el drawdown mide cuánto ha caído tu cuenta desde su punto más alto — la cicatriz de las malas rachas.',
+        'El riesgo por operación es el dinero exacto que pierdes si tu stop loss llega a saltar — no un porcentaje abstracto, sino la cifra real. Y diversificar es repartir tu capital entre distintos activos para que uno solo malo no te hunda la cuenta entera.',
+      ],
     },
     lessons: [
       {
@@ -1248,6 +1273,11 @@ export const SKILL_TREE: SkillNode[] = [
           ],
         },
       ],
+      explanations: [
+        'El FOMO es el miedo a quedarte fuera: entrar tarde a una operación solo porque algo está subiendo y no quieres perdértelo. El revenge trading es operar para recuperar una pérdida reciente, no porque haya una oportunidad real. Y el sesgo de confirmación es buscar solo la información que le da la razón a tu idea, ignorando la que la contradice.',
+        'La aversión a la pérdida explica por qué perder 100 duele más de lo que alegra ganar 100 — el mismo dinero, distinto peso emocional. El overtrading es operar de más por aburrimiento, ansiedad o euforia, sin que haya un motivo real detrás. Un plan de trading son tus reglas escritas antes de que el mercado abra, pensadas con la cabeza fría.',
+        'Un diario de trading registra cada operación y, sobre todo, el motivo real por el que la hiciste — la mejor forma de descubrir tus propios patrones. Y la disciplina es, simplemente, seguir tu plan aunque el impulso del momento esté gritando otra cosa.',
+      ],
     },
     lessons: [
       {
@@ -1506,6 +1536,11 @@ export const SKILL_TREE: SkillNode[] = [
             },
           ],
         },
+      ],
+      explanations: [
+        'Una orden de mercado se ejecuta ya, al mejor precio disponible en ese instante. Una orden limitada solo se ejecuta a tu precio o mejor — y puede que no llegue a ejecutarse nunca. Y una orden stop se activa en cuanto el precio toca el nivel que tú marcaste.',
+        'Una stop limitada combina las dos anteriores: se activa en un nivel y, a partir de ahí, se comporta como una orden limitada. El spread es la diferencia entre el precio al que puedes comprar y al que puedes vender en ese momento. Y el slippage es la diferencia entre el precio que esperabas y el precio al que realmente se ejecutó tu orden.',
+        'La liquidez es la facilidad para entrar y salir de una operación sin mover tú mismo el precio. Y el libro de órdenes es la lista completa de todas las órdenes de compra y venta que están pendientes de ejecutarse en ese momento.',
       ],
     },
     lessons: [
@@ -1767,6 +1802,11 @@ export const SKILL_TREE: SkillNode[] = [
             },
           ],
         },
+      ],
+      explanations: [
+        'El análisis fundamental estudia cuánto vale de verdad un activo a partir de sus datos, no de su gráfico. Los earnings son el informe trimestral de resultados que publica cada empresa. Y el BPA (beneficio por acción) reparte ese beneficio entre todas las acciones que existen, para saber cuánto le toca a cada una.',
+        'El PER te dice cuántos años del beneficio actual estás pagando por tener esa acción — cuanto más alto, más caro está el precio en relación a lo que gana la empresa. El dividendo es la parte del beneficio que la empresa reparte directamente entre sus accionistas. Y los tipos de interés son, básicamente, el precio del dinero: los fija el banco central y mueven todos los demás mercados.',
+        'La inflación es la subida general y sostenida de los precios de todo, no solo de un producto. Y el guidance es la previsión que da la propia empresa sobre cómo le irán los próximos trimestres — a veces mueve más el precio que los resultados que acaba de publicar.',
       ],
     },
     lessons: [
