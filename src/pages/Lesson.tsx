@@ -171,7 +171,7 @@ export default function Lesson() {
     const wasFirstEverLesson = attempts.length === 0;
     const alreadyCompleted = isLessonCompleted(lesson.id);
 
-    const protectorGifted = completeLesson({
+    const { protectorGifted, levelUp } = completeLesson({
       lessonId: lesson.id,
       nodeId: node.id,
       completedAt: new Date().toISOString(),
@@ -204,6 +204,7 @@ export default function Lesson() {
         stage: getNodeStage(node.id),
         maxStage: getNodeMaxStage(node.id),
         protectorGifted,
+        levelUp,
       },
       replace: true,
     });

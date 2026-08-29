@@ -3,8 +3,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import ResultsScreen from '../components/ResultsScreen';
 import ProtectorCelebration from '../components/ProtectorCelebration';
+import LevelUpCelebration from '../components/LevelUpCelebration';
 import { BADGES } from '../data/badges';
-import { useUserStore } from '../store/useUserStore';
+import { useUserStore, type LevelUpInfo } from '../store/useUserStore';
 
 interface ResultsState {
   correctCount: number;
@@ -15,16 +16,21 @@ interface ResultsState {
   stage: number;
   maxStage: number;
   protectorGifted?: boolean;
+  levelUp?: LevelUpInfo | null;
 }
+
+/** Shown in order, one at a time, before the regular results — each earns
+ *  its own full-screen beat rather than splitting attention with the others. */
+type Celebration = 'protector' | 'levelup' | null;
 
 export default function LessonResults() {
   const location = useLocation();
   const navigate = useNavigate();
   const state = location.state as ResultsState | null;
   const { shouldPitchUltra, markUltraPitched } = useUserStore();
-  // Its own beat before the results screen, not a line competing with XP and
-  // badges for attention — shown once, then out of the way for good.
-  const [showProtector, setShowProtector] = useState(() => !!state?.protectorGifted);
+  const [celebration, setCelebration] = useState<Celebration>(() =>
+    state?.protectorGifted ? 'protector' : state?.levelUp ? 'levelup' : null
+  );
 
   useEffect(() => {
     if (!state) navigate('/home', { replace: true });
@@ -32,10 +38,15 @@ export default function LessonResults() {
 
   if (!state) return null;
 
-  const { nodeTitle, newBadgeIds, stage, maxStage, correctCount, totalQuestions } = state;
+  const { nodeTitle, newBadgeIds, stage, maxStage, correctCount, totalQuestions, levelUp } = state;
 
-  if (showProtector) {
-    return <ProtectorCelebration onContinue={() => setShowProtector(false)} />;
+  if (celebration === 'protector') {
+    return (
+      <ProtectorCelebration onContinue={() => setCelebration(levelUp ? 'levelup' : null)} />
+    );
+  }
+  if (celebration === 'levelup' && levelUp) {
+    return <LevelUpCelebration info={levelUp} onContinue={() => setCelebration(null)} />;
   }
 
   const perfect = correctCount === totalQuestions;

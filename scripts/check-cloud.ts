@@ -115,6 +115,10 @@ const cloudKeys = new Set(Object.keys(sample));
  * - practice*: a daily rate limit, not progress. Syncing a counter that
  *   resets at midnight would need columns and a timezone argument, and the
  *   worst it buys is one extra round of revision.
+ * - daily*: the rotating daily missions' counters and claimed state. Same
+ *   reasoning as practice*: a per-day rate limit rather than progress, and
+ *   which three missions are on offer is a pure function of the date, so
+ *   there's nothing here a second device couldn't recompute for itself.
  *
  * frozenDates and reviewDates used to be here too, kept local so a laptop
  * never showed a frozen day for a gap it never lived through. That also
@@ -132,6 +136,14 @@ const LOCAL_ONLY = new Set([
   'reminderEnabled',
   'reminderHour',
   'heartsReminderEnabled',
+  'dailyStatsDate',
+  'dailyXp',
+  'dailyLessons',
+  'dailyPerfectLessons',
+  'dailyCorrect',
+  'dailyReviews',
+  'dailyMissionsDate',
+  'claimedDailyMissionIds',
 ]);
 
 for (const key of persistedKeys) {

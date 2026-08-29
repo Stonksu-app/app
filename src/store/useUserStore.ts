@@ -17,10 +17,18 @@ import {
 } from '../utils/streak';
 import { DEFAULT_REMINDER_HOUR } from '../lib/notifications';
 import { FREE_PRACTICE_PER_DAY, hasAllAccessories, hasUnlimitedHearts, hasUnlimitedPractice, type Plan } from '../data/plans';
+import { pickDailyMissions, type DailyMissionInput } from '../data/dailyMissions';
 
 const MAX_HEARTS = 5;
 const HEART_REGEN_MINUTES = 30;
 const XP_PER_LEVEL = 100;
+/** Every level pays coins; a level that's a multiple of this also pays a
+ *  streak protector, so a milestone feels bigger than "the same amount, more
+ *  coins" — the moment Duolingo hands out a Streak Freeze for exactly the
+ *  same "you kept going" reason. */
+const LEVEL_MILESTONE_EVERY = 5;
+const LEVEL_UP_COINS = 20;
+const LEVEL_MILESTONE_COINS = 100;
 
 interface UserState {
   name: string;
@@ -64,6 +72,21 @@ interface UserState {
    */
   practiceDay: string | null;
   practiceRoundsToday: number;
+  /**
+   * Today's counters for the rotating daily missions — what's rolled over is
+   * the date they belong to, not progress in their own right, so they're
+   * kept off the cloud for the same reason as the practice allowance above.
+   */
+  dailyStatsDate: string | null;
+  dailyXp: number;
+  dailyLessons: number;
+  dailyPerfectLessons: number;
+  dailyCorrect: number;
+  dailyReviews: number;
+  /** Which of today's three missions have been claimed. Reset along with
+   *  the counters above whenever the date moves on. */
+  dailyMissionsDate: string | null;
+  claimedDailyMissionIds: string[];
   /**
    * Days finished with a repaso and no lesson.
    *
@@ -132,7 +155,7 @@ interface UserState {
   loseHeart: () => void;
   refillHearts: () => void;
   tickHeartRegen: () => void;
-  addXp: (amount: number) => void;
+  addXp: (amount: number) => LevelUpInfo | null;
   /** Counts today toward the streak on its own, for activities (like guide
    *  revision) that should keep a streak alive without being a lesson. */
   completeReview: () => void;
@@ -152,8 +175,7 @@ interface UserState {
    * practised today either.
    */
   settleStreak: () => void;
-  /** Returns whether this completion also gifted a streak protector. */
-  completeLesson: (attempt: LessonAttempt) => boolean;
+  completeLesson: (attempt: LessonAttempt) => { protectorGifted: boolean; levelUp: LevelUpInfo | null };
   isNodeUnlocked: (nodeId: string) => boolean;
   isLessonCompleted: (lessonId: string) => boolean;
   unlockBadge: (badgeId: string) => void;
@@ -184,6 +206,8 @@ interface UserState {
   recordMistake: (key: string) => void;
   clearMistake: (key: string) => void;
   claimMission: (missionId: string) => void;
+  /** Returns false if that mission isn't actually done yet, or was already claimed. */
+  claimDailyMission: (id: string) => boolean;
   isAccessoryUnlocked: (style: AccessoryStyle) => boolean;
   setReminder: (patch: { enabled?: boolean; hour?: number }) => void;
   setHeartsReminder: (enabled: boolean) => void;
@@ -267,6 +291,58 @@ function todayStr(offsetDays = 0): string {
   return todayLocal(offsetDays);
 }
 
+export interface LevelUpInfo {
+  /** The highest level reached — a big enough XP grant can cross more than one. */
+  level: number;
+  coins: number;
+  protectors: number;
+}
+
+function levelRewardFor(level: number): { coins: number; protector: boolean } {
+  const milestone = level % LEVEL_MILESTONE_EVERY === 0;
+  return { coins: milestone ? LEVEL_MILESTONE_COINS : LEVEL_UP_COINS, protector: milestone };
+}
+
+/** Every level crossed between two XP totals, summed into one reward — so a
+ *  grant big enough to jump two levels at once still pays for both instead
+ *  of only the one the total lands on. */
+/**
+ * `currentProtectors` is whatever the player is holding right before this
+ * reward, including any other protector this same action already granted
+ * (a lesson's own gift, a chest) — so the count reported here, and the one
+ * the celebration shows, is never higher than what actually fit under the
+ * cap. Reporting the theoretical amount instead would celebrate a protector
+ * that silently evaporated the instant it tried to exceed MAX_PROTECTORS.
+ */
+function computeLevelUp(beforeXp: number, afterXp: number, currentProtectors: number): LevelUpInfo | null {
+  const before = xpToLevel(beforeXp).level;
+  const after = xpToLevel(afterXp).level;
+  if (after <= before) return null;
+
+  let coins = 0;
+  let protectorsEarned = 0;
+  for (let level = before + 1; level <= after; level++) {
+    const reward = levelRewardFor(level);
+    coins += reward.coins;
+    if (reward.protector) protectorsEarned++;
+  }
+  const protectors = Math.min(protectorsEarned, Math.max(0, MAX_PROTECTORS - currentProtectors));
+  return { level: after, coins, protectors };
+}
+
+/** Resets the day's counters the moment they're read for a day they don't
+ *  belong to. Lazy on purpose, like practiceDay/practiceRoundsToday: nothing
+ *  needs to run at midnight, because nothing reads a stale count without
+ *  going through here or through computeDailyMissions, which does the same
+ *  check for display. */
+function rollDailyStats(
+  s: Pick<UserState, 'dailyStatsDate' | 'dailyXp' | 'dailyLessons' | 'dailyPerfectLessons' | 'dailyCorrect' | 'dailyReviews'>,
+  today: string
+): DailyMissionInput & { dailyStatsDate: string } {
+  if (s.dailyStatsDate === today) return s as DailyMissionInput & { dailyStatsDate: string };
+  return { dailyStatsDate: today, dailyXp: 0, dailyLessons: 0, dailyPerfectLessons: 0, dailyCorrect: 0, dailyReviews: 0 };
+}
+
 
 export const useUserStore = create<UserState>()(
   persist(
@@ -291,6 +367,14 @@ export const useUserStore = create<UserState>()(
       planStartedAt: null,
       practiceDay: null,
       practiceRoundsToday: 0,
+      dailyStatsDate: null,
+      dailyXp: 0,
+      dailyLessons: 0,
+      dailyPerfectLessons: 0,
+      dailyCorrect: 0,
+      dailyReviews: 0,
+      dailyMissionsDate: null,
+      claimedDailyMissionIds: [],
       reviewDates: [],
       lastStreakLoss: null,
       lessonsSincePitch: 0,
@@ -357,7 +441,22 @@ export const useUserStore = create<UserState>()(
         set({ hearts: newHearts, lastHeartLostAt: newLastHeartLostAt });
       },
 
-      addXp: (amount) => set((s) => ({ xp: s.xp + amount })),
+      addXp: (amount) => {
+        const s = get();
+        const today = todayStr();
+        const daily = rollDailyStats(s, today);
+        const levelUp = computeLevelUp(s.xp, s.xp + amount, s.streakProtectors);
+        set({
+          xp: s.xp + amount,
+          coins: s.coins + (levelUp?.coins ?? 0),
+          streakProtectors: levelUp
+            ? Math.min(MAX_PROTECTORS, s.streakProtectors + levelUp.protectors)
+            : s.streakProtectors,
+          ...daily,
+          dailyXp: daily.dailyXp + amount,
+        });
+        return levelUp;
+      },
 
       /**
        * Marks today as active for streak purposes without touching lesson
@@ -378,6 +477,7 @@ export const useUserStore = create<UserState>()(
         const frozenDates = [
           ...new Set([...s.frozenDates, ...coveredDays(s.lastActiveDate, today, protectorsUsed)]),
         ];
+        const daily = rollDailyStats(s, today);
         set({
           streak,
           lastActiveDate,
@@ -386,6 +486,8 @@ export const useUserStore = create<UserState>()(
           reviewDates: [...new Set([...s.reviewDates, today])],
           streakProtectors: s.streakProtectors - protectorsUsed,
           lastStreakLoss: recordLoss(s, streak, missed, protectorsUsed, today),
+          ...daily,
+          dailyReviews: daily.dailyReviews + 1,
         });
       },
 
@@ -472,11 +574,16 @@ export const useUserStore = create<UserState>()(
           isNewCompletion &&
           completedLessonIds.length % LESSON_PROTECTOR_GIFT_EVERY === 0 &&
           streakProtectorsAfterUse < MAX_PROTECTORS;
-        const streakProtectors = gifted ? streakProtectorsAfterUse + 1 : streakProtectorsAfterUse;
+        const protectorsAfterGift = gifted ? streakProtectorsAfterUse + 1 : streakProtectorsAfterUse;
+        const levelUp = computeLevelUp(s.xp, s.xp + attempt.xpEarned, protectorsAfterGift);
+        const streakProtectors = protectorsAfterGift + (levelUp?.protectors ?? 0);
+
+        const isPerfect = attempt.totalQuestions > 0 && attempt.correctCount === attempt.totalQuestions;
+        const daily = rollDailyStats(s, today);
 
         set({
           xp: s.xp + attempt.xpEarned,
-          coins: s.coins + attempt.correctCount * COINS_PER_CORRECT,
+          coins: s.coins + attempt.correctCount * COINS_PER_CORRECT + (levelUp?.coins ?? 0),
           streakProtectors,
           frozenDates,
           attempts: [...s.attempts, attempt],
@@ -488,9 +595,14 @@ export const useUserStore = create<UserState>()(
           // time spent in lessons, not on new ground covered.
           lessonsSincePitch: s.lessonsSincePitch + 1,
           lastStreakLoss: recordLoss(s, streak, missed, protectorsUsed, today),
+          ...daily,
+          dailyXp: daily.dailyXp + attempt.xpEarned,
+          dailyLessons: daily.dailyLessons + 1,
+          dailyPerfectLessons: daily.dailyPerfectLessons + (isPerfect ? 1 : 0),
+          dailyCorrect: daily.dailyCorrect + attempt.correctCount,
         });
 
-        return gifted;
+        return { protectorGifted: gifted, levelUp };
       },
 
       isNodeUnlocked: (nodeId) => {
@@ -598,11 +710,17 @@ export const useUserStore = create<UserState>()(
         // Finishing a whole level is a bigger milestone than a single lesson,
         // so it always tops up a protector (still capped at MAX_PROTECTORS).
         const gifted = s.streakProtectors < MAX_PROTECTORS;
+        const protectorsAfterGift = gifted ? s.streakProtectors + 1 : s.streakProtectors;
+        const levelUp = computeLevelUp(s.xp, s.xp + CHEST_REWARD.xp, protectorsAfterGift);
+        const today = todayStr();
+        const daily = rollDailyStats(s, today);
         set({
           openedChestIds: [...s.openedChestIds, chestId],
           xp: s.xp + CHEST_REWARD.xp,
-          coins: s.coins + CHEST_REWARD.coins,
-          streakProtectors: gifted ? s.streakProtectors + 1 : s.streakProtectors,
+          coins: s.coins + CHEST_REWARD.coins + (levelUp?.coins ?? 0),
+          streakProtectors: protectorsAfterGift + (levelUp?.protectors ?? 0),
+          ...daily,
+          dailyXp: daily.dailyXp + CHEST_REWARD.xp,
         });
         return gifted;
       },
@@ -661,6 +779,27 @@ export const useUserStore = create<UserState>()(
           };
         }),
 
+      claimDailyMission: (id) => {
+        const s = get();
+        const today = todayStr();
+        const daily = rollDailyStats(s, today);
+        const claimedIds = s.dailyMissionsDate === today ? s.claimedDailyMissionIds : [];
+        // Guarded the same way claimMission is: a double tap can't pay out
+        // twice, and the mission's own target is re-checked rather than
+        // trusting whatever the caller believes is true.
+        if (claimedIds.includes(id)) return false;
+        const mission = pickDailyMissions(today).find((m) => m.id === id);
+        if (!mission || mission.progress(daily) < mission.target) return false;
+
+        set({
+          ...daily,
+          dailyMissionsDate: today,
+          claimedDailyMissionIds: [...claimedIds, id],
+          coins: s.coins + mission.reward,
+        });
+        return true;
+      },
+
       isAccessoryUnlocked: (style) => style === 'ninguno' || get().unlockedAccessories.includes(style),
 
       setReminder: (patch) =>
@@ -693,6 +832,14 @@ export const useUserStore = create<UserState>()(
           planStartedAt: null,
           practiceDay: null,
           practiceRoundsToday: 0,
+          dailyStatsDate: null,
+          dailyXp: 0,
+          dailyLessons: 0,
+          dailyPerfectLessons: 0,
+          dailyCorrect: 0,
+          dailyReviews: 0,
+          dailyMissionsDate: null,
+          claimedDailyMissionIds: [],
           reviewDates: [],
           lastStreakLoss: null,
           lessonsSincePitch: 0,
