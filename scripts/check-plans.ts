@@ -20,8 +20,9 @@ import {
   showsAds,
   type Plan,
 } from '../src/data/plans';
-import { LESSONS_PER_PITCH, useUserStore } from '../src/store/useUserStore';
+import { LESSONS_PER_PITCH, MAX_PROTECTORS, useUserStore } from '../src/store/useUserStore';
 import { SKILL_TREE } from '../src/data/lessons';
+import { leaguePromotionReward } from '../src/data/leagues';
 
 let failed = 0;
 const check = (name: string, cond: boolean, detail = '') => {
@@ -164,6 +165,42 @@ check(
   !SKILL_TREE[0]?.ultra,
   'nadie debería toparse con el muro antes de jugar'
 );
+
+// ------------------------------------------- what a promotion pays
+/*
+ * Promotion pays once, upwards only, and never past the protector cap.
+ *
+ * The server decides the rank on Mondays; the coins are paid by whichever
+ * device notices first, so the record of having paid has to be the thing that
+ * stops the second one paying again.
+ */
+useUserStore.setState({ leagueRank: 0, leagueRewardedRank: 0, coins: 0, streakProtectors: 0 });
+check('sin ascenso no se paga nada', store.claimLeaguePromotion() === null);
+
+useUserStore.setState({ leagueRank: 3 });
+const subida = store.claimLeaguePromotion();
+const esperado = leaguePromotionReward(3);
+check('ascender paga lo que dice la tabla', subida?.coins === esperado.coins, `${subida?.coins}`);
+check('y da los protectores de esa liga', useUserStore.getState().streakProtectors === esperado.protectors);
+check('el segundo intento no paga otra vez', store.claimLeaguePromotion() === null);
+check(
+  'y queda anotado hasta qué liga se pagó',
+  useUserStore.getState().leagueRewardedRank === 3
+);
+
+useUserStore.setState({ leagueRank: 1 });
+check('descender no paga ni quita nada', store.claimLeaguePromotion() === null);
+const monedasTrasBajar = useUserStore.getState().coins;
+useUserStore.setState({ leagueRank: 5 });
+const arriba = store.claimLeaguePromotion();
+check('volver a subir sí paga la liga nueva', arriba?.rank === 5);
+check('sumando a lo que ya tenías', useUserStore.getState().coins > monedasTrasBajar);
+check(
+  'los protectores no pasan del tope',
+  useUserStore.getState().streakProtectors <= MAX_PROTECTORS,
+  `${useUserStore.getState().streakProtectors}`
+);
+check('la primera liga nunca paga', leaguePromotionReward(0).coins === 0);
 
 console.log(failed === 0 ? '\nTodo correcto.' : `\n${failed} problema(s).`);
 process.exit(failed === 0 ? 0 : 1);

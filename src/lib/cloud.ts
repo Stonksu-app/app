@@ -43,6 +43,7 @@ export interface CloudState {
   frozenDates: string[];
   reviewDates: string[];
   activeDates: string[];
+  leagueRewardedRank: number;
   /** XP earned since the current league week started — see PulledProfile
    *  for why leagueRank/leagueTableId/leagueWeekStart aren't here too. */
   weeklyXp: number;
@@ -89,6 +90,7 @@ export interface ProfileRow {
   frozen_dates: string[];
   review_dates: string[];
   active_dates: string[];
+  league_rewarded_rank: number;
   weekly_xp: number;
   league_rank: number;
   league_table_id: string | null;
@@ -125,6 +127,7 @@ export function toRow(s: CloudState, id: string) {
     frozen_dates: s.frozenDates,
     review_dates: s.reviewDates,
     active_dates: s.activeDates,
+    league_rewarded_rank: s.leagueRewardedRank,
     weekly_xp: s.weeklyXp,
   };
 }
@@ -162,6 +165,10 @@ export function fromRow(row: ProfileRow, attempts: LessonAttempt[]): PulledProfi
     frozenDates: row.frozen_dates ?? [],
     reviewDates: row.review_dates ?? [],
     activeDates: row.active_dates ?? [],
+    // Missing on a database that predates the column: 0 means "nothing paid
+    // yet", which pays a promotion again at worst — the safe direction for a
+    // reward, and self-correcting once the column exists.
+    leagueRewardedRank: row.league_rewarded_rank ?? 0,
     weeklyXp: row.weekly_xp ?? 0,
     leagueRank: row.league_rank ?? 0,
     leagueTableId: row.league_table_id ?? null,
@@ -175,7 +182,7 @@ const PROFILE_COLUMNS =
   'seen_intro_node_ids, opened_chest_ids, claimed_mission_ids, unlocked_accessories, ' +
   'pending_mistakes, node_stage_progress, term_mastery, plan, plan_started_at, avatar, ' +
   'virtual_balance, frozen_dates, review_dates, active_dates, weekly_xp, league_rank, ' +
-  'league_table_id, ' +
+  'league_table_id, league_rewarded_rank, ' +
   'league_week_start';
 
 /**

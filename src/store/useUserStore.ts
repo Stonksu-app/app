@@ -5,6 +5,7 @@ import { findMission } from '../data/missions';
 import { DEFAULT_LOOK } from '../components/Mascot';
 import { SKILL_TREE } from '../data/lessons';
 import { stagesForDifficulty } from '../utils/mastery';
+import { leaguePromotionReward } from '../data/leagues';
 import {
   computeStreakUpdate,
   datesBetween,
@@ -124,6 +125,15 @@ interface UserState {
   /** The Monday this table's week started. Server-owned. */
   leagueWeekStart: string | null;
   /**
+   * The highest league already paid for, and the week it was paid.
+   *
+   * Promotion is decided by the server on Mondays; the payout happens here,
+   * the first time this account sees the new rank. Synced, because a reward
+   * paid per device is a reward paid twice — open the app on a phone and a
+   * laptop after a promotion and you'd collect the coins on both.
+   */
+  leagueRewardedRank: number;
+  /**
    * The last streak that broke, and why.
    *
    * Losing a streak while holding protectors that didn't cover the gap looks
@@ -190,6 +200,14 @@ interface UserState {
    * incomplete — but a day you played is evidence you did.
    */
   repairStreak: () => void;
+  /**
+   * Pays for a promotion the server has already decided, once.
+   *
+   * Returns what was paid so the screen can celebrate it, or null when there
+   * is nothing new — which is every call but the first after a Monday that
+   * moved you up.
+   */
+  claimLeaguePromotion: () => { rank: number; coins: number; protectors: number } | null;
   /**
    * Zeroes a streak that has already, provably, died — without waiting for
    * the next lesson to notice. Only touches state once, the same way
@@ -425,6 +443,7 @@ export const useUserStore = create<UserState>()(
       leagueRank: 0,
       leagueTableId: null,
       leagueWeekStart: null,
+      leagueRewardedRank: 0,
       lastStreakLoss: null,
       lessonsSincePitch: 0,
       openedChestIds: [],
@@ -574,6 +593,21 @@ export const useUserStore = create<UserState>()(
         // yesterday, which is what streakFromHistory counted back from.
         const lastDay = days.includes(today) ? today : todayStr(-1);
         set({ streak: proven, lastActiveDate: s.lastActiveDate ?? lastDay });
+      },
+
+      claimLeaguePromotion: () => {
+        const s = get();
+        // Only upwards. Relegation is its own kind of news and doesn't take
+        // anything back — the coins were spent on a week you did climb.
+        if (s.leagueRank <= s.leagueRewardedRank) return null;
+
+        const reward = leaguePromotionReward(s.leagueRank);
+        set({
+          leagueRewardedRank: s.leagueRank,
+          coins: s.coins + reward.coins,
+          streakProtectors: Math.min(MAX_PROTECTORS, s.streakProtectors + reward.protectors),
+        });
+        return { rank: s.leagueRank, ...reward };
       },
 
       settleStreak: () => {
@@ -942,6 +976,7 @@ export const useUserStore = create<UserState>()(
           leagueRank: 0,
           leagueTableId: null,
           leagueWeekStart: null,
+      leagueRewardedRank: 0,
           lastStreakLoss: null,
           lessonsSincePitch: 0,
           openedChestIds: [],

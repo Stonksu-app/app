@@ -7,6 +7,7 @@ import Icon from '../components/Icon';
 import NodeRing from '../components/NodeRing';
 import AdSlot from '../components/AdSlot';
 import UltraPromo from '../components/UltraPromo';
+import LeaguePromotionCelebration from '../components/LeaguePromotionCelebration';
 import { Button } from '../components/Button';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import { SKILL_TREE } from '../data/lessons';
@@ -208,6 +209,23 @@ export default function Home() {
     getNodeMaxStage,
     isNodePlatinum,
   } = useUserStore();
+  /*
+   * A promotion is collected on the way back to the path.
+   *
+   * The server decides it on Monday, so there is no moment in the app where
+   * it "happens" — the first time this device sees the new rank is the only
+   * honest place to say so, and that's here, on the screen everyone opens
+   * first. Checked once per mount rather than on every render.
+   */
+  const [promotion, setPromotion] = useState<{
+    rank: number;
+    coins: number;
+    protectors: number;
+  } | null>(null);
+  useEffect(() => {
+    setPromotion(useUserStore.getState().claimLeaguePromotion());
+  }, []);
+
   // Depend on the raw state slices, not on the store's getter functions: those
   // keep a stable identity, so a memo keyed on them never recomputes and the
   // path would keep rendering a chest as unopened after you claimed it.
@@ -442,6 +460,17 @@ export default function Home() {
     });
     return items;
   }, [sectionNodes, openedChestIds, testMode, platinumUnits]);
+
+  if (promotion) {
+    return (
+      <LeaguePromotionCelebration
+        rank={promotion.rank}
+        coins={promotion.coins}
+        protectors={promotion.protectors}
+        onContinue={() => setPromotion(null)}
+      />
+    );
+  }
 
   return (
     <div className="min-h-dvh bg-carbon-900 lg:flex">

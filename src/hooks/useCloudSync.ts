@@ -53,6 +53,7 @@ function snapshot(): CloudState {
     frozenDates: s.frozenDates,
     reviewDates: s.reviewDates,
     activeDates: s.activeDates,
+    leagueRewardedRank: s.leagueRewardedRank,
     weeklyXp: s.weeklyXp,
   };
 }

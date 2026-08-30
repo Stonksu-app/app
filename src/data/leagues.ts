@@ -48,3 +48,28 @@ export const DEMOTION_ZONE = 1;
 /** A table below this size promotes or relegates nobody — see the migration. */
 export const MIN_TABLE_SIZE_FOR_PROMOTION = 4;
 export const MIN_TABLE_SIZE_FOR_DEMOTION = 1;
+
+/**
+ * What arriving in a league pays.
+ *
+ * Promotion already gives you a harder table, which is a reward only if you
+ * wanted one — so it comes with something you can spend. It climbs with the
+ * league because the weeks get harder as the table does, and protectors
+ * arrive at the top half, where a broken streak costs a rank rather than just
+ * a number.
+ *
+ * Index is the league you arrive *in*: nobody is rewarded for rank 0, which
+ * is where everyone starts.
+ */
+export const LEAGUE_PROMOTION_REWARDS: { coins: number; protectors: number }[] = [
+  { coins: 0, protectors: 0 },
+  { coins: 50, protectors: 0 },
+  { coins: 100, protectors: 0 },
+  { coins: 175, protectors: 1 },
+  { coins: 275, protectors: 1 },
+  { coins: 400, protectors: 2 },
+];
+
+export function leaguePromotionReward(rank: number): { coins: number; protectors: number } {
+  return LEAGUE_PROMOTION_REWARDS[Math.min(Math.max(rank, 0), MAX_LEAGUE_RANK)];
+}
