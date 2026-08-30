@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Mascot from './Mascot';
 import PlanBadge from './PlanBadge';
+import LeagueMark from './LeagueMark';
 import Icon from './Icon';
 import { Button, ButtonLink } from './Button';
 import { listFriends, type Friend } from '../lib/friends';
@@ -48,6 +49,8 @@ function FriendPreviewRow({ friend }: { friend: Friend }) {
         </p>
         <p className="text-sm text-carbon-400 tabular-nums">{friend.xp} XP</p>
       </div>
+
+      <LeagueMark rank={friend.leagueRank} size={30} />
 
       {friend.streak > 0 && (
         <span className="shrink-0 inline-flex items-center gap-1 text-sm font-black text-carbon-300 tabular-nums">

@@ -239,6 +239,25 @@ check('it pins the search path, like every other definer function', /set search_
 check('accuracy leaves as a percentage, not as the answers behind it', /round\(100\.0 \* sum/.test(friendSql));
 check('anonymous callers cannot execute it', /revoke all on function public\.friend_profile/.test(friendSql));
 
+// A friend's league travels with the rest of their profile — and the list
+// gains it too, so the ladder shows without opening anything.
+const friendLeagueSql = readFileSync('supabase/migrations/0014_friend_league.sql', 'utf8');
+check(
+  'friend_list y friend_profile devuelven la liga',
+  /friend_list[\s\S]*league_rank/.test(friendLeagueSql) &&
+    /friend_profile[\s\S]*p\.league_rank/.test(friendLeagueSql)
+);
+check(
+  'y siguen detrás de sus puertas',
+  /are_friends\(auth\.uid\(\), other\)/.test(friendLeagueSql) &&
+    /auth\.uid\(\) in \(f\.requester_id, f\.addressee_id\)/.test(friendLeagueSql)
+);
+check(
+  'reemplazan la definición anterior en vez de duplicarla',
+  /drop function if exists public\.friend_list\(\)/.test(friendLeagueSql) &&
+    /drop function if exists public\.friend_profile\(uuid\)/.test(friendLeagueSql)
+);
+
 // The calendar a friend's streak claims, with the same door as the rest of it.
 const calendarSql = readFileSync('supabase/migrations/0012_friend_streak_calendar.sql', 'utf8');
 check(

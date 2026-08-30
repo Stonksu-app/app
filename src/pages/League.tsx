@@ -10,6 +10,7 @@ import { Button } from '../components/Button';
 import { fetchLeagueTable, type LeagueMember } from '../lib/leagues';
 import {
   leagueRankInfo,
+  LEAGUE_RANKS,
   MAX_LEAGUE_RANK,
   MIN_TABLE_SIZE_FOR_DEMOTION,
   MIN_TABLE_SIZE_FOR_PROMOTION,
@@ -170,6 +171,54 @@ export default function League() {
               )}
             </>
           )}
+
+          {/* The whole ladder, so the rank you're on has somewhere to be on.
+              A single league with nothing above or below it is a table, not a
+              league. */}
+          <h2 className="mt-8 text-2xl font-black text-carbon-50">Todas las ligas</h2>
+          <p className="mt-1 text-sm text-carbon-400">
+            Cada lunes, los primeros suben y los últimos bajan.
+          </p>
+
+          <div className="mt-3 bg-carbon-850 border-2 border-carbon-800 rounded-2xl px-4">
+            {LEAGUE_RANKS.map((info, i) => {
+              const current = i === leagueRank;
+              // Everything above where you are is still ahead of you. Below is
+              // ground you've covered, which is worth showing as covered
+              // rather than as another locked door.
+              const locked = i > leagueRank;
+              return (
+                <div
+                  key={info.name}
+                  className={`flex items-center gap-3 py-3 border-b-2 border-carbon-800 last:border-b-0 ${
+                    locked ? 'opacity-45' : ''
+                  }`}
+                >
+                  <LeagueMark rank={i} size={40} />
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={`font-black truncate ${
+                        current ? 'text-lime-400' : 'text-carbon-100'
+                      }`}
+                    >
+                      {info.name}
+                      {current && ' (estás aquí)'}
+                    </p>
+                    <p className="text-[13px] text-carbon-500">Liga {i + 1} de {MAX_LEAGUE_RANK + 1}</p>
+                  </div>
+                  {locked ? (
+                    <Icon name="lock" size={18} className="shrink-0 text-carbon-600" />
+                  ) : current ? (
+                    <span className="shrink-0 rounded-lg bg-lime-500/15 px-2 py-1 text-[11px] font-black uppercase tracking-wide text-lime-400">
+                      Actual
+                    </span>
+                  ) : (
+                    <Icon name="check" size={18} strokeWidth={3} className="shrink-0 text-carbon-500" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
           {!isCloudEnabled && (
             <p className="mt-6 text-center text-xs text-carbon-600 font-bold">

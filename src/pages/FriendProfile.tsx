@@ -6,6 +6,8 @@ import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
 import Mascot from '../components/Mascot';
 import PlanBadge from '../components/PlanBadge';
+import LeagueMark from '../components/LeagueMark';
+import { MAX_LEAGUE_RANK, leagueRankInfo } from '../data/leagues';
 import { MonthGrid } from '../components/StreakCalendar';
 import { Button } from '../components/Button';
 import ConfirmModal from '../components/ConfirmModal';
@@ -217,6 +219,29 @@ export default function FriendProfile() {
                     })}
                   </p>
                 )}
+              </div>
+
+              {/* Their league, above the stats: it's the one line here that
+                  says where they are relative to everyone, which is the
+                  reason to look at somebody else's profile at all. */}
+              <div className="mt-4 flex items-center gap-3 rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-4">
+                <LeagueMark rank={profile.leagueRank} size={44} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] font-black uppercase tracking-[0.8px] text-carbon-500">
+                    Liga {profile.leagueRank + 1} de {MAX_LEAGUE_RANK + 1}
+                  </p>
+                  <p className="text-[17px] font-black text-carbon-50 truncate">
+                    {leagueRankInfo(profile.leagueRank).name}
+                  </p>
+                </div>
+                <span className="shrink-0 text-right">
+                  <span className="block text-[15px] font-black text-carbon-100 tabular-nums">
+                    {profile.weeklyXp}
+                  </span>
+                  <span className="block text-[11px] font-bold uppercase tracking-wide text-carbon-500">
+                    XP semana
+                  </span>
+                </span>
               </div>
 
               <h3 className="mt-8 text-[19px] font-black text-carbon-50">Estadísticas</h3>

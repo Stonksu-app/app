@@ -8,6 +8,7 @@ import Mascot from '../components/Mascot';
 import { Button } from '../components/Button';
 import ConfirmModal from '../components/ConfirmModal';
 import PlanBadge from '../components/PlanBadge';
+import LeagueMark from '../components/LeagueMark';
 import { formatCountdown } from '../hooks/useHeartRegen';
 import {
   listFriends,
@@ -97,6 +98,10 @@ function FriendRow({
           </span>
         </p>
       </button>
+
+      {/* Their league, small, only for actual friends — a pending request
+          isn't somebody you're competing with yet. */}
+      {friend.relation === 'friend' && <LeagueMark rank={friend.leagueRank} size={32} />}
 
       {friend.relation === 'friend' && (
         <div className="shrink-0 flex items-center gap-2">

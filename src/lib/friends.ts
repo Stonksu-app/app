@@ -22,6 +22,8 @@ export interface Friend {
   streak: number;
   xp: number;
   plan: Plan;
+  /** Index into LEAGUE_RANKS — see src/data/leagues.ts. */
+  leagueRank: number;
   relation: Relation;
   since: string;
 }
@@ -35,6 +37,8 @@ export interface FriendProfile {
   streak: number;
   xp: number;
   plan: Plan;
+  leagueRank: number;
+  weeklyXp: number;
   lessons: number;
   /** Percentage of answers correct, or null if they've never answered one. */
   accuracy: number | null;
@@ -151,6 +155,7 @@ export async function listFriends(): Promise<Friend[]> {
     // A list served by a database that predates the plan column reads free,
     // which is the safe way to be wrong: it under-promises a badge.
     plan: (r.plan as Plan) ?? 'free',
+    leagueRank: (r.league_rank as number) ?? 0,
     relation: r.relation as Relation,
     since: r.since as string,
   }));
@@ -178,6 +183,10 @@ export async function fetchFriendProfile(friendId: string): Promise<FriendProfil
     streak: (row.streak as number) ?? 0,
     xp: (row.xp as number) ?? 0,
     plan: ((row.plan as Plan) ?? 'free'),
+    // A database still on the previous version sends neither; rank 0 is the
+    // first league, which is where an unranked player would sit anyway.
+    leagueRank: (row.league_rank as number) ?? 0,
+    weeklyXp: (row.weekly_xp as number) ?? 0,
     lessons: (row.lessons as number) ?? 0,
     accuracy: row.accuracy === null || row.accuracy === undefined ? null : Number(row.accuracy),
     memberSince: row.member_since as string,
