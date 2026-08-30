@@ -117,5 +117,36 @@ check(
   'un boton que reescribe la racha acaba en la pantalla de otra persona'
 );
 
+/*
+ * A lesson records the day it happened, not just its timestamp.
+ *
+ * The timestamp is UTC and the streak counts local days, so anything
+ * rebuilding the calendar from outside the device — a friend's profile — had
+ * to guess, and guessed wrong for anything played after midnight. The result
+ * was a streak of three over a calendar showing one day, which is how the
+ * number stops being believed.
+ */
+useUserStore.setState({ activeDates: [], reviewDates: [] });
+play(99);
+const today = new Date();
+const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
+  today.getDate()
+).padStart(2, '0')}`;
+check(
+  'una lección deja escrito su día local',
+  useUserStore.getState().activeDates.includes(todayKey),
+  `quedó ${JSON.stringify(useUserStore.getState().activeDates)}`
+);
+play(100);
+check(
+  'dos el mismo día son un solo día en el calendario',
+  useUserStore.getState().activeDates.filter((d) => d === todayKey).length === 1
+);
+useUserStore.getState().completeReview();
+check(
+  'y un repaso cuenta igual',
+  useUserStore.getState().activeDates.includes(todayKey)
+);
+
 console.log(failed === 0 ? '\nTodo correcto.' : `\n${failed} problema(s).`);
 process.exit(failed === 0 ? 0 : 1);

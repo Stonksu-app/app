@@ -98,6 +98,17 @@ interface UserState {
    */
   reviewDates: string[];
   /**
+   * Every day with activity, as the local day this device saw.
+   *
+   * Lessons only left a UTC timestamp in `attempts`, so anyone rebuilding the
+   * calendar from the outside — a friend's profile, served by the database —
+   * had to guess the day from the clock, and a session after midnight landed
+   * on the square before. The streak, meanwhile, has always counted local
+   * days. Recording the day itself is what stops the number and the calendar
+   * describing different things.
+   */
+  activeDates: string[];
+  /**
    * XP earned since the current league week started — what this week's
    * table is ranked on, not the lifetime total above. Synced: it's the one
    * of the four league fields this device is allowed to write, the same way
@@ -409,6 +420,7 @@ export const useUserStore = create<UserState>()(
       dailyMissionsDate: null,
       claimedDailyMissionIds: [],
       reviewDates: [],
+      activeDates: [],
       weeklyXp: 0,
       leagueRank: 0,
       leagueTableId: null,
@@ -534,6 +546,7 @@ export const useUserStore = create<UserState>()(
           frozenDates,
           // Deduped: two repasos in one day are one day on the calendar.
           reviewDates: [...new Set([...s.reviewDates, today])],
+          activeDates: [...new Set([...s.activeDates, today])],
           streakProtectors: s.streakProtectors - protectorsUsed,
           lastStreakLoss: recordLoss(s, streak, missed, protectorsUsed, today),
           dailyReviews: daily.dailyReviews + 1,
@@ -550,6 +563,7 @@ export const useUserStore = create<UserState>()(
           // local days, so slicing would misfile anything played near midnight.
           ...s.attempts.map((a) => localDayKey(new Date(a.completedAt))),
           ...s.reviewDates,
+          ...s.activeDates,
           ...s.frozenDates,
         ];
         const today = todayStr();
@@ -659,6 +673,9 @@ export const useUserStore = create<UserState>()(
           nodeStageProgress,
           // Counts every lesson, repeats included: the pitch paces itself on
           // time spent in lessons, not on new ground covered.
+          // The day a lesson happened, in the same local domain the streak
+          // counts and the calendar draws.
+          activeDates: [...new Set([...s.activeDates, today])],
           lessonsSincePitch: s.lessonsSincePitch + 1,
           lastStreakLoss: recordLoss(s, streak, missed, protectorsUsed, today),
           dailyXp: daily.dailyXp + attempt.xpEarned,
@@ -920,6 +937,7 @@ export const useUserStore = create<UserState>()(
           dailyMissionsDate: null,
           claimedDailyMissionIds: [],
           reviewDates: [],
+          activeDates: [],
           weeklyXp: 0,
           leagueRank: 0,
           leagueTableId: null,

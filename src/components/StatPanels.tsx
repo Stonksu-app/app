@@ -14,10 +14,15 @@ export type StatKey = 'streak' | 'xp' | 'coins' | 'hearts';
 function useActiveDays() {
   const attempts = useUserStore((s) => s.attempts);
   const reviewDates = useUserStore((s) => s.reviewDates);
+  const activeDates = useUserStore((s) => s.activeDates);
   // Lessons and repasos both count: the streak already treats them the same,
   // and a calendar that disagreed with the streak beside it would look like
   // one of the two was lying.
-  return new Set([...attempts.map((a) => localDayKey(new Date(a.completedAt))), ...reviewDates]);
+  return new Set([
+    ...attempts.map((a) => localDayKey(new Date(a.completedAt))),
+    ...reviewDates,
+    ...activeDates,
+  ]);
 }
 
 function useFrozenDays(activeDays: Set<string>) {

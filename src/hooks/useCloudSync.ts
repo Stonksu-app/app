@@ -52,6 +52,7 @@ function snapshot(): CloudState {
     attempts: s.attempts,
     frozenDates: s.frozenDates,
     reviewDates: s.reviewDates,
+    activeDates: s.activeDates,
     weeklyXp: s.weeklyXp,
   };
 }

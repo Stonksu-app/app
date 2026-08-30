@@ -70,6 +70,7 @@ const sample: CloudState = {
   ],
   frozenDates: ['2026-08-15', '2026-08-16'],
   reviewDates: ['2026-08-17'],
+  activeDates: ['2026-08-17', '2026-08-18'],
   weeklyXp: 340,
 };
 

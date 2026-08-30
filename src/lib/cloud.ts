@@ -42,6 +42,7 @@ export interface CloudState {
   attempts: LessonAttempt[];
   frozenDates: string[];
   reviewDates: string[];
+  activeDates: string[];
   /** XP earned since the current league week started — see PulledProfile
    *  for why leagueRank/leagueTableId/leagueWeekStart aren't here too. */
   weeklyXp: number;
@@ -87,6 +88,7 @@ export interface ProfileRow {
   virtual_balance: number | string;
   frozen_dates: string[];
   review_dates: string[];
+  active_dates: string[];
   weekly_xp: number;
   league_rank: number;
   league_table_id: string | null;
@@ -122,6 +124,7 @@ export function toRow(s: CloudState, id: string) {
     virtual_balance: s.virtualBalance,
     frozen_dates: s.frozenDates,
     review_dates: s.reviewDates,
+    active_dates: s.activeDates,
     weekly_xp: s.weeklyXp,
   };
 }
@@ -158,6 +161,7 @@ export function fromRow(row: ProfileRow, attempts: LessonAttempt[]): PulledProfi
     // A profile written before the columns existed comes back null, not [].
     frozenDates: row.frozen_dates ?? [],
     reviewDates: row.review_dates ?? [],
+    activeDates: row.active_dates ?? [],
     weeklyXp: row.weekly_xp ?? 0,
     leagueRank: row.league_rank ?? 0,
     leagueTableId: row.league_table_id ?? null,
@@ -170,7 +174,8 @@ const PROFILE_COLUMNS =
   'last_active_date, streak_protectors, completed_lesson_ids, unlocked_badge_ids, ' +
   'seen_intro_node_ids, opened_chest_ids, claimed_mission_ids, unlocked_accessories, ' +
   'pending_mistakes, node_stage_progress, term_mastery, plan, plan_started_at, avatar, ' +
-  'virtual_balance, frozen_dates, review_dates, weekly_xp, league_rank, league_table_id, ' +
+  'virtual_balance, frozen_dates, review_dates, active_dates, weekly_xp, league_rank, ' +
+  'league_table_id, ' +
   'league_week_start';
 
 /**
