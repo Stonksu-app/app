@@ -13,7 +13,8 @@
  *
  * Run: npm run check -- progress
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { useUserStore } from '../src/store/useUserStore';
 import { SKILL_TREE } from '../src/data/lessons';
 import { stagesForDifficulty } from '../src/utils/mastery';
@@ -94,6 +95,26 @@ check(
   'el contador diario nunca devuelve el estado entero',
   !/if \(s\.dailyStatsDate === today\) return s\b/.test(source),
   'volvería a pisar todo lo que el set calculó antes del spread'
+);
+
+/*
+ * No shortcut anywhere can move the streak by hand.
+ *
+ * There was a dev button that rewound the last active day, so tapping it and
+ * playing a lesson added a day without one passing. It was gated on the dev
+ * environment rather than on test mode, so everyone testing on dev had it —
+ * and a streak built that way syncs, then shows on other people's profiles as
+ * a number their calendar cannot account for. It's gone; this keeps it gone,
+ * and keeps the next one from arriving quietly.
+ */
+const sourceFiles = readdirSync('src/pages')
+  .filter((f) => f.endsWith('.tsx'))
+  .map((f) => readFileSync(join('src/pages', f), 'utf8'))
+  .concat(readFileSync('src/store/useUserStore.ts', 'utf8'));
+check(
+  'ningun atajo rebobina el ultimo dia activo',
+  !sourceFiles.some((f) => /debugRewind|Simular un día sin practicar/.test(f)),
+  'un boton que reescribe la racha acaba en la pantalla de otra persona'
 );
 
 console.log(failed === 0 ? '\nTodo correcto.' : `\n${failed} problema(s).`);

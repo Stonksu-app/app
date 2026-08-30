@@ -64,11 +64,7 @@ export default function Profile() {
     openedChestIds,
     avatar,
     plan,
-    testMode,
     resetProgress,
-    lastActiveDate,
-    streakProtectors,
-    debugRewindLastActiveDate,
   } = useUserStore();
   const { level } = xpToLevel(xp);
   const authStatus = useAuthStore((s) => s.status);
@@ -210,44 +206,6 @@ export default function Profile() {
           >
             Cerrar sesión
           </button>
-
-          {/* Dev builds only: rewinds lastActiveDate a day at a time so the
-              streak checks that normally wait for real days to pass can be
-              exercised on demand — no need to actually skip practicing, and
-              no need to re-run onboarding as "test" just to see it. */}
-          {/*
-            Test-mode accounts only, not the whole dev deployment.
-            Rewinding the last active day makes the next lesson count as a
-            new day, so tapping it and playing walks the streak up without
-            any days passing — and that number then syncs, and shows on
-            other people's screens. It went out to everyone testing on dev,
-            where it produced an account three days old on its first
-            afternoon. A tool that rewrites history belongs to whoever is
-            deliberately holding it.
-          */}
-          {appEnv === 'dev' && testMode && (
-            <div className="mt-6 rounded-2xl border-2 border-dashed border-carbon-700 p-3">
-              <p className="text-[11px] font-black text-carbon-400 uppercase tracking-wide">
-                Modo prueba — racha
-              </p>
-              <p className="text-xs text-carbon-500 mt-1 tabular-nums">
-                Último día activo: {lastActiveDate ?? '—'} · protectores: {streakProtectors}
-              </p>
-              <button
-                onClick={() => debugRewindLastActiveDate()}
-                className="mt-2 text-xs font-black text-[#FFC93C] hover:text-[#ffd873]"
-              >
-                Simular un día sin practicar
-              </button>
-              <p className="text-[11px] text-carbon-600 mt-1">
-                Cada toque adelanta el hueco un día. Pasado lo que cubren tus
-                protectores, la racha debería bajar sola a 0 en cuanto la
-                pantalla lo detecte (sin hacer nada más). Dentro de lo que
-                cubren, hacer una lección debería mantenerla y pintar el día
-                de azul.
-              </p>
-            </div>
-          )}
 
           {/* Settles "is the new build actually on my phone?" without guesswork,
               which a sideloaded .ipa otherwise gives you no way to answer. */}

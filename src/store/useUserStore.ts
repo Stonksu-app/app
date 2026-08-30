@@ -11,7 +11,6 @@ import {
   daysBetween,
   isStreakUnrecoverable,
   localDayKey,
-  shiftDay,
   streakFromHistory,
   todayLocal,
 } from '../utils/streak';
@@ -233,7 +232,6 @@ interface UserState {
    * demand instead. Touches nothing else: coins, protectors and frozenDates
    * only change once one of those actually runs.
    */
-  debugRewindLastActiveDate: () => void;
   resetProgress: () => void;
 }
 
@@ -585,9 +583,6 @@ export const useUserStore = create<UserState>()(
           lastStreakLoss: recordLoss(s, 0, missed, protectorsUsed, today),
         });
       },
-
-      debugRewindLastActiveDate: () =>
-        set((s) => (s.lastActiveDate ? { lastActiveDate: shiftDay(s.lastActiveDate, -1) } : s)),
 
       completeLesson: (attempt) => {
         const s = get();
