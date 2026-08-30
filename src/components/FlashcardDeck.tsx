@@ -56,6 +56,7 @@ export default function FlashcardDeck({ cards, onDone }: { cards: Flashcard[]; o
             <p className="text-xs text-carbon-500 font-bold uppercase">Toca para ver qué significa</p>
           </div>
           <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] bg-lime-500 rounded-3xl flex flex-col items-center justify-center p-6 text-center gap-3">
+            <p className="text-xs font-black text-carbon-900/70 uppercase tracking-wide">{card.term}</p>
             <p className="text-lg font-bold text-carbon-900">{card.definition}</p>
           </div>
         </div>
