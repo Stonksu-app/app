@@ -55,9 +55,16 @@ export default function FlashcardDeck({ cards, onDone }: { cards: Flashcard[]; o
             <p className="text-2xl font-black text-carbon-50">{card.term}</p>
             <p className="text-xs text-carbon-500 font-bold uppercase">Toca para ver qué significa</p>
           </div>
-          <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] bg-lime-500 rounded-3xl flex flex-col items-center justify-center p-6 text-center gap-3">
-            <p className="text-xs font-black text-carbon-900/70 uppercase tracking-wide">{card.term}</p>
-            <p className="text-lg font-bold text-carbon-900">{card.definition}</p>
+          {/* The term stays on the back, as a heading rather than a caption.
+              Flipping a card answers "what does this mean?", and an answer
+              that doesn't restate the question makes you flip back to check
+              which word you were on. */}
+          <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] bg-lime-500 rounded-3xl flex flex-col p-6 text-center">
+            <p className="shrink-0 text-lg font-black text-carbon-900 leading-tight">{card.term}</p>
+            <span className="shrink-0 mt-3 h-0.5 w-12 self-center rounded-full bg-carbon-900/25" />
+            <div className="flex-1 min-h-0 flex items-center justify-center overflow-y-auto">
+              <p className="text-lg font-bold text-carbon-900 leading-snug">{card.definition}</p>
+            </div>
           </div>
         </div>
       </button>
