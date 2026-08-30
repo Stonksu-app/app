@@ -11,7 +11,7 @@ import { Button } from '../components/Button';
 import ConfirmModal from '../components/ConfirmModal';
 import { fetchFriendProfile, pingFriend, removeFriend, type FriendProfile } from '../lib/friends';
 import { useUserStore } from '../store/useUserStore';
-import { inferredFrozenDays } from '../utils/streak';
+import { inferredFrozenDays, practisedToday } from '../utils/streak';
 import type { IconName } from '../types';
 
 /*
@@ -247,9 +247,19 @@ export default function FriendProfile() {
                       have crossed are worked out rather than needing to have
                       been witnessed. */}
                   <MonthGrid activeDays={theirActiveDays} frozenDays={theirFrozenDays} />
-                  {profile.activeDays.length === 0 && (
+                  {profile.activeDays.length === 0 ? (
                     <p className="mt-2 text-center text-[13px] text-carbon-500">
                       Sin días registrados todavía.
+                    </p>
+                  ) : (
+                    /* Answers the question the grid raises on its own: the
+                       streak counts up to their last practice, so today is
+                       blank until they play, and the number looks one short
+                       to anyone counting squares including today. */
+                    <p className="mt-2 text-center text-[13px] text-carbon-500">
+                      {practisedToday(profile.lastActive)
+                        ? 'Hoy ya ha practicado.'
+                        : `Hoy todavía no. Su racha sube a ${profile.streak + 1} cuando practique.`}
                     </p>
                   )}
                 </div>
