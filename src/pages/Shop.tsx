@@ -5,7 +5,7 @@ import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/Button';
-import { planName } from '../data/plans';
+import { atLeast, planName } from '../data/plans';
 import UltraPromo from '../components/UltraPromo';
 import {
   COIN_PRICES,
@@ -77,7 +77,8 @@ function ShopRow({
 }
 
 export default function Shop() {
-  const { coins, hearts, streakProtectors, plan, buyHeartRefill, buyStreakProtector } = useUserStore();
+  const { coins, hearts, streakProtectors, plan, virtualBalance, buyHeartRefill, buyStreakProtector } =
+    useUserStore();
   const [flash, setFlash] = useState<string | null>(null);
 
   const announce = (msg: string) => {
@@ -158,6 +159,43 @@ export default function Shop() {
               if (buyStreakProtector()) announce('¡Protector de racha equipado!');
             }}
           />
+
+          <h2 className="mt-8 text-[13px] font-black text-carbon-400 uppercase tracking-widest">
+            Saldo virtual
+          </h2>
+          <div className="relative overflow-hidden rounded-3xl border-2 border-ultra-500/40 bg-carbon-850 p-5">
+            <span className="inline-flex items-center gap-1 rounded-lg bg-ultra-500/15 px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.8px] text-ultra-400">
+              <Icon name="diamond" size={13} /> Ultra
+            </span>
+            <span className="ml-2 inline-block rounded-lg bg-carbon-800 px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.8px] text-carbon-400">
+              Próximamente
+            </span>
+
+            <h3 className="mt-2.5 text-[17px] font-black text-carbon-50">Canjea tu saldo por USDT</h3>
+            <p className="mt-1 text-sm text-carbon-400 leading-snug">
+              Este es el dinero que llevas "operando" en Stonksu, no las monedas de la tienda. Con
+              Ultra, a partir de cierto saldo podrás canjearlo por USDT a través de un bróker de
+              confianza. Todavía lo estamos preparando.
+            </p>
+
+            <div className="mt-4 flex items-center gap-2">
+              <Icon name="wallet" size={20} className="text-carbon-400" />
+              <span className="font-black text-carbon-100 tabular-nums">
+                ${virtualBalance.toLocaleString('es-ES', { maximumFractionDigits: 2 })}
+              </span>
+            </div>
+
+            {!atLeast(plan, 'ultra') && (
+              <Link
+                to="/planes"
+                className="mt-4 flex h-[46px] items-center justify-center gap-1.5 rounded-xl bg-ultra-400 text-[14px] font-black uppercase tracking-[0.8px] text-carbon-900 transition hover:bg-ultra-300"
+                style={{ boxShadow: '0 4px 0 #4c1d95' }}
+              >
+                <Icon name="diamond" size={17} />
+                Consigue Ultra para cuando esté listo
+              </Link>
+            )}
+          </div>
 
           <p className="mt-8 text-xs text-carbon-500 leading-relaxed">
             Ganas monedas al acertar preguntas y al abrir cofres. Las monedas son solo de la app: no
