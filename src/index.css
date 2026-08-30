@@ -87,12 +87,23 @@ body {
   box-sizing: border-box;
 }
 
-/* Interactive game/quiz surfaces shouldn't show a text cursor or let a
-   long-press start a text selection — they behave like native controls. */
-button {
-  -webkit-user-select: none;
-  user-select: none;
-  touch-action: manipulation;
+/*
+ * Interactive game/quiz surfaces shouldn't show a text cursor or let a
+ * long-press start a text selection — they behave like native controls.
+ *
+ * In @layer base on purpose. Unlayered rules outrank Tailwind's utilities, so
+ * as a bare selector this quietly beat `touch-none` on every button in the
+ * app — including the draggable chips in the classify game, where the browser
+ * then kept panning for itself and ate the drag. Same trap that once unstuck
+ * the unit banner: this file is unlayered, so anything meant as a default has
+ * to say so.
+ */
+@layer base {
+  button {
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+  }
 }
 
 /* Duolingo's signature chunky button: a solid slab of colour sitting on a

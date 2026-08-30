@@ -37,12 +37,24 @@ export default function SortClassifyGame({
    * or with a keyboard. The drag is pointer-based rather than HTML5
    * drag-and-drop, which does not fire on touch at all.
    */
-  const [dragging, setDragging] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [dragging, setDragging] = useState<{
+    id: string;
+    x: number;
+    y: number;
+    /** True once the pointer has travelled far enough to mean a drag rather
+     *  than a tap that wobbled. Below the threshold the gesture stays a tap,
+     *  which is the flow that was already here and still works. */
+    moved: boolean;
+  } | null>(null);
   const bucketRefs = useRef<Record<'a' | 'b', HTMLElement | null>>({ a: null, b: null });
   const [hoverBucket, setHoverBucket] = useState<'a' | 'b' | null>(null);
   /** Where the finger went down, so the chip follows it rather than jumping
    *  its own top-left corner to the cursor. */
   const startRef = useRef({ x: 0, y: 0 });
+  /** Pixels of travel before a press becomes a drag. A finger never holds
+   *  perfectly still, and treating two pixels of wobble as a drag stole the
+   *  tap-then-tap flow from anyone who taps firmly. */
+  const DRAG_THRESHOLD = 6;
 
   /** Which bucket a point is over, or null between them. */
   const bucketAt = (x: number, y: number): 'a' | 'b' | null => {
@@ -83,26 +95,42 @@ export default function SortClassifyGame({
         {remaining.map((item) => (
           <button
             key={item.id}
-            onClick={() => setSelectedItem(item.id)}
+            // Pointer input already selected this on press. Kept for the
+            // keyboard, where there is no pointer at all — and guarded so it
+            // can't re-select a chip that was just dragged into a bucket.
+            onClick={() => {
+              if (!placed[item.id]) setSelectedItem(item.id);
+            }}
             onPointerDown={(e) => {
               (e.currentTarget as Element).setPointerCapture(e.pointerId);
               setSelectedItem(item.id);
               startRef.current = { x: e.clientX, y: e.clientY };
-              setDragging({ id: item.id, x: e.clientX, y: e.clientY });
+              setDragging({ id: item.id, x: e.clientX, y: e.clientY, moved: false });
             }}
             onPointerMove={(e) => {
               if (dragging?.id !== item.id) return;
-              setDragging({ id: item.id, x: e.clientX, y: e.clientY });
-              setHoverBucket(bucketAt(e.clientX, e.clientY));
+              const dx = e.clientX - startRef.current.x;
+              const dy = e.clientY - startRef.current.y;
+              const moved = dragging.moved || Math.hypot(dx, dy) > DRAG_THRESHOLD;
+              setDragging({ id: item.id, x: e.clientX, y: e.clientY, moved });
+              setHoverBucket(moved ? bucketAt(e.clientX, e.clientY) : null);
             }}
             onPointerUp={(e) => {
               if (dragging?.id !== item.id) return;
-              const bucket = bucketAt(e.clientX, e.clientY);
+              // Only a real drag drops. A tap leaves the chip selected, which
+              // is where the tap-then-tap flow picks up — and stops a firm tap
+              // that happens to land over a bucket from answering for you.
+              const bucket = dragging.moved ? bucketAt(e.clientX, e.clientY) : null;
               setDragging(null);
               setHoverBucket(null);
-              // Dropped on a bucket, it counts; dropped anywhere else the chip
-              // simply stays selected, which is where the tap flow picks up.
               if (bucket) handlePlace(bucket, item.id);
+            }}
+            // Fires when the browser takes the pointer away — a scroll gesture
+            // winning, the element unmounting mid-drag — and without it the
+            // chip stays stuck to the finger with nothing to release it.
+            onLostPointerCapture={() => {
+              setDragging(null);
+              setHoverBucket(null);
             }}
             onPointerCancel={() => {
               setDragging(null);
@@ -117,8 +145,14 @@ export default function SortClassifyGame({
                   }
                 : undefined
             }
-            className={`px-3 py-2 rounded-full border-2 text-sm font-bold touch-none transition ${
-              dragging?.id === item.id ? 'z-20 relative shadow-lg cursor-grabbing' : 'cursor-grab'
+            /* `transition` animates transform too, so while dragging the chip
+               trailed the finger by 150ms and every drop landed where the
+               finger had been rather than where it was. Off during the drag,
+               on for everything else. */
+            className={`px-3 py-2 rounded-full border-2 text-sm font-bold touch-none select-none ${
+              dragging?.id === item.id
+                ? 'z-20 relative shadow-lg cursor-grabbing transition-none'
+                : 'cursor-grab transition'
             } ${
               wrongItem === item.id
                 ? 'border-danger-500 bg-danger-950 text-danger-400 animate-shake'

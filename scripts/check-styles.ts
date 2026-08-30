@@ -171,5 +171,28 @@ check(
     /--color-league-gold/.test(css)
 );
 
+/*
+ * Element defaults have to live in @layer base.
+ *
+ * This stylesheet is unlayered, so a bare `button { … }` outranks every
+ * Tailwind utility — which is how `touch-action: manipulation` quietly beat
+ * `touch-none` on the draggable chips in the classify game and let the
+ * browser keep the gesture for panning. Same shape of bug as the blanket
+ * `position` that once unstuck the unit banner.
+ */
+const bareElementRule = new RegExp(
+  String.raw`(^|
+)(button|input|a|p|h[1-6])\s*\{[^}]*\}`
+).exec(css);
+check(
+  'ningún elemento lleva estilos por defecto fuera de @layer base',
+  bareElementRule === null,
+  bareElementRule ? bareElementRule[0].replace(/\s+/g, ' ').slice(0, 80) : ''
+);
+check(
+  'y los que hay están dentro de la capa',
+  new RegExp(String.raw`@layer base \{[\s\S]*button \{`).test(css)
+);
+
 console.log(failed === 0 ? '\nTodo correcto.' : `\n${failed} problema(s).`);
 process.exit(failed === 0 ? 0 : 1);
