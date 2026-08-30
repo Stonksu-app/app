@@ -14,6 +14,19 @@ import {
   useUserStore,
 } from '../store/useUserStore';
 
+/**
+ * The preview redemption rate: 100 USDT per this many coins.
+ *
+ * Coins come from correct answers (2 each) and chests (50), plus daily and
+ * one-off missions (40-200-ish). A genuinely daily player earns somewhere
+ * around 100-250 a day, so this sits at roughly 3-4 months of real, sustained
+ * engagement — expensive enough that it can't be farmed in a weekend, cheap
+ * enough that it's a real target rather than a joke. Revisit before this
+ * goes live; it's a starting guess, not a rate anyone has committed to.
+ */
+const COINS_PER_USDT_REDEMPTION = 20_000;
+const USDT_REDEMPTION_AMOUNT = 100;
+
 /** One purchasable row: art on the left, copy in the middle, action on the right. */
 function ShopRow({
   icon,
@@ -77,8 +90,7 @@ function ShopRow({
 }
 
 export default function Shop() {
-  const { coins, hearts, streakProtectors, plan, virtualBalance, buyHeartRefill, buyStreakProtector } =
-    useUserStore();
+  const { coins, hearts, streakProtectors, plan, buyHeartRefill, buyStreakProtector } = useUserStore();
   const [flash, setFlash] = useState<string | null>(null);
 
   const announce = (msg: string) => {
@@ -161,7 +173,7 @@ export default function Shop() {
           />
 
           <h2 className="mt-8 text-[13px] font-black text-carbon-400 uppercase tracking-widest">
-            Saldo virtual
+            Canje de monedas
           </h2>
           <div className="relative overflow-hidden rounded-3xl border-2 border-ultra-500/40 bg-carbon-850 p-5">
             <span className="inline-flex items-center gap-1 rounded-lg bg-ultra-500/15 px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.8px] text-ultra-400">
@@ -171,18 +183,29 @@ export default function Shop() {
               Próximamente
             </span>
 
-            <h3 className="mt-2.5 text-[17px] font-black text-carbon-50">Canjea tu saldo por USDT</h3>
+            <h3 className="mt-2.5 text-[17px] font-black text-carbon-50">
+              {COINS_PER_USDT_REDEMPTION.toLocaleString('es-ES')} monedas = {USDT_REDEMPTION_AMOUNT} USDT
+            </h3>
             <p className="mt-1 text-sm text-carbon-400 leading-snug">
-              Este es el dinero que llevas "operando" en Stonksu, no las monedas de la tienda. Con
-              Ultra, a partir de cierto saldo podrás canjearlo por USDT a través de un bróker de
-              confianza. Todavía lo estamos preparando.
+              Con Ultra, tus monedas ganadas jugando podrán canjearse por USDT de verdad a través de
+              un bróker de confianza, al llegar a este umbral. Todavía lo estamos preparando —
+              cantidades y condiciones pueden cambiar antes de lanzarlo.
             </p>
 
-            <div className="mt-4 flex items-center gap-2">
-              <Icon name="wallet" size={20} className="text-carbon-400" />
-              <span className="font-black text-carbon-100 tabular-nums">
-                ${virtualBalance.toLocaleString('es-ES', { maximumFractionDigits: 2 })}
-              </span>
+            <div className="mt-4">
+              <div className="flex items-center justify-between text-sm font-black text-carbon-300">
+                <span className="flex items-center gap-1.5">
+                  <Icon name="coins" size={16} className="text-lime-500" />
+                  {coins.toLocaleString('es-ES')}
+                </span>
+                <span className="text-carbon-500">{COINS_PER_USDT_REDEMPTION.toLocaleString('es-ES')}</span>
+              </div>
+              <div className="mt-1.5 h-2.5 rounded-full bg-carbon-800 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-ultra-400 transition-all duration-500"
+                  style={{ width: `${Math.min(100, (coins / COINS_PER_USDT_REDEMPTION) * 100)}%` }}
+                />
+              </div>
             </div>
 
             {!atLeast(plan, 'ultra') && (
@@ -198,8 +221,8 @@ export default function Shop() {
           </div>
 
           <p className="mt-8 text-xs text-carbon-500 leading-relaxed">
-            Ganas monedas al acertar preguntas y al abrir cofres. Las monedas son solo de la app: no
-            tienen ningún valor real ni se compran con dinero.
+            Ganas monedas al acertar preguntas y al abrir cofres. No se compran con dinero — la única
+            vía es jugar.
           </p>
         </div>
       </div>
