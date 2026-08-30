@@ -42,6 +42,23 @@ export interface CloudState {
   attempts: LessonAttempt[];
   frozenDates: string[];
   reviewDates: string[];
+  /** XP earned since the current league week started — see PulledProfile
+   *  for why leagueRank/leagueTableId/leagueWeekStart aren't here too. */
+  weeklyXp: number;
+}
+
+/**
+ * What a pull actually returns: everything CloudState pushes, plus the
+ * league placement fields the server alone computes. Kept out of CloudState
+ * itself — and so out of toRow — because a value nothing here ever writes
+ * has no business round-tripping through the push side of the mapping; the
+ * one function capable of clobbering this week's real placement with a
+ * stale local copy is the one that was never given the chance to.
+ */
+export interface PulledProfile extends CloudState {
+  leagueRank: number;
+  leagueTableId: string | null;
+  leagueWeekStart: string | null;
 }
 
 export interface ProfileRow {
@@ -70,6 +87,10 @@ export interface ProfileRow {
   virtual_balance: number | string;
   frozen_dates: string[];
   review_dates: string[];
+  weekly_xp: number;
+  league_rank: number;
+  league_table_id: string | null;
+  league_week_start: string | null;
 }
 
 /** Exported so scripts/check-cloud.ts can prove the mapping is lossless. */
@@ -101,10 +122,11 @@ export function toRow(s: CloudState, id: string) {
     virtual_balance: s.virtualBalance,
     frozen_dates: s.frozenDates,
     review_dates: s.reviewDates,
+    weekly_xp: s.weeklyXp,
   };
 }
 
-export function fromRow(row: ProfileRow, attempts: LessonAttempt[]): CloudState {
+export function fromRow(row: ProfileRow, attempts: LessonAttempt[]): PulledProfile {
   return {
     name: row.name,
     onboarded: row.onboarded,
@@ -136,6 +158,10 @@ export function fromRow(row: ProfileRow, attempts: LessonAttempt[]): CloudState 
     // A profile written before the columns existed comes back null, not [].
     frozenDates: row.frozen_dates ?? [],
     reviewDates: row.review_dates ?? [],
+    weeklyXp: row.weekly_xp ?? 0,
+    leagueRank: row.league_rank ?? 0,
+    leagueTableId: row.league_table_id ?? null,
+    leagueWeekStart: row.league_week_start ?? null,
   };
 }
 
@@ -144,7 +170,8 @@ const PROFILE_COLUMNS =
   'last_active_date, streak_protectors, completed_lesson_ids, unlocked_badge_ids, ' +
   'seen_intro_node_ids, opened_chest_ids, claimed_mission_ids, unlocked_accessories, ' +
   'pending_mistakes, node_stage_progress, term_mastery, plan, plan_started_at, avatar, ' +
-  'virtual_balance, frozen_dates, review_dates';
+  'virtual_balance, frozen_dates, review_dates, weekly_xp, league_rank, league_table_id, ' +
+  'league_week_start';
 
 /**
  * Signs in, creating an anonymous account on first launch.
@@ -259,7 +286,7 @@ function waitForSession(timeoutMs = 4000): Promise<string | null> {
 
 export type PullResult =
   /** A profile row exists; `state` is it. */
-  | { status: 'found'; state: CloudState }
+  | { status: 'found'; state: PulledProfile }
   /** The account has no profile yet. Safe to seed from this device. */
   | { status: 'empty' }
   /** The read failed. Says nothing about what is up there. */

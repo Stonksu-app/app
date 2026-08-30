@@ -70,6 +70,7 @@ const sample: CloudState = {
   ],
   frozenDates: ['2026-08-15', '2026-08-16'],
   reviewDates: ['2026-08-17'],
+  weeklyXp: 340,
 };
 
 // ------------------------------------------------- the mapping is lossless
@@ -146,9 +147,27 @@ const LOCAL_ONLY = new Set([
   'claimedDailyMissionIds',
 ]);
 
+/**
+ * The opposite asymmetry from LOCAL_ONLY: these come *from* the cloud —
+ * pulled by fromRow, present in PulledProfile — but are deliberately absent
+ * from CloudState/toRow, because nothing on this device is the one allowed
+ * to decide them. league_rank, league_table_id and league_week_start are
+ * server-owned: only the weekly reset and join_league_if_needed() (both
+ * running as the database, not the client) ever write them. Pushing back
+ * whatever stale copy this device happened to have would be exactly the bug
+ * that cost the streak calendar its frozen days before frozenDates synced —
+ * except unrecoverable here, since it would overwrite a value the server
+ * just computed with one the client made up.
+ */
+const SERVER_OWNED = new Set(['leagueRank', 'leagueTableId', 'leagueWeekStart']);
+
 for (const key of persistedKeys) {
   if (LOCAL_ONLY.has(key)) {
     check(`"${key}" is deliberately kept off the cloud`, !cloudKeys.has(key));
+    continue;
+  }
+  if (SERVER_OWNED.has(key)) {
+    check(`"${key}" is read from the cloud but never written back`, !cloudKeys.has(key));
     continue;
   }
   check(`store field "${key}" is synced`, cloudKeys.has(key), 'add it to CloudState, toRow and fromRow');
@@ -174,6 +193,15 @@ for (const column of Object.keys(row)) {
   // Two shapes count: a column in the original create table, and one bolted
   // on later by an alter. Only matching the first would push every new field
   // into 0001, which is what having migrations at all is meant to stop.
+  const declared =
+    new RegExp(String.raw`\n\s+${column}\s`).test(sql) ||
+    new RegExp(String.raw`add column (if not exists )?${column}\s`).test(sql);
+  check(`the profiles table declares "${column}"`, declared, `missing from ${migrationDir}`);
+}
+
+// Server-owned columns don't come from toRow's output, so the loop above
+// never looks for them — checked by hand instead, same regex.
+for (const column of ['league_rank', 'league_table_id', 'league_week_start']) {
   const declared =
     new RegExp(String.raw`\n\s+${column}\s`).test(sql) ||
     new RegExp(String.raw`add column (if not exists )?${column}\s`).test(sql);
@@ -209,6 +237,34 @@ check('it runs as definer, since the caller cannot read those tables', /security
 check('it pins the search path, like every other definer function', /set search_path = ''/.test(friendSql));
 check('accuracy leaves as a percentage, not as the answers behind it', /round\(100\.0 \* sum/.test(friendSql));
 check('anonymous callers cannot execute it', /revoke all on function public\.friend_profile/.test(friendSql));
+
+// ------------------------------------------------------------- the leagues
+// A player's table is the one door onto other players' rows; if it ever
+// stopped scoping to the caller's own league_table_id, anybody's weekly XP
+// would be readable by anybody. And nothing client-facing may ever call the
+// reset directly — only the cron schedule may end everyone's week.
+const leagueSql = readFileSync('supabase/migrations/0009_leagues.sql', 'utf8');
+check(
+  'league_leaderboard only answers for the caller\'s own table',
+  /where league_table_id = \(select league_table_id from public\.profiles where id = auth\.uid\(\)\)/.test(
+    leagueSql
+  )
+);
+check('join_league_if_needed turns away anonymous accounts', /is_anonymous = false/.test(leagueSql));
+check(
+  'both league functions run as definer, since the caller cannot read other rows',
+  (leagueSql.match(/security definer/g) ?? []).length >= 3
+);
+check(
+  'the weekly reset cannot be called by a client',
+  /revoke all on function public\.run_weekly_league_reset\(\) from public;/.test(leagueSql) &&
+    !/grant execute on function public\.run_weekly_league_reset/.test(leagueSql)
+);
+check('the reset is scheduled, not left to run by hand', /cron\.schedule\(/.test(leagueSql));
+check(
+  'promotion and relegation only trigger on a table big enough for them to be fair',
+  /table_size > 4/.test(leagueSql) && /table_size > 1/.test(leagueSql)
+);
 
 // ------------------------------------------ how a failed write is classified
 // Both of these fail identically on every later attempt too, so getting the

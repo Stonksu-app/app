@@ -99,6 +99,21 @@ interface UserState {
    */
   reviewDates: string[];
   /**
+   * XP earned since the current league week started — what this week's
+   * table is ranked on, not the lifetime total above. Synced: it's the one
+   * of the four league fields this device is allowed to write, the same way
+   * it already writes xp. The other three are server-owned.
+   */
+  weeklyXp: number;
+  /** 0 Beginner .. 5 Market Master — see data/leagues.ts. Server-owned: only
+   *  the weekly reset changes it, so this device only ever reads it back. */
+  leagueRank: number;
+  /** Which group of same-league players this account is competing against
+   *  this week. Null until join_league_if_needed() seats it. Server-owned. */
+  leagueTableId: string | null;
+  /** The Monday this table's week started. Server-owned. */
+  leagueWeekStart: string | null;
+  /**
    * The last streak that broke, and why.
    *
    * Losing a streak while holding protectors that didn't cover the gap looks
@@ -376,6 +391,10 @@ export const useUserStore = create<UserState>()(
       dailyMissionsDate: null,
       claimedDailyMissionIds: [],
       reviewDates: [],
+      weeklyXp: 0,
+      leagueRank: 0,
+      leagueTableId: null,
+      leagueWeekStart: null,
       lastStreakLoss: null,
       lessonsSincePitch: 0,
       openedChestIds: [],
@@ -461,6 +480,7 @@ export const useUserStore = create<UserState>()(
         }
         set({
           xp: s.xp + amount,
+          weeklyXp: s.weeklyXp + amount,
           coins: s.coins + (levelUp?.coins ?? 0),
           streakProtectors: s.streakProtectors + (levelUp?.protectors ?? 0),
           ...daily,
@@ -612,6 +632,7 @@ export const useUserStore = create<UserState>()(
 
         set({
           xp: s.xp + attempt.xpEarned,
+          weeklyXp: s.weeklyXp + attempt.xpEarned,
           coins: s.coins + attempt.correctCount * COINS_PER_CORRECT + (levelUp?.coins ?? 0),
           streakProtectors,
           frozenDates,
@@ -759,6 +780,7 @@ export const useUserStore = create<UserState>()(
         set({
           openedChestIds: [...s.openedChestIds, chestId],
           xp: s.xp + CHEST_REWARD.xp,
+          weeklyXp: s.weeklyXp + CHEST_REWARD.xp,
           coins: s.coins + CHEST_REWARD.coins + (levelUp?.coins ?? 0),
           streakProtectors: protectorsAfterGift + (levelUp?.protectors ?? 0),
           ...daily,
@@ -883,6 +905,10 @@ export const useUserStore = create<UserState>()(
           dailyMissionsDate: null,
           claimedDailyMissionIds: [],
           reviewDates: [],
+          weeklyXp: 0,
+          leagueRank: 0,
+          leagueTableId: null,
+          leagueWeekStart: null,
           lastStreakLoss: null,
           lessonsSincePitch: 0,
           openedChestIds: [],

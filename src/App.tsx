@@ -11,6 +11,7 @@ import Shop from './pages/Shop';
 import Achievements from './pages/Achievements';
 import AvatarEditor from './pages/AvatarEditor';
 import Missions from './pages/Missions';
+import League from './pages/League';
 import Login from './pages/Login';
 import Friends from './pages/Friends';
 import FriendProfile from './pages/FriendProfile';
@@ -215,6 +216,14 @@ function App() {
         element={
           <RequireOnboarded>
             <Missions />
+          </RequireOnboarded>
+        }
+      />
+      <Route
+        path="/liga"
+        element={
+          <RequireOnboarded>
+            <League />
           </RequireOnboarded>
         }
       />
