@@ -6,10 +6,12 @@ import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
 import Mascot from '../components/Mascot';
 import PlanBadge from '../components/PlanBadge';
+import { MonthGrid } from '../components/StreakCalendar';
 import { Button } from '../components/Button';
 import ConfirmModal from '../components/ConfirmModal';
 import { fetchFriendProfile, pingFriend, removeFriend, type FriendProfile } from '../lib/friends';
 import { useUserStore } from '../store/useUserStore';
+import { inferredFrozenDays } from '../utils/streak';
 import type { IconName } from '../types';
 
 /*
@@ -26,18 +28,52 @@ function Stat({
   value,
   label,
   tone = 'text-lime-500',
+  onClick,
+  open,
 }: {
   icon: IconName;
   value: string;
   label: string;
   tone?: string;
+  /** Present when the tile opens something — the streak's calendar. */
+  onClick?: () => void;
+  open?: boolean;
 }) {
-  return (
-    <div className="rounded-2xl border-2 border-carbon-800 bg-carbon-850 px-4 py-4">
+  const body = (
+    <>
       <Icon name={icon} size={20} className={tone} />
       <p className="mt-1.5 text-2xl font-black text-carbon-50 tabular-nums leading-none">{value}</p>
-      <p className="mt-1.5 text-[12px] font-bold uppercase tracking-wide text-carbon-500">{label}</p>
-    </div>
+      <p className="mt-1.5 flex items-center gap-1 text-[12px] font-bold uppercase tracking-wide text-carbon-500">
+        {label}
+        {onClick && (
+          <Icon
+            name={open ? 'chevron-up' : 'chevron-down'}
+            size={14}
+            className="text-carbon-500"
+          />
+        )}
+      </p>
+    </>
+  );
+
+  const shell = 'rounded-2xl border-2 px-4 py-4 text-left w-full';
+  // Tapping the number you're curious about is the obvious way in — no
+  // separate "ver calendario" button to find first.
+  return onClick ? (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={open}
+      className={`${shell} transition ${
+        open
+          ? 'border-lime-500/50 bg-carbon-800'
+          : 'border-carbon-800 bg-carbon-850 hover:border-carbon-700'
+      }`}
+    >
+      {body}
+    </button>
+  ) : (
+    <div className={`${shell} border-carbon-800 bg-carbon-850`}>{body}</div>
   );
 }
 
@@ -94,6 +130,7 @@ export default function FriendProfile() {
   const [loading, setLoading] = useState(true);
   const [flash, setFlash] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -172,7 +209,13 @@ export default function FriendProfile() {
 
               <h3 className="mt-8 text-[19px] font-black text-carbon-50">Estadísticas</h3>
               <div className="mt-3 grid grid-cols-2 gap-3">
-                <Stat icon="flame" value={String(profile.streak)} label="Días de racha" />
+                <Stat
+                  icon="flame"
+                  value={String(profile.streak)}
+                  label="Días de racha"
+                  onClick={() => setShowCalendar((v) => !v)}
+                  open={showCalendar}
+                />
                 <Stat icon="star" value={String(profile.xp)} label="XP total" />
                 {/* Never having answered is not the same as answering
                     everything wrong, so it shows a dash rather than 0%. */}
@@ -184,6 +227,33 @@ export default function FriendProfile() {
                 />
                 <Stat icon="book" value={String(profile.lessons)} label="Lecciones" />
               </div>
+
+              {showCalendar && (
+                <div className="mt-3 animate-pop-in">
+                  {/* The same grid as your own streak panel, drawn from their
+                      days — and, as with yours, the days their streak must
+                      have crossed are worked out rather than needing to have
+                      been witnessed. */}
+                  <MonthGrid
+                    activeDays={new Set(profile.activeDays)}
+                    frozenDays={
+                      new Set([
+                        ...profile.frozenDays,
+                        ...inferredFrozenDays(
+                          profile.streak,
+                          profile.lastActive,
+                          new Set(profile.activeDays)
+                        ),
+                      ])
+                    }
+                  />
+                  {profile.activeDays.length === 0 && (
+                    <p className="mt-2 text-center text-[13px] text-carbon-500">
+                      Sin días registrados todavía.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* The comparison is the part that makes a friend a reason to
                   come back, rather than a name on a list. */}

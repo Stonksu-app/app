@@ -40,6 +40,10 @@ export interface FriendProfile {
   accuracy: number | null;
   memberSince: string;
   lastActive: string | null;
+  /** Days they practised, and days a protector covered — the last 60, as
+   *  YYYY-MM-DD, for drawing the same calendar their streak claims. */
+  activeDays: string[];
+  frozenDays: string[];
 }
 
 export interface Ping {
@@ -178,6 +182,10 @@ export async function fetchFriendProfile(friendId: string): Promise<FriendProfil
     accuracy: row.accuracy === null || row.accuracy === undefined ? null : Number(row.accuracy),
     memberSince: row.member_since as string,
     lastActive: (row.last_active as string) ?? null,
+    // A database still on the previous version returns neither, and an empty
+    // calendar is the honest answer to "we don't know yet".
+    activeDays: (row.active_days as string[]) ?? [],
+    frozenDays: (row.frozen_days as string[]) ?? [],
   };
 }
 

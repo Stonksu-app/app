@@ -238,6 +238,25 @@ check('it pins the search path, like every other definer function', /set search_
 check('accuracy leaves as a percentage, not as the answers behind it', /round\(100\.0 \* sum/.test(friendSql));
 check('anonymous callers cannot execute it', /revoke all on function public\.friend_profile/.test(friendSql));
 
+// The calendar a friend's streak claims, with the same door as the rest of it.
+const calendarSql = readFileSync('supabase/migrations/0012_friend_streak_calendar.sql', 'utf8');
+check(
+  "a friend's calendar is still behind the friendship check",
+  /are_friends\(auth\.uid\(\), other\)/.test(calendarSql)
+);
+check(
+  'it hands over dates, never the timestamps behind them',
+  /::date/.test(calendarSql) && !/completed_at as/.test(calendarSql)
+);
+check(
+  'and only a recent window of them',
+  /interval '60 days'/.test(calendarSql)
+);
+check(
+  'the newer definition replaces the old one rather than shadowing it',
+  /drop function if exists public\.friend_profile\(uuid\)/.test(calendarSql)
+);
+
 // ------------------------------------------------------------- the leagues
 // A player's table is the one door onto other players' rows; if it ever
 // stopped scoping to the caller's own league_table_id, anybody's weekly XP
