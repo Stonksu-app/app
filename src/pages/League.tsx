@@ -4,6 +4,7 @@ import TopBar from '../components/TopBar';
 import NavRail from '../components/NavRail';
 import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
+import LeagueMark from '../components/LeagueMark';
 import Mascot from '../components/Mascot';
 import { Button } from '../components/Button';
 import { fetchLeagueTable, type LeagueMember } from '../lib/leagues';
@@ -87,7 +88,7 @@ export default function League() {
           </p>
 
           <div className="mt-4 rounded-3xl border-2 border-carbon-800 bg-carbon-850 p-5 flex items-center gap-4">
-            <span className="text-5xl leading-none">{rank.emoji}</span>
+            <LeagueMark rank={leagueRank} size={64} />
             <div className="min-w-0">
               <p className="text-[13px] font-black uppercase tracking-[0.8px] text-carbon-500">
                 Liga {leagueRank + 1}/{MAX_LEAGUE_RANK + 1}

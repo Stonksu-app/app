@@ -16,6 +16,7 @@
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { LEAGUE_RANKS } from '../src/data/leagues';
 
 let failed = 0;
 const check = (name: string, cond: boolean, detail = '') => {
@@ -135,6 +136,40 @@ for (const file of walk('src')) {
     );
   });
 }
+
+/*
+ * The league ladder has to read as a ladder.
+ *
+ * Six ranks drawn from the app's own icon set, in metals of their own — emoji
+ * rendered as whatever each platform ships, which on Android is a different
+ * drawing style from every other mark on the screen. And the tones stay off
+ * the colours that already mean something: violet is Ultra, so a rank wearing
+ * it would say "this person pays" rather than "this person climbed", and sky
+ * belongs to streak protectors.
+ */
+for (const rank of LEAGUE_RANKS) {
+  check(`la liga "${rank.name}" usa un icono de la app`, typeof rank.icon === 'string' && rank.icon.length > 0);
+  check(
+    `y un color que no pisa a Ultra ni al protector: ${rank.name}`,
+    !/ultra|sky/.test(rank.tone),
+    rank.tone
+  );
+  check(
+    `"${rank.name}" ya no es un emoji`,
+    !/[\u{1F300}-\u{1FAFF}]/u.test(`${rank.icon}${rank.tone}`)
+  );
+}
+check(
+  'solo la última liga brilla',
+  LEAGUE_RANKS.filter((r) => r.glow).length === 1 &&
+    !!LEAGUE_RANKS[LEAGUE_RANKS.length - 1].glow
+);
+check(
+  'los metales de la liga están declarados en la paleta',
+  /--color-league-bronze/.test(css) &&
+    /--color-league-silver/.test(css) &&
+    /--color-league-gold/.test(css)
+);
 
 console.log(failed === 0 ? '\nTodo correcto.' : `\n${failed} problema(s).`);
 process.exit(failed === 0 ? 0 : 1);

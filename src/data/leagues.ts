@@ -1,20 +1,36 @@
+import type { IconName } from '../types';
+
 /**
  * The six league ranks, lowest to highest. Index into this array is exactly
  * `profiles.league_rank` — see supabase/migrations/0009_leagues.sql, which
  * is the only thing that ever changes that number.
  */
 export interface LeagueRank {
-  emoji: string;
+  /** From the app's own icon set — see src/components/Icon.tsx. Emoji were
+   *  here first and rendered as whatever each platform ships, which on
+   *  Android is a different drawing style from every other mark in the app. */
+  icon: IconName;
   name: string;
+  /** Tailwind text colour for the mark. The ladder climbs bronze → silver →
+   *  gold, then the app's own lime for the bull, and back to gold at the top
+   *  with a halo, so the last rank reads as the end of a road rather than as
+   *  another colour.
+   *
+   *  Deliberately not violet: that belongs to Ultra and mastery, and a rank
+   *  wearing it would read as "this person pays" rather than "this person
+   *  climbed". Sky is likewise spoken for by streak protectors. */
+  tone: string;
+  /** Only the top rank. */
+  glow?: boolean;
 }
 
 export const LEAGUE_RANKS: LeagueRank[] = [
-  { emoji: '🌱', name: 'Beginner' },
-  { emoji: '📈', name: 'Trader' },
-  { emoji: '⚡', name: 'Analyst' },
-  { emoji: '🐂', name: 'Bull' },
-  { emoji: '💎', name: 'Pro Trader' },
-  { emoji: '👑', name: 'Market Master' },
+  { icon: 'sprout', name: 'Beginner', tone: 'text-league-bronze' },
+  { icon: 'candle', name: 'Trader', tone: 'text-league-silver' },
+  { icon: 'brain', name: 'Analyst', tone: 'text-league-silver' },
+  { icon: 'bull', name: 'Bull', tone: 'text-lime-500' },
+  { icon: 'diamond', name: 'Pro Trader', tone: 'text-league-gold' },
+  { icon: 'trophy', name: 'Market Master', tone: 'text-league-gold', glow: true },
 ];
 
 export const MAX_LEAGUE_RANK = LEAGUE_RANKS.length - 1;

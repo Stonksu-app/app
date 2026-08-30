@@ -49,6 +49,17 @@
   --color-ultra-600: #7c3aed;
   --color-ultra-800: #4c1d95;
 
+  /*
+   * League metals. Their own small ramp, because the ladder needs six steps
+   * that read in order and the existing accents are all spoken for: lime is
+   * progress, amber is a reward, sky is a streak protector, violet is Ultra.
+   * Gold is the same #FFC93C the chests use — a league crown and a chest are
+   * both "you won something", so sharing it costs nothing.
+   */
+  --color-league-bronze: #c08457;
+  --color-league-silver: #c9cdd3;
+  --color-league-gold: #ffc93c;
+
   /* Danger — for bearish / incorrect states */
   --color-danger-950: #2a0e0e;
   --color-danger-600: #E23F3F;

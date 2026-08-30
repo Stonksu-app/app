@@ -6,6 +6,7 @@ import BottomNav from '../components/BottomNav';
 import Mascot from '../components/Mascot';
 import Icon from '../components/Icon';
 import PlanBadge from '../components/PlanBadge';
+import LeagueMark from '../components/LeagueMark';
 import { MAX_LEAGUE_RANK, leagueRankInfo } from '../data/leagues';
 import AchievementRow from '../components/AchievementRow';
 import ReminderSetting from '../components/ReminderSetting';
@@ -170,7 +171,7 @@ export default function Profile() {
               to="/liga"
               className="mt-3 flex items-center gap-4 rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-4 hover:border-carbon-700 transition"
             >
-              <span className="text-4xl leading-none shrink-0">{league.emoji}</span>
+              <LeagueMark rank={leagueRank} size={52} />
               <div className="min-w-0 flex-1">
                 <p className="text-[12px] font-black uppercase tracking-[0.8px] text-carbon-500">
                   Liga {leagueRank + 1} de {MAX_LEAGUE_RANK + 1}
