@@ -131,6 +131,18 @@ export default function FriendProfile() {
   const [flash, setFlash] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+
+  /* Their last active day is a day they were active — same rule as your own
+   * calendar. Without it their profile shows a streak counting today over a
+   * grid with today blank. */
+  const theirActiveDays = new Set([
+    ...(profile?.activeDays ?? []),
+    ...(profile?.lastActive ? [profile.lastActive] : []),
+  ]);
+  const theirFrozenDays = new Set([
+    ...(profile?.frozenDays ?? []),
+    ...inferredFrozenDays(profile?.streak ?? 0, profile?.lastActive ?? null, theirActiveDays),
+  ]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -234,19 +246,7 @@ export default function FriendProfile() {
                       days — and, as with yours, the days their streak must
                       have crossed are worked out rather than needing to have
                       been witnessed. */}
-                  <MonthGrid
-                    activeDays={new Set(profile.activeDays)}
-                    frozenDays={
-                      new Set([
-                        ...profile.frozenDays,
-                        ...inferredFrozenDays(
-                          profile.streak,
-                          profile.lastActive,
-                          new Set(profile.activeDays)
-                        ),
-                      ])
-                    }
-                  />
+                  <MonthGrid activeDays={theirActiveDays} frozenDays={theirFrozenDays} />
                   {profile.activeDays.length === 0 && (
                     <p className="mt-2 text-center text-[13px] text-carbon-500">
                       Sin días registrados todavía.

@@ -15,13 +15,25 @@ function useActiveDays() {
   const attempts = useUserStore((s) => s.attempts);
   const reviewDates = useUserStore((s) => s.reviewDates);
   const activeDates = useUserStore((s) => s.activeDates);
+  const lastActiveDate = useUserStore((s) => s.lastActiveDate);
   // Lessons and repasos both count: the streak already treats them the same,
   // and a calendar that disagreed with the streak beside it would look like
   // one of the two was lying.
+  /*
+   * The last active day counts as practised, alongside the days with a
+   * record of their own.
+   *
+   * It's the day the streak is anchored on, and only finishing a lesson or a
+   * repaso can set it — the debug button that used to move it by hand is
+   * gone. So a streak of two whose second day is today, drawn over a calendar
+   * with today blank, was the picture disagreeing with itself rather than
+   * catching anything.
+   */
   return new Set([
     ...attempts.map((a) => localDayKey(new Date(a.completedAt))),
     ...reviewDates,
     ...activeDates,
+    ...(lastActiveDate ? [lastActiveDate] : []),
   ]);
 }
 

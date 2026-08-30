@@ -450,3 +450,27 @@ if (settleFailed > 0) {
   process.exit(1);
 }
 console.log('Sentencia de racha: todo correcto.');
+
+/*
+ * The calendar shows every day the streak counts, including today.
+ *
+ * A streak of two ending today, over a grid where today is blank, is the
+ * profile disagreeing with itself — and it was reported twice. The last
+ * active day is set only by finishing a lesson or a repaso, so it belongs on
+ * the calendar as practised.
+ */
+const dias = new Set(['2026-08-29']);
+const conHoy = new Set([...dias, '2026-08-30']);
+check5(
+  'el último día activo cuenta como practicado',
+  conHoy.has('2026-08-30'),
+  'el calendario dejaría hoy en blanco bajo una racha que lo cuenta'
+);
+check5(
+  'y ya no se deduce como congelado, porque está practicado',
+  !inferredFrozenDays(2, '2026-08-30', conHoy).includes('2026-08-30')
+);
+check5(
+  'los huecos anteriores siguen deduciéndose',
+  inferredFrozenDays(4, '2026-08-30', conHoy).includes('2026-08-28')
+);
