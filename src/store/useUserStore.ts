@@ -354,7 +354,27 @@ function rollDailyStats(
   s: Pick<UserState, 'dailyStatsDate' | 'dailyXp' | 'dailyLessons' | 'dailyPerfectLessons' | 'dailyCorrect' | 'dailyReviews'>,
   today: string
 ): DailyMissionInput & { dailyStatsDate: string } {
-  if (s.dailyStatsDate === today) return s as DailyMissionInput & { dailyStatsDate: string };
+  /*
+   * Copied field by field, never `return s`.
+   *
+   * It used to hand back the whole state when the day already matched, and
+   * every caller spreads this into a `set()` — after the fields it had just
+   * computed. So the second lesson of any given day spread a snapshot of the
+   * state from *before* that lesson over its own results: no XP, no coins, no
+   * stage, the attempt not recorded. The first lesson of the day worked,
+   * because that's the branch that builds a fresh object, which is why this
+   * survived as "the stage doesn't advance when I replay a lesson".
+   */
+  if (s.dailyStatsDate === today) {
+    return {
+      dailyStatsDate: today,
+      dailyXp: s.dailyXp,
+      dailyLessons: s.dailyLessons,
+      dailyPerfectLessons: s.dailyPerfectLessons,
+      dailyCorrect: s.dailyCorrect,
+      dailyReviews: s.dailyReviews,
+    };
+  }
   return { dailyStatsDate: today, dailyXp: 0, dailyLessons: 0, dailyPerfectLessons: 0, dailyCorrect: 0, dailyReviews: 0 };
 }
 
@@ -479,11 +499,11 @@ export const useUserStore = create<UserState>()(
           console.error('[addXp] level-up/daily-mission bonus failed, paying the XP without it:', err);
         }
         set({
+          ...daily,
           xp: s.xp + amount,
           weeklyXp: s.weeklyXp + amount,
           coins: s.coins + (levelUp?.coins ?? 0),
           streakProtectors: s.streakProtectors + (levelUp?.protectors ?? 0),
-          ...daily,
           dailyXp: daily.dailyXp + amount,
         });
         return levelUp;
@@ -510,6 +530,7 @@ export const useUserStore = create<UserState>()(
         ];
         const daily = rollDailyStats(s, today);
         set({
+          ...daily,
           streak,
           lastActiveDate,
           frozenDates,
@@ -517,7 +538,6 @@ export const useUserStore = create<UserState>()(
           reviewDates: [...new Set([...s.reviewDates, today])],
           streakProtectors: s.streakProtectors - protectorsUsed,
           lastStreakLoss: recordLoss(s, streak, missed, protectorsUsed, today),
-          ...daily,
           dailyReviews: daily.dailyReviews + 1,
         });
       },
@@ -631,6 +651,7 @@ export const useUserStore = create<UserState>()(
         const isPerfect = attempt.totalQuestions > 0 && attempt.correctCount === attempt.totalQuestions;
 
         set({
+          ...daily,
           xp: s.xp + attempt.xpEarned,
           weeklyXp: s.weeklyXp + attempt.xpEarned,
           coins: s.coins + attempt.correctCount * COINS_PER_CORRECT + (levelUp?.coins ?? 0),
@@ -645,7 +666,6 @@ export const useUserStore = create<UserState>()(
           // time spent in lessons, not on new ground covered.
           lessonsSincePitch: s.lessonsSincePitch + 1,
           lastStreakLoss: recordLoss(s, streak, missed, protectorsUsed, today),
-          ...daily,
           dailyXp: daily.dailyXp + attempt.xpEarned,
           dailyLessons: daily.dailyLessons + 1,
           dailyPerfectLessons: daily.dailyPerfectLessons + (isPerfect ? 1 : 0),
@@ -778,12 +798,12 @@ export const useUserStore = create<UserState>()(
           console.error('[openChest] level-up/daily-mission bonus failed, paying the chest without it:', err);
         }
         set({
+          ...daily,
           openedChestIds: [...s.openedChestIds, chestId],
           xp: s.xp + CHEST_REWARD.xp,
           weeklyXp: s.weeklyXp + CHEST_REWARD.xp,
           coins: s.coins + CHEST_REWARD.coins + (levelUp?.coins ?? 0),
           streakProtectors: protectorsAfterGift + (levelUp?.protectors ?? 0),
-          ...daily,
           dailyXp: daily.dailyXp + CHEST_REWARD.xp,
         });
         return gifted;

@@ -246,7 +246,11 @@ check('anonymous callers cannot execute it', /revoke all on function public\.fri
 const leagueSql = readFileSync('supabase/migrations/0009_leagues.sql', 'utf8');
 check(
   'league_leaderboard only answers for the caller\'s own table',
-  /where league_table_id = \(select league_table_id from public\.profiles where id = auth\.uid\(\)\)/.test(
+  // Matched on the property rather than on one exact spelling of it: the
+  // clause is `p.league_table_id = (select … where id = auth.uid())`, and the
+  // check was demanding it without the alias, so it failed on SQL that was
+  // doing precisely what it asks.
+  /league_table_id\s*=\s*\(\s*select\s+league_table_id\s+from\s+public\.profiles\s+where\s+id\s*=\s*auth\.uid\(\)\s*\)/.test(
     leagueSql
   )
 );
