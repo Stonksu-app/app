@@ -6,6 +6,7 @@ import BottomNav from '../components/BottomNav';
 import Mascot from '../components/Mascot';
 import Icon from '../components/Icon';
 import PlanBadge from '../components/PlanBadge';
+import { MAX_LEAGUE_RANK, leagueRankInfo } from '../data/leagues';
 import AchievementRow from '../components/AchievementRow';
 import ReminderSetting from '../components/ReminderSetting';
 import HeartsReminderSetting from '../components/HeartsReminderSetting';
@@ -64,9 +65,12 @@ export default function Profile() {
     openedChestIds,
     avatar,
     plan,
+    leagueRank,
+    weeklyXp,
     resetProgress,
   } = useUserStore();
   const { level } = xpToLevel(xp);
+  const league = leagueRankInfo(leagueRank);
   const authStatus = useAuthStore((s) => s.status);
   const syncUserId = useSyncStore((s) => s.userId);
   const navigate = useNavigate();
@@ -146,6 +150,46 @@ export default function Profile() {
             <StatTile icon="medal" value={level} label="Nivel actual" />
             <StatTile icon="target" value={flawless} label="Lecciones perfectas" />
           </div>
+
+          {/* League — the one number on this page that is about other
+              people, so it sits between your own stats and your friends. */}
+          <div className="mt-8 flex items-center justify-between gap-3">
+            <h2 className="text-2xl font-black text-carbon-50">Liga</h2>
+            {authStatus === 'registered' && (
+              <Link
+                to="/liga"
+                className="text-[15px] font-black uppercase tracking-[0.8px] text-lime-400 hover:text-lime-300"
+              >
+                Ver tabla
+              </Link>
+            )}
+          </div>
+
+          {authStatus === 'registered' ? (
+            <Link
+              to="/liga"
+              className="mt-3 flex items-center gap-4 rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-4 hover:border-carbon-700 transition"
+            >
+              <span className="text-4xl leading-none shrink-0">{league.emoji}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[12px] font-black uppercase tracking-[0.8px] text-carbon-500">
+                  Liga {leagueRank + 1} de {MAX_LEAGUE_RANK + 1}
+                </p>
+                <p className="text-[19px] font-black text-carbon-50 truncate">{league.name}</p>
+                {/* Weekly XP rather than total: it's what the table ranks on,
+                    and a number here that didn't decide anything would just be
+                    XP said twice. */}
+                <p className="text-sm text-carbon-400 tabular-nums">{weeklyXp} XP esta semana</p>
+              </div>
+              <Icon name="chevron-left" size={20} className="shrink-0 text-carbon-600 rotate-180" />
+            </Link>
+          ) : (
+            /* Anonymous accounts aren't seated at a table — saying so here is
+               better than a card that looks broken. */
+            <p className="mt-3 rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-5 text-sm text-carbon-400 text-center">
+              Guarda tu cuenta para competir en la liga: las anónimas no entran en las mesas.
+            </p>
+          )}
 
           {/* Friends */}
           <FriendsPanel />
