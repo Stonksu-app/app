@@ -64,6 +64,7 @@ export default function Profile() {
     openedChestIds,
     avatar,
     plan,
+    testMode,
     resetProgress,
     lastActiveDate,
     streakProtectors,
@@ -214,7 +215,17 @@ export default function Profile() {
               streak checks that normally wait for real days to pass can be
               exercised on demand — no need to actually skip practicing, and
               no need to re-run onboarding as "test" just to see it. */}
-          {appEnv === 'dev' && (
+          {/*
+            Test-mode accounts only, not the whole dev deployment.
+            Rewinding the last active day makes the next lesson count as a
+            new day, so tapping it and playing walks the streak up without
+            any days passing — and that number then syncs, and shows on
+            other people's screens. It went out to everyone testing on dev,
+            where it produced an account three days old on its first
+            afternoon. A tool that rewrites history belongs to whoever is
+            deliberately holding it.
+          */}
+          {appEnv === 'dev' && testMode && (
             <div className="mt-6 rounded-2xl border-2 border-dashed border-carbon-700 p-3">
               <p className="text-[11px] font-black text-carbon-400 uppercase tracking-wide">
                 Modo prueba — racha
