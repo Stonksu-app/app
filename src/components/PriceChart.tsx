@@ -33,14 +33,12 @@ const BORDER = '#262626';
  * looking for it on a real chart, and find it.
  */
 interface ScaleState {
-  autoScale: boolean;
   invertScale: boolean;
   mode: PriceScaleMode;
   side: 'left' | 'right';
 }
 
 const INITIAL_SCALE: ScaleState = {
-  autoScale: true,
   invertScale: false,
   mode: PriceScaleMode.Normal,
   side: 'right',
@@ -65,19 +63,26 @@ export default function PriceChart({
   liquidation,
   height = 220,
   auto = true,
-  onUserMoved,
+  onAutoChange,
 }: {
   candles: TimedCandle[];
   entry: number | null;
   liquidation: number | null;
   height?: number;
-  /** Auto-fit, the way a venue's AUTO button behaves: on, the view follows the
-   *  price; off, it stays exactly where you dragged it. */
+  /**
+   * The single switch, the way a venue's AUTO behaves.
+   *
+   * On, the chart follows the price and a vertical swipe scrolls the page. Off,
+   * it stays exactly where you left it and the chart takes the swipe, so you
+   * can drag it up and down and look wherever you want. One switch and not two
+   * because "the chart follows the price" and "I can move it freely" are the
+   * same idea seen from either side.
+   */
   auto?: boolean;
-  /** Fired the first time a gesture moves the view, so the page can turn AUTO
-   *  off by itself — snapping back mid-drag is the thing that makes a chart
-   *  feel broken. */
-  onUserMoved?: () => void;
+  /** Turn AUTO off (or back on) from inside the chart: touching it means you
+   *  want to look somewhere, and snapping back mid-gesture is exactly what
+   *  makes a chart feel broken. */
+  onAutoChange?: (auto: boolean) => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
@@ -111,7 +116,6 @@ export default function PriceChart({
     // Always against the side we just moved to, or the settings would land on
     // the axis nobody is looking at any more.
     c.priceScale(next.side).applyOptions({
-      autoScale: next.autoScale,
       invertScale: next.invertScale,
       mode: next.mode,
     });
@@ -139,10 +143,10 @@ export default function PriceChart({
       leftPriceScale: { borderColor: BORDER },
       timeScale: { borderColor: BORDER, timeVisible: true, secondsVisible: false },
       crosshair: { mode: 0 },
-      // Pan and zoom, like any chart worth reading. Scrolling the page still
-      // works because the chart only claims the gesture inside its own box.
+      // Pan and zoom, like any chart worth reading. Vertical touch dragging is
+      // decided by AUTO further down, not here.
       handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
-      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true },
     });
     const s = c.addSeries(CandlestickSeries, {
       upColor: UP,
@@ -204,14 +208,61 @@ export default function PriceChart({
     };
   }, [menu]);
 
-  // A gesture on the chart means you want to look somewhere: tell the page.
+  /*
+   * AUTO, applied to the chart.
+   *
+   * Two things at once, and they only make sense together: whether the price
+   * axis rescales itself, and whether a vertical drag belongs to the chart or
+   * to the page. With the axis on auto the chart refuses to be scrolled
+   * vertically at all — the library returns early — so an AUTO that only
+   * stopped the re-fit would look like a switch that does nothing. And handing
+   * the chart every vertical swipe while it's still following the price would
+   * trap the page: you'd drag on the chart expecting to scroll down and the
+   * page wouldn't move.
+   */
   useEffect(() => {
     const c = chart.current;
-    if (!c || !onUserMoved) return;
-    const handler = () => onUserMoved();
-    c.timeScale().subscribeVisibleLogicalRangeChange(handler);
-    return () => c.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
-  }, [onUserMoved]);
+    if (!c) return;
+    c.priceScale(scaleRef.current.side).applyOptions({ autoScale: auto });
+    c.applyOptions({ handleScroll: { vertTouchDrag: !auto } });
+    if (auto) c.timeScale().fitContent();
+  }, [auto]);
+
+  /*
+   * Touching the chart means you want to look somewhere, so AUTO gets out of
+   * the way.
+   *
+   * Read from the real gestures rather than from the view changing, because
+   * the view also changes when *we* re-fit it — which turned AUTO off a frame
+   * after it was turned on, and left a button that could never stay pressed.
+   *
+   * The chart is told here and now, in the capture phase, instead of waiting
+   * for the effect above: the library decides whether a drag may move the
+   * price at the moment the gesture starts, and a React state update doesn't
+   * land until after that moment has passed. Waiting cost you the first drag,
+   * every time — which is exactly what "el auto no hace nada" looks like.
+   */
+  useEffect(() => {
+    const el = box.current;
+    if (!el || !onAutoChange) return;
+    const free = () => {
+      const c = chart.current;
+      if (c) {
+        c.priceScale(scaleRef.current.side).applyOptions({ autoScale: false });
+        c.applyOptions({ handleScroll: { vertTouchDrag: true } });
+      }
+      onAutoChange(false);
+    };
+    const opts = { capture: true } as const;
+    el.addEventListener('pointerdown', free, opts);
+    el.addEventListener('touchstart', free, { capture: true, passive: true });
+    el.addEventListener('wheel', free, { capture: true, passive: true });
+    return () => {
+      el.removeEventListener('pointerdown', free, opts);
+      el.removeEventListener('touchstart', free, opts);
+      el.removeEventListener('wheel', free, opts);
+    };
+  }, [onAutoChange]);
 
   useEffect(() => {
     if (!series.current || candles.length === 0) return;
@@ -230,11 +281,6 @@ export default function PriceChart({
     );
     if (auto) chart.current?.timeScale().fitContent();
   }, [candles, auto]);
-
-  // Re-fitting the moment AUTO goes back on is what the button is for.
-  useEffect(() => {
-    if (auto) chart.current?.timeScale().fitContent();
-  }, [auto]);
 
   // Entry and liquidation as price lines rather than drawings: the chart keeps
   // them pinned to the scale as it moves, and puts the number on the axis —
@@ -302,7 +348,8 @@ export default function PriceChart({
             role="menuitem"
             className={item}
             onClick={() => {
-              applyScale({ ...scale, autoScale: true });
+              applyScale({ ...INITIAL_SCALE, side: scale.side });
+              onAutoChange?.(true);
               setMenu(null);
             }}
           >
@@ -317,15 +364,18 @@ export default function PriceChart({
           <button
             type="button"
             role="menuitemcheckbox"
-            aria-checked={scale.autoScale}
+            aria-checked={auto}
             className={item}
-            onClick={() => applyScale({ ...scale, autoScale: !scale.autoScale })}
+            onClick={() => {
+              onAutoChange?.(!auto);
+              setMenu(null);
+            }}
           >
-            {tick(scale.autoScale)}
+            {tick(auto)}
             <span>
               Auto
               <span className="block text-[11px] font-semibold text-carbon-500">
-                El precio cabe siempre en la pantalla
+                {auto ? 'El precio cabe siempre en la pantalla' : 'Apagado: muévete libre por el gráfico'}
               </span>
             </span>
           </button>

@@ -319,7 +319,7 @@ export default function Simulator() {
               <button
                 onClick={() => setAuto((v) => !v)}
                 aria-pressed={auto}
-                title="Ajustar la vista al precio automáticamente"
+                title="Con AUTO el gráfico sigue al precio; apágalo para moverte libre por él"
                 className={`ml-auto shrink-0 rounded-lg border-2 px-2 py-1 text-[11px] font-black uppercase tracking-wide transition ${
                   auto
                     ? 'border-lime-500/50 bg-lime-500/10 text-lime-400'
@@ -338,7 +338,7 @@ export default function Simulator() {
                 entry={position ? position.entry : null}
                 liquidation={position ? liqPrice : null}
                 auto={auto}
-                onUserMoved={() => setAuto(false)}
+                onAutoChange={setAuto}
               />
             )}
 
