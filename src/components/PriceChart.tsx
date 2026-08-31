@@ -70,18 +70,19 @@ export default function PriceChart({
   liquidation: number | null;
   height?: number;
   /**
-   * The single switch, the way a venue's AUTO behaves.
+   * Who drives the view: the chart or you.
    *
-   * On, the chart follows the price and a vertical swipe scrolls the page. Off,
-   * it stays exactly where you left it and the chart takes the swipe, so you
-   * can drag it up and down and look wherever you want. One switch and not two
-   * because "the chart follows the price" and "I can move it freely" are the
-   * same idea seen from either side.
+   * On, the chart drives — it keeps the price fitted to the screen and doesn't
+   * take your gestures at all, so a swipe over it scrolls the page like any
+   * other part of it. Off, you drive: pan, zoom and drag it up and down to
+   * wherever you want to look, and it stays there.
+   *
+   * A deliberate switch and not something a stray touch flips, because a chart
+   * that unlocks itself the moment you brush it is a chart that never sits
+   * still while you read it.
    */
   auto?: boolean;
-  /** Turn AUTO off (or back on) from inside the chart: touching it means you
-   *  want to look somewhere, and snapping back mid-gesture is exactly what
-   *  makes a chart feel broken. */
+  /** Flip AUTO from the chart's own menu. */
   onAutoChange?: (auto: boolean) => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -143,10 +144,10 @@ export default function PriceChart({
       leftPriceScale: { borderColor: BORDER },
       timeScale: { borderColor: BORDER, timeVisible: true, secondsVisible: false },
       crosshair: { mode: 0 },
-      // Pan and zoom, like any chart worth reading. Vertical touch dragging is
-      // decided by AUTO further down, not here.
-      handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
-      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true },
+      // Whether the chart accepts gestures is AUTO's business, applied in the
+      // effect below. It starts locked, which is where AUTO starts.
+      handleScale: false,
+      handleScroll: false,
     });
     const s = c.addSeries(CandlestickSeries, {
       upColor: UP,
@@ -211,58 +212,29 @@ export default function PriceChart({
   /*
    * AUTO, applied to the chart.
    *
-   * Two things at once, and they only make sense together: whether the price
-   * axis rescales itself, and whether a vertical drag belongs to the chart or
-   * to the page. With the axis on auto the chart refuses to be scrolled
-   * vertically at all — the library returns early — so an AUTO that only
-   * stopped the re-fit would look like a switch that does nothing. And handing
-   * the chart every vertical swipe while it's still following the price would
-   * trap the page: you'd drag on the chart expecting to scroll down and the
-   * page wouldn't move.
+   * Two things at once, and they're the same idea: whether the price axis
+   * rescales itself, and whether the chart accepts a gesture at all. With AUTO
+   * on it takes none of them — no pan, no zoom, no dragging the axis — so the
+   * view can't be nudged out from under a re-fit that's about to happen
+   * anyway, and a swipe over the chart scrolls the page like it does anywhere
+   * else. Turn it off and everything is yours to move.
+   *
+   * Handing back the gestures is also what makes vertical dragging possible at
+   * all: the library refuses to move the price while the axis is on auto, and
+   * treats a vertical touch drag as page scrolling unless told otherwise.
    */
   useEffect(() => {
     const c = chart.current;
     if (!c) return;
     c.priceScale(scaleRef.current.side).applyOptions({ autoScale: auto });
-    c.applyOptions({ handleScroll: { vertTouchDrag: !auto } });
+    c.applyOptions({
+      handleScroll: auto
+        ? false
+        : { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: true },
+      handleScale: auto ? false : { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
+    });
     if (auto) c.timeScale().fitContent();
   }, [auto]);
-
-  /*
-   * Touching the chart means you want to look somewhere, so AUTO gets out of
-   * the way.
-   *
-   * Read from the real gestures rather than from the view changing, because
-   * the view also changes when *we* re-fit it — which turned AUTO off a frame
-   * after it was turned on, and left a button that could never stay pressed.
-   *
-   * The chart is told here and now, in the capture phase, instead of waiting
-   * for the effect above: the library decides whether a drag may move the
-   * price at the moment the gesture starts, and a React state update doesn't
-   * land until after that moment has passed. Waiting cost you the first drag,
-   * every time — which is exactly what "el auto no hace nada" looks like.
-   */
-  useEffect(() => {
-    const el = box.current;
-    if (!el || !onAutoChange) return;
-    const free = () => {
-      const c = chart.current;
-      if (c) {
-        c.priceScale(scaleRef.current.side).applyOptions({ autoScale: false });
-        c.applyOptions({ handleScroll: { vertTouchDrag: true } });
-      }
-      onAutoChange(false);
-    };
-    const opts = { capture: true } as const;
-    el.addEventListener('pointerdown', free, opts);
-    el.addEventListener('touchstart', free, { capture: true, passive: true });
-    el.addEventListener('wheel', free, { capture: true, passive: true });
-    return () => {
-      el.removeEventListener('pointerdown', free, opts);
-      el.removeEventListener('touchstart', free, opts);
-      el.removeEventListener('wheel', free, opts);
-    };
-  }, [onAutoChange]);
 
   useEffect(() => {
     if (!series.current || candles.length === 0) return;
@@ -375,7 +347,9 @@ export default function PriceChart({
             <span>
               Auto
               <span className="block text-[11px] font-semibold text-carbon-500">
-                {auto ? 'El precio cabe siempre en la pantalla' : 'Apagado: muévete libre por el gráfico'}
+                {auto
+                  ? 'El gráfico se ajusta solo y no se deja mover'
+                  : 'Lo mueves tú: arrastra, haz zoom, mira donde quieras'}
               </span>
             </span>
           </button>
