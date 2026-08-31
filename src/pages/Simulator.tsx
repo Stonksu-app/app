@@ -11,38 +11,61 @@ import {
   FUTURE_CANDLES,
   HISTORY_CANDLES,
   LEVERAGES,
-  coinsFromReturn,
+  MAINTENANCE_MARGIN,
+  TAKER_FEE,
+  equity,
   generateCandles,
   isLiquidated,
-  positionReturn,
+  liquidationDistance,
+  liquidationPrice,
+  notional,
+  roi,
+  roundTripFee,
+  settleCoins,
   type Candle,
   type Direction,
   type Leverage,
+  type Position,
 } from '../utils/market';
 
 /*
- * A trade you can actually lose.
+ * A trade you can actually lose, laid out the way a real venue lays it out.
  *
- * Everything else in the app pays for effort; this pays for a decision, which
- * is the only way to teach what leverage feels like. The money is coins, the
- * market is a seeded random walk, and the position can be wiped out — those
- * three together are the lesson. Nothing here touches real money and the page
- * says so, because a simulator that lets you wonder is worse than no
- * simulator.
+ * Margin, leverage, position size, liquidation price, fees on both sides —
+ * the same words in the same order as Bitget or Bitunix, because the point is
+ * that somebody who plays here and later opens a real account already knows
+ * what every field means. An approximation that taught the wrong lesson would
+ * be worse than no simulator.
+ *
+ * What it deliberately does not model is cross margin. On isolated margin the
+ * engine closes you before the loss exceeds your margin, so nobody ends a
+ * round owing coins — and "you can lose more than you put in" is a warning to
+ * read, not a mechanic to hand somebody in a game with its own currency.
  */
 
-/** What each round puts at risk. Fixed rather than chosen: the variable worth
- *  playing with here is leverage, and two dials would hide which one hurt. */
-const STAKE = 100;
-/** How fast the future arrives. Slow enough to watch a position move against
- *  you, quick enough that a round is a minute, not an afternoon. */
 const TICK_MS = 420;
+/** Quick stake buttons, as fractions of the balance — same idea as the
+ *  25/50/75/100% row every venue puts under the amount field. */
+const STAKE_SHORTCUTS = [0.25, 0.5, 0.75, 1];
 
-function Chart({ candles, entryIndex }: { candles: Candle[]; entryIndex: number | null }) {
+function Chart({
+  candles,
+  entry,
+  liquidation,
+}: {
+  candles: Candle[];
+  entry: number | null;
+  liquidation: number | null;
+}) {
   const width = 320;
   const height = 180;
-  const high = Math.max(...candles.map((c) => c.high));
-  const low = Math.min(...candles.map((c) => c.low));
+  const prices = [
+    ...candles.map((c) => c.high),
+    ...candles.map((c) => c.low),
+    ...(liquidation ? [liquidation] : []),
+  ];
+  const high = Math.max(...prices);
+  const low = Math.min(...prices);
   const span = high - low || 1;
   const step = width / Math.max(candles.length, 1);
   const y = (price: number) => height - ((price - low) / span) * height;
@@ -54,33 +77,38 @@ function Chart({ candles, entryIndex }: { candles: Candle[]; entryIndex: number 
       role="img"
       aria-label="Gráfico de precio simulado"
     >
-      {entryIndex !== null && candles[entryIndex] && (
-        // Where you got in, so the profit on screen has something to be
-        // measured from.
-        <line
-          x1={0}
-          x2={width}
-          y1={y(candles[entryIndex].close)}
-          y2={y(candles[entryIndex].close)}
-          stroke="#8f8f8f"
-          strokeDasharray="4 4"
-          strokeWidth={1}
-        />
+      {entry !== null && (
+        <line x1={0} x2={width} y1={y(entry)} y2={y(entry)} stroke="#8f8f8f" strokeDasharray="4 4" strokeWidth={1} />
+      )}
+      {/* The line that ends the round. Drawn in the same red as a losing
+          candle, because that is what touching it means. */}
+      {liquidation !== null && (
+        <>
+          <line
+            x1={0}
+            x2={width}
+            y1={y(liquidation)}
+            y2={y(liquidation)}
+            stroke="#FF5252"
+            strokeDasharray="2 3"
+            strokeWidth={1}
+          />
+          <text x={2} y={y(liquidation) - 3} fill="#FF5252" fontSize={7} fontWeight="700">
+            LIQ {liquidation.toFixed(2)}
+          </text>
+        </>
       )}
       {candles.map((c, i) => {
         const x = i * step + step / 2;
-        const up = c.close >= c.open;
-        const colour = up ? '#C6FF34' : '#FF5252';
-        const bodyTop = y(Math.max(c.open, c.close));
-        const bodyHeight = Math.max(1, Math.abs(y(c.open) - y(c.close)));
+        const colour = c.close >= c.open ? '#C6FF34' : '#FF5252';
         return (
           <g key={i}>
             <line x1={x} x2={x} y1={y(c.high)} y2={y(c.low)} stroke={colour} strokeWidth={1} />
             <rect
               x={x - step * 0.3}
-              y={bodyTop}
+              y={y(Math.max(c.open, c.close))}
               width={step * 0.6}
-              height={bodyHeight}
+              height={Math.max(1, Math.abs(y(c.open) - y(c.close)))}
               fill={colour}
               rx={1}
             />
@@ -91,39 +119,43 @@ function Chart({ candles, entryIndex }: { candles: Candle[]; entryIndex: number 
   );
 }
 
+/** One label-and-value line, the way an order panel lists its numbers. */
+function Row({ label, value, tone = 'text-carbon-200' }: { label: string; value: string; tone?: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 text-[13px]">
+      <span className="text-carbon-500">{label}</span>
+      <span className={`font-black tabular-nums ${tone}`}>{value}</span>
+    </div>
+  );
+}
+
 export default function Simulator() {
   const navigate = useNavigate();
   const { plan, coins, canTrade, startTrade, settleTrade } = useUserStore();
   const unlimited = hasUnlimitedTrades(plan);
-  // Asked before the buttons are drawn, so somebody out of trades sees why
-  // rather than finding out by pressing.
   const allowed = canTrade();
 
   const [seed] = useState(() => Math.floor(Math.random() * 1e9));
   const full = useMemo(() => generateCandles(seed, HISTORY_CANDLES + FUTURE_CANDLES), [seed]);
 
-  /** How much of the series is on screen. Starts at the history; the rest
-   *  arrives one candle at a time once a position is open. */
   const [shown, setShown] = useState(HISTORY_CANDLES);
-  const [position, setPosition] = useState<{ direction: Direction; leverage: Leverage } | null>(
-    null
-  );
-  const [leverage, setLeverage] = useState<Leverage>(2);
+  const [leverage, setLeverage] = useState<Leverage>(10);
+  const [margin, setMargin] = useState(() => Math.min(100, coins));
+  const [position, setPosition] = useState<Position | null>(null);
   const [settled, setSettled] = useState<{ coins: number; liquidated: boolean } | null>(null);
-  const [denied, setDenied] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const entryIndex = position ? HISTORY_CANDLES - 1 : null;
-  const entry = full[HISTORY_CANDLES - 1].close;
+  const entryPrice = full[HISTORY_CANDLES - 1].close;
   const price = full[shown - 1].close;
-  const ret = position ? positionReturn(entry, price, position.direction, position.leverage) : 0;
-  const liquidated = position ? isLiquidated(ret) : false;
 
-  // The future arrives on a timer while a position is open, and stops the
-  // moment it's liquidated or the series runs out.
+  /** The position you would open right now — what the panel is describing
+   *  before you commit to it. */
+  const preview: Position = { direction: 'long', leverage, margin, entry: entryPrice };
+  const liquidated = position ? isLiquidated(position, price) : false;
+  const pnl = position ? equity(position, price) - position.margin : 0;
+
   useEffect(() => {
-    if (!position || settled) return;
-    if (liquidated || shown >= full.length) return;
+    if (!position || settled || liquidated || shown >= full.length) return;
     timer.current = setInterval(() => setShown((n) => Math.min(full.length, n + 1)), TICK_MS);
     return () => {
       if (timer.current) clearInterval(timer.current);
@@ -131,28 +163,31 @@ export default function Simulator() {
   }, [position, settled, liquidated, shown, full.length]);
 
   const open = (direction: Direction) => {
-    if (!startTrade()) {
-      setDenied(true);
-      return;
-    }
-    setPosition({ direction, leverage });
+    if (margin <= 0 || margin > coins) return;
+    if (!startTrade()) return;
+    setPosition({ direction, leverage, margin, entry: entryPrice });
   };
 
   const close = () => {
-    if (!position) return;
-    const won = coinsFromReturn(STAKE, ret);
-    settleTrade(won);
-    setSettled({ coins: won, liquidated });
+    if (!position || settled) return;
+    const change = settleCoins(position, price);
+    settleTrade(change);
+    setSettled({ coins: change, liquidated: isLiquidated(position, price) });
   };
 
-  // Liquidation closes the position for you: there is nothing left to decide,
-  // and leaving the button there would suggest otherwise.
+  // Liquidation closes for you: there is nothing left to decide, and a live
+  // button would say otherwise.
   useEffect(() => {
     if (position && liquidated && !settled) close();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liquidated]);
 
-  const done = shown >= full.length;
+  const shownPosition = position ?? preview;
+  const liqPrice = liquidationPrice(shownPosition);
+  const liqDistance = liquidationDistance(shownPosition) * 100;
+  /** Under a couple of per cent, one ordinary candle ends the round. That's
+   *  the number worth shouting about, not the leverage itself. */
+  const risky = liqDistance < 2;
 
   return (
     <div className="min-h-dvh bg-carbon-900 lg:flex">
@@ -173,20 +208,24 @@ export default function Simulator() {
             </button>
             <h1 className="text-2xl font-black text-carbon-50">Simulador</h1>
           </div>
-
           <p className="mt-1 text-sm text-carbon-400">
-            Mercado inventado, monedas de verdad. Nada de esto usa dinero real.
+            Mercado inventado y monedas del juego. Las reglas son las de un perpetuo real:
+            margen aislado, comisión en cada lado y liquidación.
           </p>
 
           <div className="mt-4 rounded-3xl border-2 border-carbon-800 bg-carbon-850 p-4">
             <div className="flex items-baseline justify-between gap-3">
               <p className="text-[12px] font-black uppercase tracking-[0.8px] text-carbon-500">
-                STNK / USDT
+                STNK / USDT · Perp
               </p>
               <p className="text-lg font-black text-carbon-50 tabular-nums">{price.toFixed(2)}</p>
             </div>
 
-            <Chart candles={full.slice(0, shown)} entryIndex={entryIndex} />
+            <Chart
+              candles={full.slice(0, shown)}
+              entry={position ? position.entry : null}
+              liquidation={position ? liqPrice : null}
+            />
 
             {position && (
               <div className="mt-2 flex items-center justify-between gap-3">
@@ -197,19 +236,21 @@ export default function Simulator() {
                       : 'bg-danger-500/15 text-danger-400'
                   }`}
                 >
-                  <Icon
-                    name={position.direction === 'long' ? 'trending-up' : 'trending-down'}
-                    size={14}
-                  />
-                  {position.direction === 'long' ? 'Long' : 'Short'} x{position.leverage}
+                  <Icon name={position.direction === 'long' ? 'trending-up' : 'trending-down'} size={14} />
+                  {position.direction === 'long' ? 'Long' : 'Short'} {position.leverage}x
                 </span>
-                <span
-                  className={`text-lg font-black tabular-nums ${
-                    ret >= 0 ? 'text-lime-400' : 'text-danger-400'
-                  }`}
-                >
-                  {ret >= 0 ? '+' : ''}
-                  {(ret * 100).toFixed(1)}%
+                <span className="text-right">
+                  <span
+                    className={`block text-lg font-black tabular-nums ${
+                      pnl >= 0 ? 'text-lime-400' : 'text-danger-400'
+                    }`}
+                  >
+                    {pnl >= 0 ? '+' : ''}
+                    {pnl.toFixed(1)}
+                  </span>
+                  <span className="block text-[11px] font-bold uppercase tracking-wide text-carbon-500">
+                    PnL · ROI {(roi(position, price) * 100).toFixed(1)}%
+                  </span>
                 </span>
               </div>
             )}
@@ -218,7 +259,7 @@ export default function Simulator() {
           {settled ? (
             <div className="mt-4 rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-5 text-center">
               <p className="text-[13px] font-black uppercase tracking-[0.8px] text-carbon-500">
-                {settled.liquidated ? 'Liquidado' : 'Trade cerrado'}
+                {settled.liquidated ? 'Liquidado' : 'Posición cerrada'}
               </p>
               <p
                 className={`mt-1 text-3xl font-black tabular-nums ${
@@ -230,76 +271,158 @@ export default function Simulator() {
               </p>
               <p className="mt-1 text-sm text-carbon-400">
                 {settled.liquidated
-                  ? `Con x${position?.leverage} bastó un movimiento pequeño en tu contra para llevarse los ${STAKE}.`
-                  : 'Monedas a tu saldo. Gástalas en la tienda.'}
+                  ? `Con ${position?.leverage}x bastó un ${liqDistance.toFixed(2)}% en contra para llevarse tu margen entero.`
+                  : 'Monedas a tu saldo, comisiones ya descontadas.'}
               </p>
               <div className="mt-5 space-y-3">
                 <Button onClick={() => navigate('/tienda')}>Ir a la tienda</Button>
                 <Button variant="secondary" onClick={() => window.location.reload()}>
-                  {unlimited ? 'Otro trade' : 'Volver a intentarlo'}
+                  {unlimited ? 'Otra operación' : 'Volver a intentarlo'}
                 </Button>
               </div>
             </div>
           ) : position ? (
-            <div className="mt-4">
-              <Button variant={ret >= 0 ? 'primary' : 'danger'} onClick={close} disabled={liquidated}>
-                {done ? 'Cerrar y cobrar' : 'Cerrar posición'}
+            <div className="mt-4 space-y-3">
+              <div className="rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-4 space-y-2">
+                <Row label="Margen" value={`${position.margin} monedas`} />
+                <Row label="Tamaño de posición" value={`${notional(position).toFixed(0)} monedas`} />
+                <Row label="Precio de entrada" value={position.entry.toFixed(2)} />
+                <Row label="Precio de liquidación" value={liqPrice.toFixed(2)} tone="text-danger-400" />
+              </div>
+              <Button variant={pnl >= 0 ? 'primary' : 'danger'} onClick={close}>
+                Cerrar posición
               </Button>
-              <p className="mt-2 text-center text-[13px] text-carbon-500">
-                Arriesgas {STAKE} monedas. Con x{position.leverage}, un{' '}
-                {(100 / position.leverage).toFixed(0)}% en contra las borra.
-              </p>
             </div>
           ) : (
             <>
+              {/* Order panel. Same order as a venue: leverage, then amount,
+                  then what that combination actually means. */}
               <p className="mt-5 text-[13px] font-black uppercase tracking-[0.8px] text-carbon-500">
                 Apalancamiento
               </p>
-              <div className="mt-2 grid grid-cols-4 gap-2">
+              <div className="mt-2 grid grid-cols-5 gap-2">
                 {LEVERAGES.map((l) => (
                   <button
                     key={l}
                     onClick={() => setLeverage(l)}
-                    className={`rounded-xl border-2 py-2.5 text-sm font-black transition ${
+                    className={`rounded-xl border-2 py-2 text-[13px] font-black transition ${
                       leverage === l
-                        ? 'border-lime-500 bg-lime-500/10 text-lime-400'
+                        ? l >= 50
+                          ? 'border-danger-500 bg-danger-500/10 text-danger-400'
+                          : 'border-lime-500 bg-lime-500/10 text-lime-400'
                         : 'border-carbon-800 bg-carbon-850 text-carbon-300 hover:border-carbon-700'
                     }`}
                   >
-                    x{l}
+                    {l}x
                   </button>
                 ))}
               </div>
 
+              <div className="mt-5 flex items-baseline justify-between gap-3">
+                <p className="text-[13px] font-black uppercase tracking-[0.8px] text-carbon-500">
+                  Margen
+                </p>
+                <p className="text-[13px] font-bold text-carbon-500 tabular-nums">
+                  Saldo: {coins}
+                </p>
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={coins}
+                  value={margin}
+                  onChange={(e) => {
+                    const n = Math.floor(Number(e.target.value) || 0);
+                    // Clamped to the balance: a venue won't let you open more
+                    // than you have either, and finding out after pressing is
+                    // the worst moment to learn it.
+                    setMargin(Math.max(0, Math.min(coins, n)));
+                  }}
+                  className="flex-1 min-w-0 rounded-xl border-2 border-carbon-800 bg-carbon-900 px-4 py-3 text-lg font-black text-carbon-50 tabular-nums focus:border-lime-500/60 focus:outline-none"
+                />
+                <span className="shrink-0 text-sm font-bold text-carbon-500">monedas</span>
+              </div>
+              <div className="mt-2 grid grid-cols-4 gap-2">
+                {STAKE_SHORTCUTS.map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setMargin(Math.floor(coins * f))}
+                    className="rounded-lg border-2 border-carbon-800 bg-carbon-850 py-1.5 text-[12px] font-black text-carbon-300 hover:border-carbon-700 transition"
+                  >
+                    {f === 1 ? 'TODO' : `${f * 100}%`}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-4 rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-4 space-y-2">
+                <Row label="Tamaño de posición" value={`${notional(preview).toFixed(0)} monedas`} />
+                <Row label="Precio de liquidación" value={liqPrice.toFixed(2)} tone="text-danger-400" />
+                <Row
+                  label="Distancia hasta liquidación"
+                  value={`${liqDistance.toFixed(2)}%`}
+                  tone={risky ? 'text-danger-400' : 'text-carbon-200'}
+                />
+                <Row
+                  label={`Comisión ida y vuelta (${(TAKER_FEE * 100).toFixed(3)}% por lado)`}
+                  value={`${roundTripFee(preview, entryPrice).toFixed(1)} monedas`}
+                />
+                <Row
+                  label="Margen de mantenimiento"
+                  value={`${(MAINTENANCE_MARGIN * 100).toFixed(1)}%`}
+                />
+              </div>
+
+              {/* The warning scales with the actual danger rather than with a
+                  round number of x's: what ends a round is how close the
+                  liquidation price is, and at 100x it's less than half a
+                  per cent away. */}
+              <p
+                className={`mt-3 flex items-start gap-2 text-[13px] leading-snug ${
+                  risky ? 'text-danger-400' : 'text-carbon-500'
+                }`}
+              >
+                <Icon name={risky ? 'trending-down' : 'shield'} size={16} className="mt-0.5 shrink-0" />
+                {margin > 0
+                  ? risky
+                    ? `Un ${liqDistance.toFixed(2)}% en contra y pierdes las ${margin} monedas enteras. Una vela normal se mueve más que eso.`
+                    : `Puedes perder hasta las ${margin} monedas del margen, nunca más: la posición se cierra sola antes.`
+                  : 'Pon un margen para operar.'}
+              </p>
+
               <div className="mt-4 grid grid-cols-2 gap-3">
-                <Button disabled={!allowed} onClick={() => open('long')}>
+                <Button disabled={!allowed || margin <= 0} onClick={() => open('long')}>
                   <Icon name="trending-up" size={18} /> Long
                 </Button>
-                <Button disabled={!allowed} variant="danger" onClick={() => open('short')}>
+                <Button
+                  variant="danger"
+                  disabled={!allowed || margin <= 0}
+                  onClick={() => open('short')}
+                >
                   <Icon name="trending-down" size={18} /> Short
                 </Button>
               </div>
 
               <p className="mt-3 text-center text-[13px] text-carbon-500">
-                Arriesgas {STAKE} de tus {coins} monedas.{' '}
                 {unlimited
-                  ? 'Con Ultra, tantos trades como quieras.'
-                  : `El plan gratuito incluye ${FREE_TRADES_PER_DAY} al día.`}
+                  ? 'Con Ultra, tantas operaciones como quieras.'
+                  : `El plan gratuito incluye ${FREE_TRADES_PER_DAY} operación al día.`}
               </p>
-            </>
-          )}
 
-          {(denied || !allowed) && !position && (
-            <div className="mt-4 rounded-2xl border-2 border-ultra-500/30 bg-ultra-500/10 p-4 text-center">
-              <p className="text-sm font-bold text-ultra-300">
-                Ya has hecho tu trade de hoy. Con Ultra son ilimitados.
-              </p>
-              <div className="mt-3 w-[200px] mx-auto">
-                <Button variant="platinum" onClick={() => navigate('/planes')}>
-                  Ver Ultra
-                </Button>
-              </div>
-            </div>
+              {!allowed && (
+                <div className="mt-4 rounded-2xl border-2 border-ultra-500/30 bg-ultra-500/10 p-4 text-center">
+                  <p className="text-sm font-bold text-ultra-300">
+                    Ya has operado hoy. Con Ultra son ilimitadas.
+                  </p>
+                  <div className="mt-3 w-[200px] mx-auto">
+                    <Button variant="platinum" onClick={() => navigate('/planes')}>
+                      Ver Ultra
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

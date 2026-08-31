@@ -12,13 +12,20 @@ import {
   hasUnlimitedTrades,
 } from '../src/data/plans';
 import {
-  LEVERAGES,
-  LIQUIDATION_LOSS,
-  coinsFromReturn,
+  TAKER_FEE,
+  equity,
   generateCandles,
+  grossPnl,
   isLiquidated,
-  positionReturn,
+  liquidationDistance,
+  liquidationPrice,
+  notional,
+  roi,
+  roundTripFee,
   seededRandom,
+  settleCoins,
+  type Leverage,
+  type Position,
 } from '../src/utils/market';
 import { useUserStore } from '../src/store/useUserStore';
 
@@ -46,45 +53,78 @@ const rand = seededRandom(7);
 check('el generador se queda entre 0 y 1', Array.from({ length: 200 }, rand).every((n) => n >= 0 && n < 1));
 
 // ------------------------------------------------------------ the money
-check('un long gana cuando el precio sube', positionReturn(100, 110, 'long', 1) > 0);
-check('y pierde cuando baja', positionReturn(100, 90, 'long', 1) < 0);
-check('un short es exactamente lo contrario', positionReturn(100, 90, 'short', 1) === -positionReturn(100, 90, 'long', 1));
+const pos = (over: Partial<Position> = {}): Position => ({
+  direction: 'long',
+  leverage: 10,
+  margin: 100,
+  entry: 100,
+  ...over,
+});
+
+check('el tamaño de posición es margen por apalancamiento', notional(pos({ leverage: 20 })) === 2000);
+check('un long gana cuando el precio sube', grossPnl(pos(), 110) > 0);
+check('y pierde cuando baja', grossPnl(pos(), 90) < 0);
+check(
+  'un short es exactamente lo contrario',
+  grossPnl(pos({ direction: 'short' }), 90) === -grossPnl(pos(), 90)
+);
 check(
   'el apalancamiento multiplica el movimiento',
-  Math.abs(positionReturn(100, 105, 'long', 2) - 2 * positionReturn(100, 105, 'long', 1)) < 1e-9
-);
-check('sin movimiento no hay ni ganancia ni pérdida', positionReturn(100, 100, 'long', 10) === 0);
-
-// The part that protects the player: a position can lose its stake and not a
-// coin more, however much the price runs.
-const desplome = positionReturn(100, 40, 'long', 10);
-check('la pérdida se detiene en el capital arriesgado', desplome === LIQUIDATION_LOSS, `${desplome}`);
-check('y eso cuenta como liquidación', isLiquidated(desplome));
-check('un -99% todavía no liquida', !isLiquidated(-0.99));
-check(
-  'con x10 basta un 10% en contra para liquidar',
-  isLiquidated(positionReturn(100, 90, 'long', 10))
-);
-check(
-  'con x1 hace falta que el precio se vaya a cero',
-  !isLiquidated(positionReturn(100, 1, 'long', 1))
+  Math.abs(grossPnl(pos({ leverage: 4 }), 105) - 4 * grossPnl(pos({ leverage: 1 }), 105)) < 1e-9
 );
 
-check('ganar 100 al 25% son 25 monedas', coinsFromReturn(100, 0.25) === 25);
-check('perder el 25% de 100 son -25', coinsFromReturn(100, -0.25) === -25);
+/*
+ * Fees. Charged on both sides like a real venue, which is what makes high
+ * leverage expensive before the price has done anything: at 100x the round
+ * trip is 12% of the margin.
+ */
+const feeAt100 = roundTripFee(pos({ leverage: 100 }), 100);
+check('la comisión se cobra en los dos lados', Math.abs(feeAt100 - 100 * 100 * TAKER_FEE * 2) < 1e-9, `${feeAt100}`);
+check('a x100 la ida y vuelta cuesta el 12% del margen', Math.abs(feeAt100 - 12) < 0.001, `${feeAt100}`);
+check('sin mover el precio, abrir y cerrar ya pierde la comisión', settleCoins(pos(), 100) < 0);
+
+/*
+ * Liquidation. The distances are the whole lesson — and they have to match
+ * what the screen promises, since the chart draws that exact price.
+ */
+for (const [lev, expected] of [[2, 49.5], [10, 9.5], [25, 3.5], [100, 0.5]] as const) {
+  const p = pos({ leverage: lev as Leverage });
+  const d = liquidationDistance(p) * 100;
+  check(
+    `a ${lev}x se liquida a un ${d.toFixed(2)}% en contra`,
+    Math.abs(d - expected) < 0.1,
+    `esperado ~${expected}%`
+  );
+}
 check(
-  'los decimales se redondean a favor del jugador al ganar',
-  coinsFromReturn(100, 0.005) === 0 && coinsFromReturn(100, 0.019) === 1
+  'tocar el precio de liquidación liquida',
+  isLiquidated(pos({ leverage: 100 }), liquidationPrice(pos({ leverage: 100 })))
 );
+check('un pelo antes, todavía no', !isLiquidated(pos({ leverage: 100 }), liquidationPrice(pos({ leverage: 100 })) * 1.0001));
 check(
-  'y a su favor también al perder',
-  coinsFromReturn(100, -0.019) === -1 && coinsFromReturn(100, -0.005) === 0
+  'y en un short el precio de liquidación está por encima de la entrada',
+  liquidationPrice(pos({ direction: 'short', leverage: 50 })) > 100
 );
+
+/*
+ * The floor. Isolated margin: the round can cost the margin and not one coin
+ * more, however far the price runs — which is what makes it honest to let
+ * anybody play with the app's own currency.
+ */
+check('un desplome del 50% con x10 cuesta el margen entero', settleCoins(pos(), 50) === -100);
+check('y un desplome del 99% no cuesta más', settleCoins(pos(), 1) === -100);
+check('el patrimonio nunca baja de cero', equity(pos(), 1) === 0);
+check('el ROI nunca es peor que -100%', roi(pos(), 1) === -1);
 check(
-  'liquidarse cuesta exactamente lo apostado',
-  coinsFromReturn(100, LIQUIDATION_LOSS) === -100
+  'apostar todo el saldo sigue teniendo el mismo suelo',
+  settleCoins(pos({ margin: 5000 }), 1) === -5000
 );
-check('los apalancamientos ofrecidos son razonables', LEVERAGES.every((l) => l >= 1 && l <= 10));
+
+check('ganar redondea a favor del jugador', settleCoins(pos({ leverage: 1 }), 100.001) === 0);
+check(
+  'y perder también',
+  settleCoins(pos({ leverage: 1, margin: 1000 }), 99.999) >= -2
+);
 
 // ------------------------------------------------------- the daily limit
 const store = useUserStore.getState();
