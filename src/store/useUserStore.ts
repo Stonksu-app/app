@@ -96,6 +96,10 @@ interface UserState {
      *  and are restored as isolated. */
     mode?: 'isolated' | 'cross';
     wallet?: number;
+    /** The orders that close it on their own. Optional for the same reason as
+     *  the two above, and null when the trade was opened without them. */
+    takeProfit?: number | null;
+    stopLoss?: number | null;
   } | null;
   /**
    * Today's counters for the rotating daily missions — what's rolled over is

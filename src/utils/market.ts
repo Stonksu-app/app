@@ -99,7 +99,16 @@ export interface Position {
   /** Every coin available when the position opened, margin included. On cross
    *  this is what stands behind it; on isolated it's only bookkeeping. */
   wallet: number;
+  /** The price that closes the position in profit. null or absent: none set,
+   *  which is how every position opened before this existed is stored. */
+  takeProfit?: number | null;
+  /** The price that closes it at a loss you chose, instead of at the one the
+   *  engine chooses for you. */
+  stopLoss?: number | null;
 }
+
+/** Why a round ended. */
+export type ExitReason = 'liquidation' | 'takeProfit' | 'stopLoss' | 'manual';
 
 /**
  * The most a position can cost — and what it can draw on before it dies.
@@ -217,4 +226,74 @@ export function settleCoins(p: Position, price: number): number {
 export function liquidationDistance(p: Position): number {
   if (p.entry <= 0) return 0;
   return Math.abs(liquidationPrice(p) - p.entry) / p.entry;
+}
+
+/*
+ * Take profit and stop loss.
+ *
+ * The two orders that separate trading from gambling: one decides in advance
+ * what you'll settle for, the other decides in advance what you'll accept
+ * losing — both while you're calm, rather than while the number is moving.
+ * The lesson is that a stop *below* the liquidation price is not a stop at
+ * all, so that case is named and rejected rather than quietly accepted.
+ */
+
+/** Where a trigger has to sit for the direction to make any sense. */
+export function triggerIsValid(p: Position, kind: 'takeProfit' | 'stopLoss', price: number): boolean {
+  if (!Number.isFinite(price) || price <= 0) return false;
+  const liq = liquidationPrice(p);
+  if (p.direction === 'long') {
+    return kind === 'takeProfit' ? price > p.entry : price < p.entry && price > liq;
+  }
+  return kind === 'takeProfit' ? price < p.entry : price > p.entry && price < liq;
+}
+
+/** Whether a price range reaches a level, from the side the position cares
+ *  about: a long takes profit on the way up and stops out on the way down. */
+function reaches(p: Position, kind: 'takeProfit' | 'stopLoss', level: number, low: number, high: number): boolean {
+  const up = (p.direction === 'long') === (kind === 'takeProfit');
+  return up ? high >= level : low <= level;
+}
+
+/**
+ * What ends the round inside a price range, if anything does.
+ *
+ * Order matters and it isn't arbitrary. Liquidation comes first because the
+ * engine doesn't queue behind your orders. Then the stop, then the target:
+ * within a single candle nobody can know which the price touched first, and
+ * assuming the worse of the two is both what an honest backtest does and the
+ * only assumption that can't flatter a result.
+ */
+export function triggeredBy(
+  p: Position,
+  low: number,
+  high: number
+): { price: number; reason: ExitReason } | null {
+  const liq = liquidationPrice(p);
+  if (p.direction === 'long' ? low <= liq : high >= liq) return { price: liq, reason: 'liquidation' };
+  if (p.stopLoss != null && reaches(p, 'stopLoss', p.stopLoss, low, high)) {
+    return { price: p.stopLoss, reason: 'stopLoss' };
+  }
+  if (p.takeProfit != null && reaches(p, 'takeProfit', p.takeProfit, low, high)) {
+    return { price: p.takeProfit, reason: 'takeProfit' };
+  }
+  return null;
+}
+
+/**
+ * The price that would leave you at a given ROI, fees included.
+ *
+ * Solved rather than approximated, because the fee is exactly what makes a
+ * "break even" stop lose money: at 0% ROI this comes back *above* the entry
+ * for a long, and seeing that is the point of showing it.
+ */
+export function priceForRoi(p: Position, targetRoi: number): number {
+  const size = positionSize(p);
+  if (size <= 0) return p.entry;
+  const wanted = targetRoi * p.margin;
+  const price =
+    p.direction === 'long'
+      ? (wanted + p.entry * size * (1 + TAKER_FEE)) / (size * (1 - TAKER_FEE))
+      : (p.entry * size * (1 - TAKER_FEE) - wanted) / (size * (1 + TAKER_FEE));
+  return Math.max(0, price);
 }

@@ -15,6 +15,9 @@ import {
   TAKER_FEE,
   backing,
   equity,
+  priceForRoi,
+  triggerIsValid,
+  triggeredBy,
   generateCandles,
   grossPnl,
   isLiquidated,
@@ -227,6 +230,61 @@ check(
 check(
   'un cruzado sin más saldo que el margen es un aislado',
   liquidationPrice(pos({ mode: 'cross', wallet: 100 })) === liquidationPrice(pos({ mode: 'isolated' }))
+);
+
+/*
+ * Take profit y stop loss.
+ *
+ * Lo que separa operar de apostar: decidir cuándo sales estando tranquilo. Las
+ * comprobaciones que importan son las que castigan el optimismo — que la
+ * comisión hace que "salir en tablas" esté por encima de la entrada, que si en
+ * una vela caben el stop y el objetivo gana el stop, y que la liquidación no
+ * hace cola detrás de tus órdenes.
+ */
+const enLargo = pos({ direction: 'long', leverage: 10, margin: 100, entry: 100, wallet: 100 });
+const enCorto = pos({ direction: 'short', leverage: 10, margin: 100, entry: 100, wallet: 100 });
+
+check('un objetivo del +50% da el +50% justo', Math.abs(roi(enLargo, priceForRoi(enLargo, 0.5)) - 0.5) < 1e-9);
+check('y en corto también', Math.abs(roi(enCorto, priceForRoi(enCorto, 0.5)) - 0.5) < 1e-9);
+check(
+  'salir en tablas no es salir al precio de entrada: la comisión ya se pagó',
+  priceForRoi(enLargo, 0) > enLargo.entry,
+  `${priceForRoi(enLargo, 0).toFixed(4)} vs ${enLargo.entry}`
+);
+check('en corto, las tablas quedan por debajo', priceForRoi(enCorto, 0) < enCorto.entry);
+check('el objetivo de un largo está por encima de la entrada', priceForRoi(enLargo, 0.5) > enLargo.entry);
+check('el de un corto, por debajo', priceForRoi(enCorto, 0.5) < enCorto.entry);
+
+check('un take profit por debajo de la entrada no vale para un largo', !triggerIsValid(enLargo, 'takeProfit', 99));
+check('un stop por encima tampoco', !triggerIsValid(enLargo, 'stopLoss', 101));
+check(
+  'un stop más allá de la liquidación no es un stop',
+  !triggerIsValid(enLargo, 'stopLoss', liquidationPrice(enLargo) - 1)
+);
+check('uno antes de la liquidación sí', triggerIsValid(enLargo, 'stopLoss', liquidationPrice(enLargo) + 1));
+
+const conOrdenes = { ...enLargo, takeProfit: 110, stopLoss: 95 };
+check('sin llegar a ninguna, la posición sigue abierta', triggeredBy(conOrdenes, 99, 101) === null);
+check('tocar el objetivo cierra en el objetivo', triggeredBy(conOrdenes, 100, 111)?.reason === 'takeProfit');
+check('tocar el stop cierra en el stop', triggeredBy(conOrdenes, 94, 101)?.reason === 'stopLoss');
+check(
+  'si en la misma vela caben los dos, manda el stop',
+  triggeredBy(conOrdenes, 94, 111)?.reason === 'stopLoss',
+  'nadie sabe cuál tocó antes, y suponer el bueno maquilla cualquier resultado'
+);
+check(
+  'la liquidación no hace cola detrás de tus órdenes',
+  triggeredBy({ ...conOrdenes, stopLoss: liquidationPrice(enLargo) + 0.01 }, 0, 111)?.reason === 'liquidation'
+);
+check(
+  'cerrar en el stop cuesta lo que dijiste, no el margen entero',
+  settleCoins(conOrdenes, 95) > settleCoins(conOrdenes, liquidationPrice(conOrdenes)),
+  `${settleCoins(conOrdenes, 95)} vs ${settleCoins(conOrdenes, liquidationPrice(conOrdenes))}`
+);
+check(
+  'sin órdenes, solo cierra la liquidación',
+  triggeredBy(enLargo, 95, 200) === null &&
+    triggeredBy(enLargo, liquidationPrice(enLargo), 200)?.reason === 'liquidation'
 );
 
 console.log(failed === 0 ? '\nTodo correcto.' : `\n${failed} problema(s).`);

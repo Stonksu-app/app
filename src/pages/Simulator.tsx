@@ -11,8 +11,8 @@ import PriceChart from '../components/PriceChart';
 import {
   INTERVALS,
   SYMBOL,
+  exitDuring,
   fetchCandles,
-  liquidationDuring,
   subscribePrice,
   worstPrice,
   type Interval,
@@ -27,14 +27,17 @@ import {
   TAKER_FEE,
   equity,
   generateCandles,
-  isLiquidated,
   liquidationDistance,
   liquidationPrice,
   notional,
+  priceForRoi,
   roi,
   roundTripFee,
   settleCoins,
+  triggerIsValid,
+  triggeredBy,
   type Direction,
+  type ExitReason,
   type Leverage,
   type MarginMode,
   type Position,
@@ -58,6 +61,26 @@ import {
 /** Quick stake buttons, as fractions of the balance — same idea as the
  *  25/50/75/100% row every venue puts under the amount field. */
 const STAKE_SHORTCUTS = [0.25, 0.5, 0.75, 1];
+
+/*
+ * Take profit and stop loss, entered as ROI rather than as a price.
+ *
+ * A venue asks for a price because it already knows which side you're on. Here
+ * the side isn't chosen until you press Long or Short, and "20% de ganancia"
+ * means the same thing on both — while a price would be a target on one and a
+ * stop on the other. It also puts the number that matters in front of you: at
+ * 50x, a 20% move in your favour isn't 20% of anything you own.
+ */
+const TP_SHORTCUTS = [25, 50, 100];
+const SL_SHORTCUTS = [10, 25, 50];
+
+/** What each ending is called on the screen that announces it. */
+const EXIT_TITLES: Record<ExitReason, string> = {
+  liquidation: 'Liquidado',
+  takeProfit: 'Take profit',
+  stopLoss: 'Stop loss',
+  manual: 'Posición cerrada',
+};
 
 /** One label-and-value line, the way an order panel lists its numbers. */
 function Row({ label, value, tone = 'text-carbon-200' }: { label: string; value: string; tone?: string }) {
@@ -160,8 +183,18 @@ export default function Simulator() {
     // your balance either, and finding out after pressing is the worst moment.
     setMarginText(String(Math.min(coins, Number(digits))));
   };
+  /** Take profit and stop loss, as percentages of ROI and held as text for
+   *  the same reason the margin is. Empty means "no order". */
+  const [tpText, setTpText] = useState('');
+  const [slText, setSlText] = useState('');
+  const percent = (raw: string) => raw.replace(/[^\d.]/g, '').replace(/^(\d*\.\d*).*$/, '$1');
+  const asRoi = (raw: string, sign: 1 | -1) => {
+    const n = Number(raw);
+    return raw.trim() !== '' && Number.isFinite(n) && n > 0 ? (sign * n) / 100 : null;
+  };
+
   const [position, setPosition] = useState<Position | null>(null);
-  const [settled, setSettled] = useState<{ coins: number; liquidated: boolean } | null>(null);
+  const [settled, setSettled] = useState<{ coins: number; reason: ExitReason } | null>(null);
 
   /*
    * A position left open keeps running, and the path decides its fate.
@@ -185,15 +218,24 @@ export default function Simulator() {
         // since it can only settle for less than cross would.
         mode: openTrade.mode ?? 'isolated',
         wallet: openTrade.wallet ?? openTrade.margin,
+        takeProfit: openTrade.takeProfit ?? null,
+        stopLoss: openTrade.stopLoss ?? null,
       };
       const since = await fetchCandles(1000, openTrade.openedAt);
       if (cancelled) return;
-      const liqHit = since ? liquidationDuring(restored, since) : null;
-      if (liqHit !== null) {
-        const change = settleCoins(restored, worstPrice(restored.direction, since ?? []) ?? liqHit);
+      const hit = since ? exitDuring(restored, since) : null;
+      if (hit !== null) {
+        // A liquidation settles at the worst the path reached, which is what
+        // the engine would have matched against. A stop or a target settles at
+        // its own level: that's the price you asked for.
+        const at =
+          hit.reason === 'liquidation'
+            ? worstPrice(restored.direction, since ?? []) ?? hit.price
+            : hit.price;
+        const change = settleCoins(restored, at);
         settleTrade(change);
         setOpenTrade(null);
-        setSettled({ coins: change, liquidated: true });
+        setSettled({ coins: change, reason: hit.reason });
         return;
       }
       setPosition(restored);
@@ -207,9 +249,12 @@ export default function Simulator() {
   const price = livePrice ?? candles[candles.length - 1]?.close ?? 0;
   const entryPrice = price;
 
+  const tpRoi = asRoi(tpText, 1);
+  const slRoi = asRoi(slText, -1);
+
   /** The position you would open right now — what the panel is describing
    *  before you commit to it. */
-  const preview: Position = {
+  const base: Position = {
     direction: 'long',
     leverage,
     margin,
@@ -217,13 +262,40 @@ export default function Simulator() {
     mode,
     wallet: coins,
   };
-  const liquidated = position ? isLiquidated(position, price) : false;
+  /*
+   * The orders turned into prices.
+   *
+   * Only meaningful once there's a margin: with nothing staked the ROI has
+   * nothing to be a percentage of. A stop further away than the liquidation
+   * price is rejected rather than drawn, because the engine would get there
+   * first and a line that can never be reached is a lie on a chart.
+   */
+  const tpPrice = margin > 0 && tpRoi !== null ? priceForRoi(base, tpRoi) : null;
+  const slPrice = margin > 0 && slRoi !== null ? priceForRoi(base, slRoi) : null;
+  const slReachable = slPrice === null || triggerIsValid(base, 'stopLoss', slPrice);
+  const preview: Position = {
+    ...base,
+    takeProfit: tpPrice,
+    stopLoss: slReachable ? slPrice : null,
+  };
   const pnl = position ? equity(position, price) - position.margin : 0;
 
   const open = (direction: Direction) => {
-    if (margin <= 0 || margin > coins) return;
+    if (margin <= 0 || margin > coins || !slReachable) return;
     if (!startTrade()) return;
-    setPosition({ direction, leverage, margin, entry: entryPrice, mode, wallet: coins });
+    const opened: Position = {
+      direction,
+      leverage,
+      margin,
+      entry: entryPrice,
+      mode,
+      wallet: coins,
+    };
+    // Solved for the direction actually chosen: the same "+25%" is a price
+    // above the entry on a long and below it on a short.
+    opened.takeProfit = tpRoi !== null ? priceForRoi(opened, tpRoi) : null;
+    opened.stopLoss = slRoi !== null ? priceForRoi(opened, slRoi) : null;
+    setPosition(opened);
     // Remembered before anything else can go wrong: a position that exists on
     // screen but not in storage is one that vanishes when the app is closed.
     setOpenTrade({
@@ -234,23 +306,31 @@ export default function Simulator() {
       openedAt: Date.now(),
       mode,
       wallet: coins,
+      takeProfit: opened.takeProfit,
+      stopLoss: opened.stopLoss,
     });
   };
 
-  const close = () => {
+  const closeAt = (at: number, reason: ExitReason) => {
     if (!position || settled) return;
-    const change = settleCoins(position, price);
+    const change = settleCoins(position, at);
     settleTrade(change);
     setOpenTrade(null);
-    setSettled({ coins: change, liquidated: isLiquidated(position, price) });
+    setSettled({ coins: change, reason });
   };
 
-  // Liquidation closes for you: there is nothing left to decide, and a live
-  // button would say otherwise.
+  /*
+   * What the current price does to an open position.
+   *
+   * A live tick is a candle whose high and low are both that price, so the
+   * same function decides the outcome here and in the replay above — the two
+   * paths can't drift into disagreeing about whether a stop fired.
+   */
+  const trigger = position && !settled ? triggeredBy(position, price, price) : null;
   useEffect(() => {
-    if (position && liquidated && !settled) close();
+    if (trigger) closeAt(trigger.price, trigger.reason);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liquidated]);
+  }, [trigger?.reason, trigger?.price]);
 
   const shownPosition = position ?? preview;
   const liqPrice = liquidationPrice(shownPosition);
@@ -337,6 +417,8 @@ export default function Simulator() {
                 candles={candles}
                 entry={position ? position.entry : null}
                 liquidation={position ? liqPrice : null}
+                takeProfit={shownPosition.takeProfit ?? null}
+                stopLoss={shownPosition.stopLoss ?? null}
                 auto={auto}
                 onAutoChange={setAuto}
               />
@@ -374,7 +456,7 @@ export default function Simulator() {
           {settled ? (
             <div className="mt-4 rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-5 text-center">
               <p className="text-[13px] font-black uppercase tracking-[0.8px] text-carbon-500">
-                {settled.liquidated ? 'Liquidado' : 'Posición cerrada'}
+                {EXIT_TITLES[settled.reason]}
               </p>
               <p
                 className={`mt-1 text-3xl font-black tabular-nums ${
@@ -385,8 +467,12 @@ export default function Simulator() {
                 {settled.coins}
               </p>
               <p className="mt-1 text-sm text-carbon-400">
-                {settled.liquidated
+                {settled.reason === 'liquidation'
                   ? `Con ${position?.leverage}x bastó un ${liqDistance.toFixed(2)}% en contra para llevarse tu margen entero.`
+                  : settled.reason === 'stopLoss'
+                  ? 'Tu stop cerró la posición donde tú dijiste, no donde lo habría hecho la liquidación.'
+                  : settled.reason === 'takeProfit'
+                  ? 'Tu take profit cerró la posición sola al llegar al objetivo.'
                   : 'Monedas a tu saldo, comisiones ya descontadas.'}
               </p>
               <div className="mt-5 space-y-3">
@@ -402,9 +488,19 @@ export default function Simulator() {
                 <Row label="Margen" value={`${position.margin} monedas`} />
                 <Row label="Tamaño de posición" value={`${notional(position).toFixed(0)} monedas`} />
                 <Row label="Precio de entrada" value={position.entry.toFixed(2)} />
+                {position.takeProfit != null && (
+                  <Row
+                    label="Take profit"
+                    value={position.takeProfit.toFixed(2)}
+                    tone="text-lime-400"
+                  />
+                )}
+                {position.stopLoss != null && (
+                  <Row label="Stop loss" value={position.stopLoss.toFixed(2)} tone="text-[#FFC93C]" />
+                )}
                 <Row label="Precio de liquidación" value={liqPrice.toFixed(2)} tone="text-danger-400" />
               </div>
-              <Button variant={pnl >= 0 ? 'primary' : 'danger'} onClick={close}>
+              <Button variant={pnl >= 0 ? 'primary' : 'danger'} onClick={() => closeAt(price, 'manual')}>
                 Cerrar posición
               </Button>
             </div>
@@ -508,6 +604,98 @@ export default function Simulator() {
                 ))}
               </div>
 
+              {/* Take profit and stop loss. Optional, and last in the panel
+                  because they're a decision about the position you've just
+                  described — but before the buttons, because deciding when to
+                  get out *after* getting in is the mistake this feature is
+                  here to prevent. */}
+              <p className="mt-5 text-[13px] font-black uppercase tracking-[0.8px] text-carbon-500">
+                Take profit y stop loss <span className="text-carbon-600">· opcional</span>
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-3">
+                {(
+                  [
+                    {
+                      key: 'tp' as const,
+                      label: 'Take profit',
+                      text: tpText,
+                      set: setTpText,
+                      shortcuts: TP_SHORTCUTS,
+                      sign: '+',
+                      price: tpPrice,
+                      roiValue: tpRoi,
+                      tone: 'text-lime-400',
+                      border: 'focus:border-lime-500/60',
+                    },
+                    {
+                      key: 'sl' as const,
+                      label: 'Stop loss',
+                      text: slText,
+                      set: setSlText,
+                      shortcuts: SL_SHORTCUTS,
+                      sign: '−',
+                      price: slPrice,
+                      roiValue: slRoi,
+                      tone: 'text-[#FFC93C]',
+                      border: 'focus:border-[#FFC93C]/60',
+                    },
+                  ]
+                ).map((f) => (
+                  <div key={f.key}>
+                    <p className={`text-[12px] font-black uppercase tracking-wide ${f.tone}`}>
+                      {f.label}
+                    </p>
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <span className="text-sm font-black text-carbon-500">{f.sign}</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        placeholder="—"
+                        aria-label={`${f.label} en porcentaje de ROI`}
+                        value={f.text}
+                        onChange={(e) => f.set(percent(e.target.value))}
+                        className={`w-full min-w-0 rounded-xl border-2 border-carbon-800 bg-carbon-900 px-3 py-2.5 text-base font-black text-carbon-50 tabular-nums placeholder:text-carbon-600 focus:outline-none ${f.border}`}
+                      />
+                      <span className="text-sm font-bold text-carbon-500">%</span>
+                    </div>
+                    <div className="mt-1.5 grid grid-cols-3 gap-1">
+                      {f.shortcuts.map((v) => (
+                        <button
+                          key={v}
+                          onClick={() => f.set(f.text === String(v) ? '' : String(v))}
+                          className={`rounded-lg border-2 py-1 text-[11px] font-black transition ${
+                            f.text === String(v)
+                              ? 'border-carbon-600 bg-carbon-800 text-carbon-100'
+                              : 'border-carbon-800 bg-carbon-850 text-carbon-400 hover:border-carbon-700'
+                          }`}
+                        >
+                          {v}%
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-1.5 text-[11px] font-bold text-carbon-500 tabular-nums leading-snug">
+                      {f.price !== null && f.roiValue !== null
+                        ? `${f.price.toFixed(2)} · ${f.roiValue > 0 ? '+' : ''}${(
+                            f.roiValue * margin
+                          ).toFixed(0)} monedas`
+                        : 'Sin orden'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* A stop the engine would reach first isn't a stop, and saying
+                  so is the whole lesson: at 100x there is barely any room
+                  between "voy mal" and "se acabó". */}
+              {!slReachable && (
+                <p className="mt-2 flex items-start gap-2 text-[13px] leading-snug text-danger-400">
+                  <Icon name="trending-down" size={16} className="mt-0.5 shrink-0" />
+                  Con {leverage}x te liquidan antes de perder ese {slText}%: el stop tiene que ser
+                  de menos del {(-roi(base, liqPrice) * 100).toFixed(1)}%.
+                </p>
+              )}
+
               <div className="mt-4 rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-4 space-y-2">
                 <Row label="Tamaño de posición" value={`${notional(preview).toFixed(0)} monedas`} />
                 <Row
@@ -551,12 +739,12 @@ export default function Simulator() {
               </p>
 
               <div className="mt-4 grid grid-cols-2 gap-3">
-                <Button disabled={!allowed || margin <= 0} onClick={() => open('long')}>
+                <Button disabled={!allowed || margin <= 0 || !slReachable} onClick={() => open('long')}>
                   <Icon name="trending-up" size={18} /> Long
                 </Button>
                 <Button
                   variant="danger"
-                  disabled={!allowed || margin <= 0}
+                  disabled={!allowed || margin <= 0 || !slReachable}
                   onClick={() => open('short')}
                 >
                   <Icon name="trending-down" size={18} /> Short

@@ -23,6 +23,7 @@ import type { TimedCandle } from '../lib/marketData';
 
 const UP = '#C6FF34';
 const DOWN = '#FF5252';
+const WARN = '#FFC93C';
 const BORDER = '#262626';
 
 /**
@@ -61,6 +62,8 @@ export default function PriceChart({
   candles,
   entry,
   liquidation,
+  takeProfit = null,
+  stopLoss = null,
   height = 220,
   auto = true,
   onAutoChange,
@@ -68,6 +71,11 @@ export default function PriceChart({
   candles: TimedCandle[];
   entry: number | null;
   liquidation: number | null;
+  /** Where the position closes itself, in profit and at a loss. Drawn in their
+   *  own colours: the stop is amber and not red, so it can't be mistaken at a
+   *  glance for the liquidation line right under it. */
+  takeProfit?: number | null;
+  stopLoss?: number | null;
   height?: number;
   /**
    * Who drives the view: the chart or you.
@@ -267,11 +275,17 @@ export default function PriceChart({
       liquidation !== null
         ? s.createPriceLine({ price: liquidation, color: DOWN, lineWidth: 1, lineStyle: 2, title: 'Liq.' })
         : null,
+      takeProfit !== null
+        ? s.createPriceLine({ price: takeProfit, color: UP, lineWidth: 1, lineStyle: 3, title: 'TP' })
+        : null,
+      stopLoss !== null
+        ? s.createPriceLine({ price: stopLoss, color: WARN, lineWidth: 1, lineStyle: 3, title: 'SL' })
+        : null,
     ];
     return () => {
       lines.forEach((l) => l && s.removePriceLine(l));
     };
-  }, [entry, liquidation]);
+  }, [entry, liquidation, takeProfit, stopLoss]);
 
   const item =
     'w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] font-bold text-carbon-200 hover:bg-carbon-800 transition';

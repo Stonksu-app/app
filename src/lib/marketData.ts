@@ -1,5 +1,5 @@
-import type { Candle, Direction, Position } from '../utils/market';
-import { liquidationPrice } from '../utils/market';
+import type { Candle, Direction, ExitReason, Position } from '../utils/market';
+import { liquidationPrice, triggeredBy } from '../utils/market';
 
 /*
  * Real market data for the simulator.
@@ -130,17 +130,31 @@ export function subscribePrice(onPrice: (price: number) => void): () => void {
 }
 
 /**
- * Whether a position was liquidated at some point in a stretch of candles.
+ * What closed a position while you weren't looking, if anything did.
  *
  * The reason this exists: a live position keeps running while the app is
  * closed, exactly as it would on a real venue. On return, the current price
- * alone can't answer "did it survive?" — a wick can take a position out and
- * the price can come back. So the path is replayed from the candles, using
- * each one's low for a long and high for a short, which is what a matching
- * engine watches.
+ * alone can't answer "did it survive?" — a wick can take a position out, or
+ * fill your take profit, and the price can come back as if nothing happened.
+ * So the path is replayed candle by candle, each one's high and low being what
+ * a matching engine actually watches.
  *
- * Returns the liquidation price when it was hit, or null if it survived.
+ * Returns the price and the reason, or null if the position is still open.
  */
+export function exitDuring(
+  p: Position,
+  candles: Candle[]
+): { price: number; reason: ExitReason } | null {
+  for (const c of candles) {
+    const hit = triggeredBy(p, c.low, c.high);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/** Whether a position was liquidated in a stretch of candles, ignoring its
+ *  own orders. Kept because liquidation is the one exit that settles at the
+ *  worst price the path reached rather than at the level itself. */
 export function liquidationDuring(p: Position, candles: Candle[]): number | null {
   const liq = liquidationPrice(p);
   for (const c of candles) {
