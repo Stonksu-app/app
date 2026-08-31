@@ -80,12 +80,41 @@ export function generateCandles(seed: number, count: number, startPrice = 100): 
   return candles;
 }
 
+/**
+ * Which pot backs the position.
+ *
+ * The difference people meet on their first real account, and the one that
+ * empties it: isolated risks the margin you assigned, cross risks the whole
+ * balance. Same trade, same leverage, completely different worst case.
+ */
+export type MarginMode = 'isolated' | 'cross';
+
 export interface Position {
   direction: Direction;
   leverage: Leverage;
-  /** Coins put up. On an isolated position this is the most that can be lost. */
+  /** Coins assigned to the position. Sets the size: margin × leverage. */
   margin: number;
   entry: number;
+  mode: MarginMode;
+  /** Every coin available when the position opened, margin included. On cross
+   *  this is what stands behind it; on isolated it's only bookkeeping. */
+  wallet: number;
+}
+
+/**
+ * The most a position can cost — and what it can draw on before it dies.
+ *
+ * Cross puts the whole balance behind the trade, which is why a cross
+ * position survives a move that would have liquidated the isolated one, and
+ * why the day it does die it takes everything rather than a slice.
+ *
+ * Never below zero either way. On a real venue a gap can in principle leave a
+ * negative balance, absorbed by the insurance fund; modelling that here would
+ * mean handing somebody a debt in a game currency, which teaches nothing the
+ * warning doesn't.
+ */
+export function backing(p: Position): number {
+  return p.mode === 'cross' ? Math.max(p.margin, p.wallet) : p.margin;
 }
 
 /** Margin × leverage: what you're actually trading with. */
@@ -123,13 +152,16 @@ export function grossPnl(p: Position, price: number): number {
  * belongs to a warning, not to a game that pays in the app's own currency.
  */
 export function equity(p: Position, price: number): number {
-  return Math.max(0, p.margin + grossPnl(p, price) - roundTripFee(p, price));
+  return Math.max(0, backing(p) + grossPnl(p, price) - roundTripFee(p, price));
 }
 
 /** Profit or loss as a fraction of the margin — the ROI a venue shows. */
 export function roi(p: Position, price: number): number {
   if (p.margin <= 0) return 0;
-  return (equity(p, price) - p.margin) / p.margin;
+  // Always against the margin, whatever backs the position: ROI is "what did
+  // this trade do to the money I committed", and a cross position measured
+  // against the whole wallet would flatter every result.
+  return (equity(p, price) - backing(p)) / p.margin;
 }
 
 /**
@@ -143,12 +175,11 @@ export function liquidationPrice(p: Position): number {
   const size = positionSize(p);
   if (size <= 0) return 0;
   const maintenance = notional(p) * MAINTENANCE_MARGIN;
-  // margin + (P - E)·size·dir - fees(P) = maintenance, with fees linear in P.
+  // backing + (P - E)·size·dir - fees(P) = maintenance, fees linear in P.
   const feeIn = size * p.entry * TAKER_FEE;
   const dir = p.direction === 'long' ? 1 : -1;
-  // size·dir·P - size·TAKER_FEE·P = maintenance - margin + feeIn + size·dir·E
   const coefficient = size * dir - size * TAKER_FEE * (dir === 1 ? 1 : -1) * dir;
-  const constant = maintenance - p.margin + feeIn + size * dir * p.entry;
+  const constant = maintenance - backing(p) + feeIn + size * dir * p.entry;
   const price = constant / coefficient;
   return Math.max(0, price);
 }
@@ -177,7 +208,7 @@ export function isLiquidated(p: Position, price: number): boolean {
  * can never be worse than the margin.
  */
 export function settleCoins(p: Position, price: number): number {
-  const change = equity(p, price) - p.margin;
+  const change = equity(p, price) - backing(p);
   return change >= 0 ? Math.floor(change) : Math.ceil(change);
 }
 

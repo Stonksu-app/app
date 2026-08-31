@@ -9,14 +9,17 @@ import { useUserStore } from '../store/useUserStore';
 import { FREE_TRADES_PER_DAY, hasUnlimitedTrades } from '../data/plans';
 import PriceChart from '../components/PriceChart';
 import {
+  INTERVALS,
   SYMBOL,
   fetchCandles,
   liquidationDuring,
   subscribePrice,
   worstPrice,
+  type Interval,
   type TimedCandle,
 } from '../lib/marketData';
 import {
+  backing,
   FUTURE_CANDLES,
   HISTORY_CANDLES,
   LEVERAGES,
@@ -33,6 +36,7 @@ import {
   settleCoins,
   type Direction,
   type Leverage,
+  type MarginMode,
   type Position,
 } from '../utils/market';
 
@@ -79,6 +83,9 @@ export default function Simulator() {
    * that already had a working market of its own. The screen says which one
    * you're looking at, because a simulated price labelled BTC would be a lie.
    */
+  /** The chart's timeframe. Above the fetch that reads it, since a hook
+   *  can't reach a `const` declared further down the component. */
+  const [timeframe, setTimeframe] = useState<Interval>('1m');
   const [seed] = useState(() => Math.floor(Math.random() * 1e9));
   const [candles, setCandles] = useState<TimedCandle[]>([]);
   const [live, setLive] = useState(false);
@@ -88,7 +95,7 @@ export default function Simulator() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const real = await fetchCandles(120);
+      const real = await fetchCandles(120, undefined, timeframe);
       if (cancelled) return;
       if (real) {
         setCandles(real);
@@ -109,7 +116,7 @@ export default function Simulator() {
     return () => {
       cancelled = true;
     };
-  }, [seed]);
+  }, [seed, timeframe]);
 
   // The live price, straight from the trade stream. It moves the last candle
   // rather than appending, so the chart doesn't grow a bar per tick.
@@ -128,6 +135,9 @@ export default function Simulator() {
     });
   }, [live]);
   const [leverage, setLeverage] = useState<Leverage>(10);
+  const [mode, setMode] = useState<MarginMode>('isolated');
+  /** Auto-fit, off the moment you move the chart yourself. */
+  const [auto, setAuto] = useState(true);
   /*
    * Held as text, not as a number.
    *
@@ -171,6 +181,10 @@ export default function Simulator() {
         leverage: openTrade.leverage as Leverage,
         margin: openTrade.margin,
         entry: openTrade.entry,
+        // Older positions predate the mode; isolated is the safer assumption,
+        // since it can only settle for less than cross would.
+        mode: openTrade.mode ?? 'isolated',
+        wallet: openTrade.wallet ?? openTrade.margin,
       };
       const since = await fetchCandles(1000, openTrade.openedAt);
       if (cancelled) return;
@@ -195,17 +209,32 @@ export default function Simulator() {
 
   /** The position you would open right now — what the panel is describing
    *  before you commit to it. */
-  const preview: Position = { direction: 'long', leverage, margin, entry: entryPrice };
+  const preview: Position = {
+    direction: 'long',
+    leverage,
+    margin,
+    entry: entryPrice,
+    mode,
+    wallet: coins,
+  };
   const liquidated = position ? isLiquidated(position, price) : false;
   const pnl = position ? equity(position, price) - position.margin : 0;
 
   const open = (direction: Direction) => {
     if (margin <= 0 || margin > coins) return;
     if (!startTrade()) return;
-    setPosition({ direction, leverage, margin, entry: entryPrice });
+    setPosition({ direction, leverage, margin, entry: entryPrice, mode, wallet: coins });
     // Remembered before anything else can go wrong: a position that exists on
     // screen but not in storage is one that vanishes when the app is closed.
-    setOpenTrade({ direction, leverage, margin, entry: entryPrice, openedAt: Date.now() });
+    setOpenTrade({
+      direction,
+      leverage,
+      margin,
+      entry: entryPrice,
+      openedAt: Date.now(),
+      mode,
+      wallet: coins,
+    });
   };
 
   const close = () => {
@@ -270,6 +299,37 @@ export default function Simulator() {
               <p className="text-lg font-black text-carbon-50 tabular-nums">{price.toFixed(2)}</p>
             </div>
 
+            {/* Timeframes and the AUTO button, where a venue puts them: above
+                the chart, and AUTO on the right because it's about the view
+                rather than about the market. */}
+            <div className="mt-2 flex items-center gap-1 overflow-x-auto">
+              {INTERVALS.map((tf) => (
+                <button
+                  key={tf}
+                  onClick={() => setTimeframe(tf)}
+                  className={`shrink-0 rounded-lg px-2.5 py-1 text-[12px] font-black uppercase transition ${
+                    timeframe === tf
+                      ? 'bg-carbon-800 text-lime-400'
+                      : 'text-carbon-500 hover:text-carbon-300'
+                  }`}
+                >
+                  {tf}
+                </button>
+              ))}
+              <button
+                onClick={() => setAuto((v) => !v)}
+                aria-pressed={auto}
+                title="Ajustar la vista al precio automáticamente"
+                className={`ml-auto shrink-0 rounded-lg border-2 px-2 py-1 text-[11px] font-black uppercase tracking-wide transition ${
+                  auto
+                    ? 'border-lime-500/50 bg-lime-500/10 text-lime-400'
+                    : 'border-carbon-800 text-carbon-500 hover:text-carbon-300'
+                }`}
+              >
+                Auto
+              </button>
+            </div>
+
             {loading ? (
               <p className="py-16 text-center text-sm font-bold text-carbon-500">Cargando mercado…</p>
             ) : (
@@ -277,6 +337,8 @@ export default function Simulator() {
                 candles={candles}
                 entry={position ? position.entry : null}
                 liquidation={position ? liqPrice : null}
+                auto={auto}
+                onUserMoved={() => setAuto(false)}
               />
             )}
 
@@ -350,6 +412,44 @@ export default function Simulator() {
             <>
               {/* Order panel. Same order as a venue: leverage, then amount,
                   then what that combination actually means. */}
+              {/* Margin mode first, because it decides what the leverage
+                  below it can cost you. */}
+              <p className="mt-5 text-[13px] font-black uppercase tracking-[0.8px] text-carbon-500">
+                Modo de margen
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {(['isolated', 'cross'] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setMode(m)}
+                    className={`rounded-xl border-2 px-3 py-2.5 text-left transition ${
+                      mode === m
+                        ? m === 'cross'
+                          ? 'border-danger-500 bg-danger-500/10'
+                          : 'border-lime-500 bg-lime-500/10'
+                        : 'border-carbon-800 bg-carbon-850 hover:border-carbon-700'
+                    }`}
+                  >
+                    <span
+                      className={`block text-[13px] font-black uppercase tracking-wide ${
+                        mode === m
+                          ? m === 'cross'
+                            ? 'text-danger-400'
+                            : 'text-lime-400'
+                          : 'text-carbon-300'
+                      }`}
+                    >
+                      {m === 'isolated' ? 'Aislado' : 'Cruzado'}
+                    </span>
+                    <span className="block text-[11px] text-carbon-500 leading-snug">
+                      {m === 'isolated'
+                        ? 'Solo arriesgas el margen'
+                        : 'Todo tu saldo respalda la posición'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
               <p className="mt-5 text-[13px] font-black uppercase tracking-[0.8px] text-carbon-500">
                 Apalancamiento
               </p>
@@ -410,6 +510,11 @@ export default function Simulator() {
 
               <div className="mt-4 rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-4 space-y-2">
                 <Row label="Tamaño de posición" value={`${notional(preview).toFixed(0)} monedas`} />
+                <Row
+                  label="Pérdida máxima"
+                  value={`${backing(preview).toFixed(0)} monedas`}
+                  tone={mode === 'cross' ? 'text-danger-400' : 'text-carbon-200'}
+                />
                 <Row label="Precio de liquidación" value={liqPrice.toFixed(2)} tone="text-danger-400" />
                 <Row
                   label="Distancia hasta liquidación"
@@ -436,11 +541,13 @@ export default function Simulator() {
                 }`}
               >
                 <Icon name={risky ? 'trending-down' : 'shield'} size={16} className="mt-0.5 shrink-0" />
-                {margin > 0
-                  ? risky
-                    ? `Un ${liqDistance.toFixed(2)}% en contra y pierdes las ${margin} monedas enteras. Una vela normal se mueve más que eso.`
-                    : `Puedes perder hasta las ${margin} monedas del margen, nunca más: la posición se cierra sola antes.`
-                  : 'Pon un margen para operar.'}
+                {margin <= 0
+                  ? 'Pon un margen para operar.'
+                  : mode === 'cross'
+                  ? `Cruzado: aguanta un ${liqDistance.toFixed(2)}% en contra porque lo respalda todo tu saldo — y si llega ahí, se lleva las ${backing(preview).toFixed(0)} monedas, no solo el margen.`
+                  : risky
+                  ? `Un ${liqDistance.toFixed(2)}% en contra y pierdes las ${margin} monedas enteras. Una vela normal se mueve más que eso.`
+                  : `Aislado: puedes perder hasta las ${margin} monedas del margen, nunca más.`}
               </p>
 
               <div className="mt-4 grid grid-cols-2 gap-3">

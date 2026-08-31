@@ -23,7 +23,12 @@ const STREAM = 'wss://stream.binance.com:9443/ws';
  *  recognises — the point is that the shape on screen is a shape they'll see
  *  again on a real venue. */
 export const SYMBOL = 'BTCUSDT';
-export const INTERVAL = '1m';
+
+/** The timeframes a venue puts along the top of a chart. Same strings Binance
+ *  takes, so the selector and the request can't drift apart. */
+export const INTERVALS = ['1m', '5m', '15m', '1h', '4h', '1d'] as const;
+export type Interval = (typeof INTERVALS)[number];
+export const DEFAULT_INTERVAL: Interval = '1m';
 
 interface RawKline extends Array<unknown> {
   0: number; // open time
@@ -57,11 +62,15 @@ function toCandle(k: RawKline): TimedCandle {
  * back on, and "the network is down" is a normal state on a phone, not an
  * error worth an exception.
  */
-export async function fetchCandles(limit = 120, startTime?: number): Promise<TimedCandle[] | null> {
+export async function fetchCandles(
+  limit = 120,
+  startTime?: number,
+  interval: Interval = DEFAULT_INTERVAL
+): Promise<TimedCandle[] | null> {
   try {
     const params = new URLSearchParams({
       symbol: SYMBOL,
-      interval: INTERVAL,
+      interval,
       limit: String(Math.min(1000, limit)),
     });
     if (startTime) params.set('startTime', String(startTime));

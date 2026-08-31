@@ -92,6 +92,10 @@ interface UserState {
     entry: number;
     /** Epoch ms, so the path since can be fetched and replayed. */
     openedAt: number;
+    /** Optional: positions opened before margin modes existed have neither,
+     *  and are restored as isolated. */
+    mode?: 'isolated' | 'cross';
+    wallet?: number;
   } | null;
   /**
    * Today's counters for the rotating daily missions — what's rolled over is

@@ -27,11 +27,20 @@ export default function PriceChart({
   entry,
   liquidation,
   height = 220,
+  auto = true,
+  onUserMoved,
 }: {
   candles: TimedCandle[];
   entry: number | null;
   liquidation: number | null;
   height?: number;
+  /** Auto-fit, the way a venue's AUTO button behaves: on, the view follows the
+   *  price; off, it stays exactly where you dragged it. */
+  auto?: boolean;
+  /** Fired the first time a gesture moves the view, so the page can turn AUTO
+   *  off by itself — snapping back mid-drag is the thing that makes a chart
+   *  feel broken. */
+  onUserMoved?: () => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
@@ -56,8 +65,10 @@ export default function PriceChart({
       rightPriceScale: { borderColor: '#262626' },
       timeScale: { borderColor: '#262626', timeVisible: true, secondsVisible: false },
       crosshair: { mode: 0 },
-      handleScale: false,
-      handleScroll: false,
+      // Pan and zoom, like any chart worth reading. Scrolling the page still
+      // works because the chart only claims the gesture inside its own box.
+      handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
     });
     const s = c.addSeries(CandlestickSeries, {
       upColor: UP,
@@ -80,6 +91,15 @@ export default function PriceChart({
     };
   }, [height]);
 
+  // A gesture on the chart means you want to look somewhere: tell the page.
+  useEffect(() => {
+    const c = chart.current;
+    if (!c || !onUserMoved) return;
+    const handler = () => onUserMoved();
+    c.timeScale().subscribeVisibleLogicalRangeChange(handler);
+    return () => c.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
+  }, [onUserMoved]);
+
   useEffect(() => {
     if (!series.current || candles.length === 0) return;
     // The library's own time type: a branded number, so the seconds we
@@ -95,8 +115,13 @@ export default function PriceChart({
         })
       )
     );
-    chart.current?.timeScale().fitContent();
-  }, [candles]);
+    if (auto) chart.current?.timeScale().fitContent();
+  }, [candles, auto]);
+
+  // Re-fitting the moment AUTO goes back on is what the button is for.
+  useEffect(() => {
+    if (auto) chart.current?.timeScale().fitContent();
+  }, [auto]);
 
   // Entry and liquidation as price lines rather than drawings: the chart keeps
   // them pinned to the scale as it moves, and puts the number on the axis —

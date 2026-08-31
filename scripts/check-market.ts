@@ -13,6 +13,7 @@ import {
 } from '../src/data/plans';
 import {
   TAKER_FEE,
+  backing,
   equity,
   generateCandles,
   grossPnl,
@@ -60,6 +61,8 @@ const pos = (over: Partial<Position> = {}): Position => ({
   leverage: 10,
   margin: 100,
   entry: 100,
+  mode: 'isolated',
+  wallet: 100,
   ...over,
 });
 
@@ -156,7 +159,7 @@ check('y ganar suma con normalidad', useUserStore.getState().coins === 50);
  * that happens to be showing: a spike can take a 50x position out and be gone
  * a minute later, which on a real venue is exactly what happens.
  */
-const held: Position = { direction: 'long', leverage: 10, margin: 100, entry: 100 };
+const held: Position = pos();
 const liq = liquidationPrice(held);
 
 const tranquilo: Candle[] = [
@@ -193,6 +196,38 @@ check(
 );
 check('y el de un short, el máximo', worstPrice('short', tranquilo) === 102);
 check('sin velas no hay peor precio', worstPrice('long', []) === null);
+
+/*
+ * Isolated versus cross — the difference that empties a first real account.
+ *
+ * Same trade, same leverage: cross survives a move that kills the isolated
+ * one, because the whole balance is standing behind it, and the day it does
+ * die it takes the whole balance rather than a slice. Both floored at zero:
+ * a real venue can leave a negative balance on a gap, absorbed by its
+ * insurance fund, and handing somebody a debt in a game currency would teach
+ * nothing the warning doesn't.
+ */
+const aislado = pos({ leverage: 25, margin: 100, wallet: 1000, mode: 'isolated' });
+const cruzado = pos({ leverage: 25, margin: 100, wallet: 1000, mode: 'cross' });
+
+check('en aislado solo respalda el margen', backing(aislado) === 100);
+check('en cruzado respalda todo el saldo', backing(cruzado) === 1000);
+check(
+  'por eso el cruzado aguanta mucho más',
+  liquidationDistance(cruzado) > liquidationDistance(aislado) * 5,
+  `${(liquidationDistance(cruzado) * 100).toFixed(2)}% vs ${(liquidationDistance(aislado) * 100).toFixed(2)}%`
+);
+check('el aislado se lleva solo el margen', settleCoins(aislado, 1) === -100);
+check('el cruzado se lleva el saldo entero', settleCoins(cruzado, 1) === -1000);
+check('ninguno de los dos deja deuda', equity(cruzado, 0.01) === 0 && equity(aislado, 0.01) === 0);
+check(
+  'el ROI se mide contra el margen en los dos modos',
+  Math.abs(roi(cruzado, 101) - roi(aislado, 101)) < 1e-9
+);
+check(
+  'un cruzado sin más saldo que el margen es un aislado',
+  liquidationPrice(pos({ mode: 'cross', wallet: 100 })) === liquidationPrice(pos({ mode: 'isolated' }))
+);
 
 console.log(failed === 0 ? '\nTodo correcto.' : `\n${failed} problema(s).`);
 process.exit(failed === 0 ? 0 : 1);
