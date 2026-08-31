@@ -140,7 +140,28 @@ export default function Simulator() {
 
   const [shown, setShown] = useState(HISTORY_CANDLES);
   const [leverage, setLeverage] = useState<Leverage>(10);
-  const [margin, setMargin] = useState(() => Math.min(100, coins));
+  /*
+   * Held as text, not as a number.
+   *
+   * A controlled numeric field can't be empty: clearing it snapped straight
+   * back to 0, and the next digit typed landed behind that zero — "0100" for
+   * anyone who cleared the field before typing, which is what everybody does.
+   * The text is what you typed; the number is derived from it.
+   */
+  const [marginText, setMarginText] = useState(() => String(Math.min(100, coins)));
+  const margin = Math.max(0, Math.min(coins, Math.floor(Number(marginText) || 0)));
+
+  const typeMargin = (raw: string) => {
+    // Digits only, and no leading zeros to sit in front of the real number.
+    const digits = raw.replace(/[^\d]/g, '').replace(/^0+(?=\d)/, '');
+    if (digits === '') {
+      setMarginText('');
+      return;
+    }
+    // Clamped as you type rather than on submit: a venue won't open more than
+    // your balance either, and finding out after pressing is the worst moment.
+    setMarginText(String(Math.min(coins, Number(digits))));
+  };
   const [position, setPosition] = useState<Position | null>(null);
   const [settled, setSettled] = useState<{ coins: number; liquidated: boolean } | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -327,20 +348,19 @@ export default function Simulator() {
                 </p>
               </div>
               <div className="mt-2 flex items-center gap-2">
+                {/* type="text" with a numeric keypad rather than
+                    type="number": the spinner arrows are useless at this scale
+                    and the browser's own coercion is what put the stray zero
+                    there in the first place. */}
                 <input
-                  type="number"
+                  type="text"
                   inputMode="numeric"
-                  min={1}
-                  max={coins}
-                  value={margin}
-                  onChange={(e) => {
-                    const n = Math.floor(Number(e.target.value) || 0);
-                    // Clamped to the balance: a venue won't let you open more
-                    // than you have either, and finding out after pressing is
-                    // the worst moment to learn it.
-                    setMargin(Math.max(0, Math.min(coins, n)));
-                  }}
-                  className="flex-1 min-w-0 rounded-xl border-2 border-carbon-800 bg-carbon-900 px-4 py-3 text-lg font-black text-carbon-50 tabular-nums focus:border-lime-500/60 focus:outline-none"
+                  autoComplete="off"
+                  placeholder="0"
+                  aria-label="Margen en monedas"
+                  value={marginText}
+                  onChange={(e) => typeMargin(e.target.value)}
+                  className="flex-1 min-w-0 rounded-xl border-2 border-carbon-800 bg-carbon-900 px-4 py-3 text-lg font-black text-carbon-50 tabular-nums placeholder:text-carbon-600 focus:border-lime-500/60 focus:outline-none"
                 />
                 <span className="shrink-0 text-sm font-bold text-carbon-500">monedas</span>
               </div>
@@ -348,7 +368,7 @@ export default function Simulator() {
                 {STAKE_SHORTCUTS.map((f) => (
                   <button
                     key={f}
-                    onClick={() => setMargin(Math.floor(coins * f))}
+                    onClick={() => setMarginText(String(Math.floor(coins * f)))}
                     className="rounded-lg border-2 border-carbon-800 bg-carbon-850 py-1.5 text-[12px] font-black text-carbon-300 hover:border-carbon-700 transition"
                   >
                     {f === 1 ? 'TODO' : `${f * 100}%`}
