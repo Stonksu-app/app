@@ -3,6 +3,7 @@ import TopBar from '../components/TopBar';
 import NavRail from '../components/NavRail';
 import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
+import ChallengeTabs from '../components/ChallengeTabs';
 import Mascot from '../components/Mascot';
 import { Button } from '../components/Button';
 import { computeMissions } from '../data/missions';
@@ -67,6 +68,8 @@ export default function Missions() {
 
         <div className="max-w-2xl mx-auto px-4 py-6 pb-32 lg:pb-6">
           <h1 className="text-2xl font-black text-carbon-50">Misiones</h1>
+
+          <ChallengeTabs />
           <p className="text-sm text-carbon-400 mt-1">
             {pending > 0
               ? `Tienes ${pending} ${pending === 1 ? 'recompensa' : 'recompensas'} por reclamar.`

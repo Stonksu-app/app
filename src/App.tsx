@@ -7,6 +7,7 @@ import GuidePractice from './pages/GuidePractice';
 import GuideRead from './pages/GuideRead';
 import Premium from './pages/Premium';
 import UltraPitch from './pages/UltraPitch';
+import Simulator from './pages/Simulator';
 import Shop from './pages/Shop';
 import Achievements from './pages/Achievements';
 import AvatarEditor from './pages/AvatarEditor';
@@ -160,6 +161,14 @@ function App() {
         element={
           <RequireOnboarded>
             <FriendProfile />
+          </RequireOnboarded>
+        }
+      />
+      <Route
+        path="/simulador"
+        element={
+          <RequireOnboarded>
+            <Simulator />
           </RequireOnboarded>
         }
       />

@@ -16,6 +16,7 @@ import {
   hasAllAccessories,
   hasUnlimitedHearts,
   hasUnlimitedPractice,
+  hasUnlimitedTrades,
   planName,
   showsAds,
   type Plan,
@@ -44,6 +45,7 @@ check('premium no alcanza a ultra', !atLeast('premium', 'ultra'));
 check('los anuncios solo se ven en el plan gratuito', showsAds('free') && !showsAds('premium') && !showsAds('ultra'));
 check('las vidas infinitas son solo de ultra', hasUnlimitedHearts('ultra') && !hasUnlimitedHearts('premium'));
 check('el repaso ilimitado es solo de ultra', hasUnlimitedPractice('ultra') && !hasUnlimitedPractice('premium'));
+check('los trades ilimitados también', hasUnlimitedTrades('ultra') && !hasUnlimitedTrades('premium'));
 check('los accesorios exclusivos son solo de ultra', hasAllAccessories('ultra') && !hasAllAccessories('free'));
 check('las lecciones ultra son solo de ultra', canPlayUltraLessons('ultra') && !canPlayUltraLessons('premium'));
 
@@ -53,6 +55,7 @@ check('las lecciones ultra son solo de ultra', canPlayUltraLessons('ultra') && !
 const ENFORCED: { keyword: RegExp; holds: (p: Plan) => boolean }[] = [
   { keyword: /vidas infinitas/i, holds: hasUnlimitedHearts },
   { keyword: /repaso .*ilimitado/i, holds: hasUnlimitedPractice },
+  { keyword: /trades ilimitados/i, holds: hasUnlimitedTrades },
   { keyword: /accesorios/i, holds: hasAllAccessories },
   { keyword: /lecciones exclusivas/i, holds: canPlayUltraLessons },
   { keyword: /sin anuncios/i, holds: (p) => !showsAds(p) },

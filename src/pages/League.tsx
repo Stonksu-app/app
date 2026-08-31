@@ -4,6 +4,7 @@ import TopBar from '../components/TopBar';
 import NavRail from '../components/NavRail';
 import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
+import ChallengeTabs from '../components/ChallengeTabs';
 import LeagueMark from '../components/LeagueMark';
 import Mascot from '../components/Mascot';
 import { Button } from '../components/Button';
@@ -84,6 +85,8 @@ export default function League() {
 
         <div className="max-w-2xl mx-auto px-4 py-6 pb-32 lg:pb-6">
           <h1 className="text-2xl font-black text-carbon-50">Liga</h1>
+
+          <ChallengeTabs />
           <p className="text-sm text-carbon-400 mt-1">
             Compite por XP de esta semana, no por tu total — cada lunes se reparte de cero.
           </p>

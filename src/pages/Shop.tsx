@@ -141,6 +141,25 @@ export default function Shop() {
             </Link>
           )}
 
+          {/* The shop is where coins run out, so it's where earning them
+              belongs — the simulator is the only place that pays for a
+              decision rather than for effort. */}
+          <Link
+            to="/simulador"
+            className="mt-6 flex items-center gap-4 rounded-3xl border-2 border-carbon-800 bg-carbon-850 p-5 hover:border-carbon-700 transition"
+          >
+            <span className="w-12 h-12 shrink-0 rounded-2xl bg-lime-500/15 flex items-center justify-center">
+              <Icon name="candle" size={26} className="text-lime-500" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[17px] font-black text-carbon-50">Gana monedas operando</span>
+              <span className="block text-sm text-carbon-400">
+                Long o short con apalancamiento, en un mercado simulado.
+              </span>
+            </span>
+            <Icon name="chevron-left" size={20} className="shrink-0 text-carbon-600 rotate-180" />
+          </Link>
+
           <h2 className="mt-8 text-[13px] font-black text-carbon-400 uppercase tracking-widest">Vidas</h2>
           <ShopRow
             icon="heart"

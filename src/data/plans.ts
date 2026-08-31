@@ -21,6 +21,10 @@ export function atLeast(plan: Plan, needed: Plan): boolean {
 /** Free rounds of guide practice per day. Ultra lifts the limit entirely. */
 export const FREE_PRACTICE_PER_DAY = 1;
 
+/** Simulator trades a day without Ultra. One is enough to learn what leverage
+ *  does to a position; unlimited is what makes it a thing you come back to. */
+export const FREE_TRADES_PER_DAY = 1;
+
 // ------------------------------------------------------------ the rules
 /** House promos only ever appear on free accounts — that's what's being sold. */
 export const showsAds = (plan: Plan) => plan === 'free';
@@ -28,6 +32,8 @@ export const showsAds = (plan: Plan) => plan === 'free';
 export const hasUnlimitedHearts = (plan: Plan) => atLeast(plan, 'ultra');
 /** Ultra practises as much as it likes; everyone else gets a daily taste. */
 export const hasUnlimitedPractice = (plan: Plan) => atLeast(plan, 'ultra');
+/** Same shape for the simulator: one trade a day, or as many as you want. */
+export const hasUnlimitedTrades = (plan: Plan) => atLeast(plan, 'ultra');
 /** Cosmetics that would otherwise have to be earned from missions. */
 export const hasAllAccessories = (plan: Plan) => atLeast(plan, 'ultra');
 /**
@@ -66,6 +72,7 @@ export const PLAN_OFFERS: PlanOffer[] = [
     perks: [
       { icon: 'heart', text: 'Vidas infinitas: falla sin quedarte fuera' },
       { icon: 'cards', text: 'Repaso de la guía ilimitado' },
+      { icon: 'candle', text: 'Trades ilimitados en el simulador' },
       { icon: 'book', text: 'Lecciones exclusivas de Ultra' },
       { icon: 'sparkles', text: 'Accesorios exclusivos para tu avatar' },
       { icon: 'shield', text: 'Sin anuncios' },

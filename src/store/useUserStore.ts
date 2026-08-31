@@ -16,7 +16,7 @@ import {
   todayLocal,
 } from '../utils/streak';
 import { DEFAULT_REMINDER_HOUR } from '../lib/notifications';
-import { FREE_PRACTICE_PER_DAY, hasAllAccessories, hasUnlimitedHearts, hasUnlimitedPractice, type Plan } from '../data/plans';
+import { FREE_PRACTICE_PER_DAY, FREE_TRADES_PER_DAY, hasUnlimitedTrades, hasAllAccessories, hasUnlimitedHearts, hasUnlimitedPractice, type Plan } from '../data/plans';
 import { pickDailyMissions, type DailyMissionInput } from '../data/dailyMissions';
 
 const MAX_HEARTS = 5;
@@ -72,6 +72,10 @@ interface UserState {
    */
   practiceDay: string | null;
   practiceRoundsToday: number;
+  /** The simulator's daily allowance. Local for the same reason as the
+   *  practice counter: a rate limit that resets at midnight, not progress. */
+  tradeDay: string | null;
+  tradesToday: number;
   /**
    * Today's counters for the rotating daily missions — what's rolled over is
    * the date they belong to, not progress in their own right, so they're
@@ -240,6 +244,12 @@ interface UserState {
   canPractice: () => boolean;
   /** Consumes one round of the day's allowance. Returns false if none left. */
   startPracticeRound: () => boolean;
+  /** Whether another simulator trade is allowed right now. */
+  canTrade: () => boolean;
+  /** Consumes one trade of the day's allowance. Returns false if none left. */
+  startTrade: () => boolean;
+  /** Settles a finished trade: adds (or subtracts) its coins, never below 0. */
+  settleTrade: (coins: number) => void;
   isChestOpened: (chestId: string) => boolean;
   /** Returns whether this chest also gifted a streak protector. */
   openChest: (chestId: string) => boolean;
@@ -429,6 +439,8 @@ export const useUserStore = create<UserState>()(
       planStartedAt: null,
       practiceDay: null,
       practiceRoundsToday: 0,
+      tradeDay: null,
+      tradesToday: 0,
       dailyStatsDate: null,
       dailyXp: 0,
       dailyLessons: 0,
@@ -817,6 +829,34 @@ export const useUserStore = create<UserState>()(
         return true;
       },
 
+      canTrade: () => {
+        const s = get();
+        if (hasUnlimitedTrades(s.plan)) return true;
+        if (s.tradeDay !== todayStr()) return true;
+        return s.tradesToday < FREE_TRADES_PER_DAY;
+      },
+
+      startTrade: () => {
+        const s = get();
+        const today = todayStr();
+        // Spent on opening, not on settling: a position abandoned halfway
+        // still used the day's turn, or the limit is a suggestion you dodge
+        // by closing the tab on a losing trade.
+        if (hasUnlimitedTrades(s.plan)) {
+          set({ tradeDay: today, tradesToday: s.tradeDay === today ? s.tradesToday + 1 : 1 });
+          return true;
+        }
+        const used = s.tradeDay === today ? s.tradesToday : 0;
+        if (used >= FREE_TRADES_PER_DAY) return false;
+        set({ tradeDay: today, tradesToday: used + 1 });
+        return true;
+      },
+
+      settleTrade: (coins) =>
+        // Floored at zero: the stake is the most a round can cost, and a
+        // balance that went negative would be a debt the shop can't explain.
+        set((s) => ({ coins: Math.max(0, s.coins + coins) })),
+
       isChestOpened: (chestId) => get().openedChestIds.includes(chestId),
 
       openChest: (chestId) => {
@@ -962,6 +1002,8 @@ export const useUserStore = create<UserState>()(
           planStartedAt: null,
           practiceDay: null,
           practiceRoundsToday: 0,
+          tradeDay: null,
+          tradesToday: 0,
           dailyStatsDate: null,
           dailyXp: 0,
           dailyLessons: 0,

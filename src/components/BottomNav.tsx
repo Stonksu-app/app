@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import Icon from './Icon';
-import { NAV_ITEMS } from './navItems';
+import { NAV_ITEMS, navItemIsActive } from './navItems';
 
 /** Phone navigation, pinned to the bottom. Hidden from lg up, where NavRail
  *  takes over. */
@@ -13,7 +13,7 @@ export default function BottomNav() {
     >
       <div className="flex items-stretch justify-around max-w-md mx-auto px-2 py-2">
         {NAV_ITEMS.map((item) => {
-          const active = pathname === item.to;
+          const active = navItemIsActive(item, pathname);
           return (
             <Link
               key={item.to}

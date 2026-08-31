@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import Icon from './Icon';
 import Mascot from './Mascot';
-import { NAV_ITEMS } from './navItems';
+import { NAV_ITEMS, navItemIsActive } from './navItems';
 
 /** Desktop navigation. On phones this is replaced by BottomNav. */
 export default function NavRail() {
@@ -14,7 +14,7 @@ export default function NavRail() {
       </Link>
       <nav className="mt-4 flex flex-col gap-2">
         {NAV_ITEMS.map((item) => {
-          const active = pathname === item.to;
+          const active = navItemIsActive(item, pathname);
           return (
             <Link
               key={item.to}

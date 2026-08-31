@@ -115,9 +115,10 @@ const cloudKeys = new Set(Object.keys(sample));
  * - lastStreakLoss: an explanation of what happened on this device, not
  *   progress. Syncing it would mean explaining a phone's lost streak on a
  *   laptop that never saw it.
- * - practice*: a daily rate limit, not progress. Syncing a counter that
- *   resets at midnight would need columns and a timezone argument, and the
- *   worst it buys is one extra round of revision.
+ * - practice*, trade*: daily rate limits, not progress. Syncing a counter
+ *   that resets at midnight would need columns and a timezone argument, and
+ *   the worst it buys is one extra round — of revision, or of a simulated
+ *   trade whose coins are capped at the stake either way.
  * - daily*: the rotating daily missions' counters and claimed state. Same
  *   reasoning as practice*: a per-day rate limit rather than progress, and
  *   which three missions are on offer is a pure function of the date, so
@@ -134,6 +135,8 @@ const LOCAL_ONLY = new Set([
   'testMode',
   'practiceDay',
   'practiceRoundsToday',
+  'tradeDay',
+  'tradesToday',
   'lessonsSincePitch',
   'lastStreakLoss',
   'reminderEnabled',
