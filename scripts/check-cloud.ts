@@ -137,6 +137,7 @@ const LOCAL_ONLY = new Set([
   'practiceRoundsToday',
   'tradeDay',
   'tradesToday',
+  'openTrade',
   'lessonsSincePitch',
   'lastStreakLoss',
   'reminderEnabled',

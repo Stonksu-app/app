@@ -77,6 +77,23 @@ interface UserState {
   tradeDay: string | null;
   tradesToday: number;
   /**
+   * A position left open on the live market.
+   *
+   * The simulator runs on real prices now, so a position keeps running while
+   * the app is closed, exactly as it would on a venue. Kept here so coming
+   * back finds it — and local, because a position opened on a phone and
+   * closed on a laptop would need the two to agree on a price at the same
+   * instant, which is a synchronisation problem this feature doesn't need.
+   */
+  openTrade: {
+    direction: 'long' | 'short';
+    leverage: number;
+    margin: number;
+    entry: number;
+    /** Epoch ms, so the path since can be fetched and replayed. */
+    openedAt: number;
+  } | null;
+  /**
    * Today's counters for the rotating daily missions — what's rolled over is
    * the date they belong to, not progress in their own right, so they're
    * kept off the cloud for the same reason as the practice allowance above.
@@ -250,6 +267,8 @@ interface UserState {
   startTrade: () => boolean;
   /** Settles a finished trade: adds (or subtracts) its coins, never below 0. */
   settleTrade: (coins: number) => void;
+  /** Remembers a position across app closes, or forgets it once settled. */
+  setOpenTrade: (trade: UserState['openTrade']) => void;
   isChestOpened: (chestId: string) => boolean;
   /** Returns whether this chest also gifted a streak protector. */
   openChest: (chestId: string) => boolean;
@@ -441,6 +460,7 @@ export const useUserStore = create<UserState>()(
       practiceRoundsToday: 0,
       tradeDay: null,
       tradesToday: 0,
+      openTrade: null,
       dailyStatsDate: null,
       dailyXp: 0,
       dailyLessons: 0,
@@ -852,6 +872,8 @@ export const useUserStore = create<UserState>()(
         return true;
       },
 
+      setOpenTrade: (trade) => set({ openTrade: trade }),
+
       settleTrade: (coins) =>
         // Floored at zero: the stake is the most a round can cost, and a
         // balance that went negative would be a debt the shop can't explain.
@@ -1004,6 +1026,7 @@ export const useUserStore = create<UserState>()(
           practiceRoundsToday: 0,
           tradeDay: null,
           tradesToday: 0,
+          openTrade: null,
           dailyStatsDate: null,
           dailyXp: 0,
           dailyLessons: 0,

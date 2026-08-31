@@ -28,6 +28,8 @@ import {
   type Position,
 } from '../src/utils/market';
 import { useUserStore } from '../src/store/useUserStore';
+import { liquidationDuring, worstPrice } from '../src/lib/marketData';
+import type { Candle } from '../src/utils/market';
 
 let failed = 0;
 const check = (name: string, cond: boolean, detail = '') => {
@@ -144,6 +146,53 @@ store.settleTrade(-100);
 check('perder más monedas de las que tienes deja el saldo en 0', useUserStore.getState().coins === 0);
 store.settleTrade(50);
 check('y ganar suma con normalidad', useUserStore.getState().coins === 50);
+
+/*
+ * A position that outlives the app.
+ *
+ * The market is live now, so closing the app doesn't pause it. On return the
+ * candles since the entry are replayed to find out whether the position
+ * survived — and the answer has to come from the wicks, not from the price
+ * that happens to be showing: a spike can take a 50x position out and be gone
+ * a minute later, which on a real venue is exactly what happens.
+ */
+const held: Position = { direction: 'long', leverage: 10, margin: 100, entry: 100 };
+const liq = liquidationPrice(held);
+
+const tranquilo: Candle[] = [
+  { open: 100, high: 101, low: 99.5, close: 100.5 },
+  { open: 100.5, high: 102, low: 100, close: 101 },
+];
+check('una racha tranquila no liquida', liquidationDuring(held, tranquilo) === null);
+
+const conMecha: Candle[] = [
+  { open: 100, high: 101, low: 99, close: 100.5 },
+  // The wick goes through the liquidation and the candle closes back above it.
+  { open: 100.5, high: 101, low: liq - 0.5, close: 100.8 },
+];
+check(
+  'una mecha por debajo de la liquidación sí liquida, aunque cierre por encima',
+  liquidationDuring(held, conMecha) !== null
+);
+
+const corto: Position = { ...held, direction: 'short' };
+const liqCorto = liquidationPrice(corto);
+check(
+  'en un short lo que mata es el máximo, no el mínimo',
+  liquidationDuring(corto, [{ open: 100, high: liqCorto + 0.5, low: 95, close: 99 }]) !== null
+);
+check(
+  'y una vela que solo baja no toca un short',
+  liquidationDuring(corto, [{ open: 100, high: 100.2, low: 90, close: 91 }]) === null
+);
+
+check('sin velas no se puede afirmar nada', liquidationDuring(held, []) === null);
+check(
+  'el peor precio de un long es el mínimo del tramo',
+  worstPrice('long', tranquilo) === 99.5
+);
+check('y el de un short, el máximo', worstPrice('short', tranquilo) === 102);
+check('sin velas no hay peor precio', worstPrice('long', []) === null);
 
 console.log(failed === 0 ? '\nTodo correcto.' : `\n${failed} problema(s).`);
 process.exit(failed === 0 ? 0 : 1);

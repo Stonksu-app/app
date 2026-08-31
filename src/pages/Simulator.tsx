@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar';
 import NavRail from '../components/NavRail';
@@ -7,6 +7,15 @@ import Icon from '../components/Icon';
 import { Button } from '../components/Button';
 import { useUserStore } from '../store/useUserStore';
 import { FREE_TRADES_PER_DAY, hasUnlimitedTrades } from '../data/plans';
+import PriceChart from '../components/PriceChart';
+import {
+  SYMBOL,
+  fetchCandles,
+  liquidationDuring,
+  subscribePrice,
+  worstPrice,
+  type TimedCandle,
+} from '../lib/marketData';
 import {
   FUTURE_CANDLES,
   HISTORY_CANDLES,
@@ -22,7 +31,6 @@ import {
   roi,
   roundTripFee,
   settleCoins,
-  type Candle,
   type Direction,
   type Leverage,
   type Position,
@@ -43,81 +51,9 @@ import {
  * read, not a mechanic to hand somebody in a game with its own currency.
  */
 
-const TICK_MS = 420;
 /** Quick stake buttons, as fractions of the balance — same idea as the
  *  25/50/75/100% row every venue puts under the amount field. */
 const STAKE_SHORTCUTS = [0.25, 0.5, 0.75, 1];
-
-function Chart({
-  candles,
-  entry,
-  liquidation,
-}: {
-  candles: Candle[];
-  entry: number | null;
-  liquidation: number | null;
-}) {
-  const width = 320;
-  const height = 180;
-  const prices = [
-    ...candles.map((c) => c.high),
-    ...candles.map((c) => c.low),
-    ...(liquidation ? [liquidation] : []),
-  ];
-  const high = Math.max(...prices);
-  const low = Math.min(...prices);
-  const span = high - low || 1;
-  const step = width / Math.max(candles.length, 1);
-  const y = (price: number) => height - ((price - low) / span) * height;
-
-  return (
-    <svg
-      viewBox={`0 0 ${width} ${height}`}
-      className="w-full h-44 sm:h-56"
-      role="img"
-      aria-label="Gráfico de precio simulado"
-    >
-      {entry !== null && (
-        <line x1={0} x2={width} y1={y(entry)} y2={y(entry)} stroke="#8f8f8f" strokeDasharray="4 4" strokeWidth={1} />
-      )}
-      {/* The line that ends the round. Drawn in the same red as a losing
-          candle, because that is what touching it means. */}
-      {liquidation !== null && (
-        <>
-          <line
-            x1={0}
-            x2={width}
-            y1={y(liquidation)}
-            y2={y(liquidation)}
-            stroke="#FF5252"
-            strokeDasharray="2 3"
-            strokeWidth={1}
-          />
-          <text x={2} y={y(liquidation) - 3} fill="#FF5252" fontSize={7} fontWeight="700">
-            LIQ {liquidation.toFixed(2)}
-          </text>
-        </>
-      )}
-      {candles.map((c, i) => {
-        const x = i * step + step / 2;
-        const colour = c.close >= c.open ? '#C6FF34' : '#FF5252';
-        return (
-          <g key={i}>
-            <line x1={x} x2={x} y1={y(c.high)} y2={y(c.low)} stroke={colour} strokeWidth={1} />
-            <rect
-              x={x - step * 0.3}
-              y={y(Math.max(c.open, c.close))}
-              width={step * 0.6}
-              height={Math.max(1, Math.abs(y(c.open) - y(c.close)))}
-              fill={colour}
-              rx={1}
-            />
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
 
 /** One label-and-value line, the way an order panel lists its numbers. */
 function Row({ label, value, tone = 'text-carbon-200' }: { label: string; value: string; tone?: string }) {
@@ -131,14 +67,66 @@ function Row({ label, value, tone = 'text-carbon-200' }: { label: string; value:
 
 export default function Simulator() {
   const navigate = useNavigate();
-  const { plan, coins, canTrade, startTrade, settleTrade } = useUserStore();
+  const { plan, coins, canTrade, startTrade, settleTrade, openTrade, setOpenTrade } = useUserStore();
   const unlimited = hasUnlimitedTrades(plan);
   const allowed = canTrade();
 
+  /*
+   * Real candles when the network allows, the seeded market when it doesn't.
+   *
+   * A phone on a train, a country that blocks the host, an exchange having a
+   * bad afternoon — none of those should mean "come back later" for a feature
+   * that already had a working market of its own. The screen says which one
+   * you're looking at, because a simulated price labelled BTC would be a lie.
+   */
   const [seed] = useState(() => Math.floor(Math.random() * 1e9));
-  const full = useMemo(() => generateCandles(seed, HISTORY_CANDLES + FUTURE_CANDLES), [seed]);
+  const [candles, setCandles] = useState<TimedCandle[]>([]);
+  const [live, setLive] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [livePrice, setLivePrice] = useState<number | null>(null);
 
-  const [shown, setShown] = useState(HISTORY_CANDLES);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const real = await fetchCandles(120);
+      if (cancelled) return;
+      if (real) {
+        setCandles(real);
+        setLive(true);
+      } else {
+        // The offline market, wearing timestamps so the same chart can draw it.
+        const now = Math.floor(Date.now() / 1000);
+        setCandles(
+          generateCandles(seed, HISTORY_CANDLES + FUTURE_CANDLES).map((c, i) => ({
+            ...c,
+            time: now - (HISTORY_CANDLES + FUTURE_CANDLES - i) * 60,
+          }))
+        );
+        setLive(false);
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [seed]);
+
+  // The live price, straight from the trade stream. It moves the last candle
+  // rather than appending, so the chart doesn't grow a bar per tick.
+  useEffect(() => {
+    if (!live) return;
+    return subscribePrice((p) => {
+      setLivePrice(p);
+      setCandles((cs) => {
+        if (cs.length === 0) return cs;
+        const last = { ...cs[cs.length - 1] };
+        last.close = p;
+        last.high = Math.max(last.high, p);
+        last.low = Math.min(last.low, p);
+        return [...cs.slice(0, -1), last];
+      });
+    });
+  }, [live]);
   const [leverage, setLeverage] = useState<Leverage>(10);
   /*
    * Held as text, not as a number.
@@ -164,10 +152,46 @@ export default function Simulator() {
   };
   const [position, setPosition] = useState<Position | null>(null);
   const [settled, setSettled] = useState<{ coins: number; liquidated: boolean } | null>(null);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const entryPrice = full[HISTORY_CANDLES - 1].close;
-  const price = full[shown - 1].close;
+  /*
+   * A position left open keeps running, and the path decides its fate.
+   *
+   * That's the honest version of a live market: close the app on a losing
+   * 50x position and it does not politely wait. On return the candles since
+   * the entry are replayed — a long dies on a low, a short on a high, which
+   * is what a matching engine watches — so a wick that took the position out
+   * counts even if the price came back before you looked.
+   */
+  useEffect(() => {
+    if (!openTrade || position || settled) return;
+    let cancelled = false;
+    void (async () => {
+      const restored: Position = {
+        direction: openTrade.direction,
+        leverage: openTrade.leverage as Leverage,
+        margin: openTrade.margin,
+        entry: openTrade.entry,
+      };
+      const since = await fetchCandles(1000, openTrade.openedAt);
+      if (cancelled) return;
+      const liqHit = since ? liquidationDuring(restored, since) : null;
+      if (liqHit !== null) {
+        const change = settleCoins(restored, worstPrice(restored.direction, since ?? []) ?? liqHit);
+        settleTrade(change);
+        setOpenTrade(null);
+        setSettled({ coins: change, liquidated: true });
+        return;
+      }
+      setPosition(restored);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const price = livePrice ?? candles[candles.length - 1]?.close ?? 0;
+  const entryPrice = price;
 
   /** The position you would open right now — what the panel is describing
    *  before you commit to it. */
@@ -175,24 +199,20 @@ export default function Simulator() {
   const liquidated = position ? isLiquidated(position, price) : false;
   const pnl = position ? equity(position, price) - position.margin : 0;
 
-  useEffect(() => {
-    if (!position || settled || liquidated || shown >= full.length) return;
-    timer.current = setInterval(() => setShown((n) => Math.min(full.length, n + 1)), TICK_MS);
-    return () => {
-      if (timer.current) clearInterval(timer.current);
-    };
-  }, [position, settled, liquidated, shown, full.length]);
-
   const open = (direction: Direction) => {
     if (margin <= 0 || margin > coins) return;
     if (!startTrade()) return;
     setPosition({ direction, leverage, margin, entry: entryPrice });
+    // Remembered before anything else can go wrong: a position that exists on
+    // screen but not in storage is one that vanishes when the app is closed.
+    setOpenTrade({ direction, leverage, margin, entry: entryPrice, openedAt: Date.now() });
   };
 
   const close = () => {
     if (!position || settled) return;
     const change = settleCoins(position, price);
     settleTrade(change);
+    setOpenTrade(null);
     setSettled({ coins: change, liquidated: isLiquidated(position, price) });
   };
 
@@ -230,23 +250,35 @@ export default function Simulator() {
             <h1 className="text-2xl font-black text-carbon-50">Simulador</h1>
           </div>
           <p className="mt-1 text-sm text-carbon-400">
-            Mercado inventado y monedas del juego. Las reglas son las de un perpetuo real:
-            margen aislado, comisión en cada lado y liquidación.
+            {live
+              ? 'Precio real de BTC en vivo, monedas del juego. Margen aislado, comisión en cada lado y liquidación, como en un perpetuo.'
+              : 'Sin conexión al mercado: estás operando sobre un precio simulado. Las reglas son las mismas.'}
           </p>
 
           <div className="mt-4 rounded-3xl border-2 border-carbon-800 bg-carbon-850 p-4">
             <div className="flex items-baseline justify-between gap-3">
-              <p className="text-[12px] font-black uppercase tracking-[0.8px] text-carbon-500">
-                STNK / USDT · Perp
+              <p className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[0.8px] text-carbon-500">
+                {live ? `${SYMBOL.replace('USDT', '')} / USDT · Perp` : 'STNK / USDT · Simulado'}
+                {live && (
+                  // Only claimed when a socket is actually delivering ticks.
+                  <span className="inline-flex items-center gap-1 text-lime-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-lime-500 animate-pulse-soft" />
+                    En vivo
+                  </span>
+                )}
               </p>
               <p className="text-lg font-black text-carbon-50 tabular-nums">{price.toFixed(2)}</p>
             </div>
 
-            <Chart
-              candles={full.slice(0, shown)}
-              entry={position ? position.entry : null}
-              liquidation={position ? liqPrice : null}
-            />
+            {loading ? (
+              <p className="py-16 text-center text-sm font-bold text-carbon-500">Cargando mercado…</p>
+            ) : (
+              <PriceChart
+                candles={candles}
+                entry={position ? position.entry : null}
+                liquidation={position ? liqPrice : null}
+              />
+            )}
 
             {position && (
               <div className="mt-2 flex items-center justify-between gap-3">
