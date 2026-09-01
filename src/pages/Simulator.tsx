@@ -8,18 +8,22 @@ import { Button } from '../components/Button';
 import { useUserStore } from '../store/useUserStore';
 import { FREE_TRADES_PER_DAY, hasUnlimitedTrades } from '../data/plans';
 import PriceChart from '../components/PriceChart';
+import TradeHistory from '../components/TradeHistory';
 import {
   INTERVALS,
   SYMBOL,
   exitDuring,
   fetchCandles,
+  fillDuring,
   subscribePrice,
   worstPrice,
   type Interval,
   type TimedCandle,
 } from '../lib/marketData';
 import {
+  MAKER_FEE,
   backing,
+  entryFeeRate,
   FUTURE_CANDLES,
   HISTORY_CANDLES,
   LEVERAGES,
@@ -27,6 +31,8 @@ import {
   TAKER_FEE,
   equity,
   generateCandles,
+  limitCanRest,
+  limitFills,
   liquidationDistance,
   liquidationPrice,
   notional,
@@ -38,6 +44,7 @@ import {
   triggeredBy,
   type Direction,
   type ExitReason,
+  type OrderType,
   type Leverage,
   type MarginMode,
   type Position,
@@ -94,7 +101,19 @@ function Row({ label, value, tone = 'text-carbon-200' }: { label: string; value:
 
 export default function Simulator() {
   const navigate = useNavigate();
-  const { plan, coins, canTrade, startTrade, settleTrade, openTrade, setOpenTrade } = useUserStore();
+  const {
+    plan,
+    coins,
+    canTrade,
+    startTrade,
+    settleTrade,
+    openTrade,
+    setOpenTrade,
+    pendingOrder,
+    setPendingOrder,
+    refundTrade,
+    recordTrade,
+  } = useUserStore();
   const unlimited = hasUnlimitedTrades(plan);
   const allowed = canTrade();
 
@@ -158,6 +177,10 @@ export default function Simulator() {
     });
   }, [live]);
   const [leverage, setLeverage] = useState<Leverage>(10);
+  const [orderType, setOrderType] = useState<OrderType>('market');
+  /** The price a limit order waits at. Text, like every other number in this
+   *  panel, so it can be empty while you're typing it. */
+  const [limitText, setLimitText] = useState('');
   const [mode, setMode] = useState<MarginMode>('isolated');
   /** Auto-fit, off the moment you move the chart yourself. */
   const [auto, setAuto] = useState(true);
@@ -194,6 +217,8 @@ export default function Simulator() {
   };
 
   const [position, setPosition] = useState<Position | null>(null);
+  /** When the open position was opened, for the history row it will become. */
+  const [openedAt, setOpenedAt] = useState<number | null>(null);
   const [settled, setSettled] = useState<{ coins: number; reason: ExitReason } | null>(null);
 
   /*
@@ -220,6 +245,7 @@ export default function Simulator() {
         wallet: openTrade.wallet ?? openTrade.margin,
         takeProfit: openTrade.takeProfit ?? null,
         stopLoss: openTrade.stopLoss ?? null,
+        orderType: openTrade.orderType ?? 'market',
       };
       const since = await fetchCandles(1000, openTrade.openedAt);
       if (cancelled) return;
@@ -232,13 +258,47 @@ export default function Simulator() {
           hit.reason === 'liquidation'
             ? worstPrice(restored.direction, since ?? []) ?? hit.price
             : hit.price;
-        const change = settleCoins(restored, at);
-        settleTrade(change);
-        setOpenTrade(null);
-        setSettled({ coins: change, reason: hit.reason });
+        finish(restored, at, hit.reason, openTrade.openedAt);
         return;
       }
       setPosition(restored);
+      setOpenedAt(openTrade.openedAt);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /*
+   * An order left waiting doesn't wait for you to come back either.
+   *
+   * The candles since it was placed decide three things in order: whether it
+   * filled at all, and if it did, whether the position it became survived the
+   * rest of them. Skipping that second half would hand somebody a position a
+   * real venue had already closed hours ago — the pleasant half of the replay
+   * without the other one.
+   */
+  useEffect(() => {
+    if (!pendingOrder || position || settled) return;
+    let cancelled = false;
+    void (async () => {
+      const since = await fetchCandles(1000, pendingOrder.placedAt);
+      if (cancelled || !since) return;
+      const at = fillDuring(pendingOrder.direction, pendingOrder.limitPrice, since);
+      if (at === null) return;
+
+      const when = since[at].time * 1000;
+      const opened = fill(pendingOrder.limitPrice, when);
+      if (!opened) return;
+
+      const after = since.slice(at);
+      const hit = exitDuring(opened, after);
+      if (!hit) return;
+      const exit =
+        hit.reason === 'liquidation' ? worstPrice(opened.direction, after) ?? hit.price : hit.price;
+      setPosition(null);
+      finish(opened, exit, hit.reason, when);
     })();
     return () => {
       cancelled = true;
@@ -251,6 +311,7 @@ export default function Simulator() {
 
   const tpRoi = asRoi(tpText, 1);
   const slRoi = asRoi(slText, -1);
+  const limitPrice = Number(limitText) > 0 ? Number(limitText) : null;
 
   /** The position you would open right now — what the panel is describing
    *  before you commit to it. */
@@ -258,9 +319,13 @@ export default function Simulator() {
     direction: 'long',
     leverage,
     margin,
-    entry: entryPrice,
+    // A limit order's entry is the price you asked for, not the price now:
+    // every number below it — size, liquidation, targets — is measured from
+    // there, which is the whole reason for placing one.
+    entry: orderType === 'limit' && limitPrice !== null ? limitPrice : entryPrice,
     mode,
     wallet: coins,
+    orderType,
   };
   /*
    * The orders turned into prices.
@@ -278,11 +343,62 @@ export default function Simulator() {
     takeProfit: tpPrice,
     stopLoss: slReachable ? slPrice : null,
   };
+  /** Whether a limit order in this direction could actually wait: a buy has to
+   *  be under the market and a sell over it. */
+  const canRest = (d: Direction) =>
+    orderType === 'market' || (limitPrice !== null && limitCanRest(d, limitPrice, price));
   const pnl = position ? equity(position, price) - position.margin : 0;
 
+  /*
+   * Filing a finished trade.
+   *
+   * Everything the history needs is decided here, at the one moment all of it
+   * is known: a row written later from the position alone couldn't say what
+   * closed it or when.
+   */
+  const finish = (p: Position, at: number, reason: ExitReason, since: number) => {
+    const change = settleCoins(p, at);
+    settleTrade(change);
+    setOpenTrade(null);
+    recordTrade({
+      id: `${since}-${Math.random().toString(36).slice(2, 8)}`,
+      direction: p.direction,
+      leverage: p.leverage,
+      margin: p.margin,
+      mode: p.mode,
+      orderType: p.orderType ?? 'market',
+      entry: p.entry,
+      exit: at,
+      reason,
+      coins: change,
+      roi: roi(p, at),
+      openedAt: since,
+      closedAt: Date.now(),
+    });
+    setSettled({ coins: change, reason });
+  };
+
   const open = (direction: Direction) => {
-    if (margin <= 0 || margin > coins || !slReachable) return;
+    if (margin <= 0 || margin > coins || !slReachable || !canRest(direction)) return;
     if (!startTrade()) return;
+
+    if (orderType === 'limit' && limitPrice !== null) {
+      // Nothing is bought yet and nothing is at risk: the order waits, and the
+      // targets wait with it as percentages, to be priced off the fill.
+      setPendingOrder({
+        direction,
+        leverage,
+        margin,
+        limitPrice,
+        placedAt: Date.now(),
+        mode,
+        wallet: coins,
+        tpRoi,
+        slRoi,
+      });
+      return;
+    }
+
     const opened: Position = {
       direction,
       leverage,
@@ -290,12 +406,14 @@ export default function Simulator() {
       entry: entryPrice,
       mode,
       wallet: coins,
+      orderType: 'market',
     };
     // Solved for the direction actually chosen: the same "+25%" is a price
     // above the entry on a long and below it on a short.
     opened.takeProfit = tpRoi !== null ? priceForRoi(opened, tpRoi) : null;
     opened.stopLoss = slRoi !== null ? priceForRoi(opened, slRoi) : null;
     setPosition(opened);
+    setOpenedAt(Date.now());
     // Remembered before anything else can go wrong: a position that exists on
     // screen but not in storage is one that vanishes when the app is closed.
     setOpenTrade({
@@ -308,15 +426,51 @@ export default function Simulator() {
       wallet: coins,
       takeProfit: opened.takeProfit,
       stopLoss: opened.stopLoss,
+      orderType: 'market',
     });
+  };
+
+  /** Turns a waiting order into a position at its own price. */
+  const fill = (at: number, when: number) => {
+    if (!pendingOrder) return;
+    const opened: Position = {
+      direction: pendingOrder.direction,
+      leverage: pendingOrder.leverage as Leverage,
+      margin: pendingOrder.margin,
+      entry: at,
+      mode: pendingOrder.mode,
+      wallet: pendingOrder.wallet,
+      orderType: 'limit',
+    };
+    opened.takeProfit = pendingOrder.tpRoi != null ? priceForRoi(opened, pendingOrder.tpRoi) : null;
+    opened.stopLoss = pendingOrder.slRoi != null ? priceForRoi(opened, pendingOrder.slRoi) : null;
+    setPendingOrder(null);
+    setPosition(opened);
+    setOpenedAt(when);
+    setOpenTrade({
+      direction: opened.direction,
+      leverage: opened.leverage,
+      margin: opened.margin,
+      entry: opened.entry,
+      openedAt: when,
+      mode: opened.mode,
+      wallet: opened.wallet,
+      takeProfit: opened.takeProfit,
+      stopLoss: opened.stopLoss,
+      orderType: 'limit',
+    });
+    return opened;
+  };
+
+  const cancelOrder = () => {
+    setPendingOrder(null);
+    // Nothing was ever traded, so the day's turn goes back.
+    refundTrade();
   };
 
   const closeAt = (at: number, reason: ExitReason) => {
     if (!position || settled) return;
-    const change = settleCoins(position, at);
-    settleTrade(change);
-    setOpenTrade(null);
-    setSettled({ coins: change, reason });
+    finish(position, at, reason, openedAt ?? Date.now());
   };
 
   /*
@@ -325,12 +479,28 @@ export default function Simulator() {
    * A live tick is a candle whose high and low are both that price, so the
    * same function decides the outcome here and in the replay above — the two
    * paths can't drift into disagreeing about whether a stop fired.
+   *
+   * Nothing is decided while the price is still 0. That isn't a cheap price,
+   * it's the absence of one — the market hasn't loaded yet — and every long
+   * ever opened is below its liquidation at zero. A restored position could
+   * lose on arrival, before a single real tick, purely because its own fetch
+   * came back before the chart's.
    */
-  const trigger = position && !settled ? triggeredBy(position, price, price) : null;
+  const trigger = position && !settled && price > 0 ? triggeredBy(position, price, price) : null;
   useEffect(() => {
     if (trigger) closeAt(trigger.price, trigger.reason);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trigger?.reason, trigger?.price]);
+
+  // And what it does to an order still waiting for its price.
+  const fills =
+    pendingOrder && !position && !settled && price > 0
+      ? limitFills(pendingOrder.direction, pendingOrder.limitPrice, price, price)
+      : false;
+  useEffect(() => {
+    if (fills && pendingOrder) fill(pendingOrder.limitPrice, Date.now());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fills]);
 
   const shownPosition = position ?? preview;
   const liqPrice = liquidationPrice(shownPosition);
@@ -482,6 +652,37 @@ export default function Simulator() {
                 </Button>
               </div>
             </div>
+          ) : pendingOrder && !position ? (
+            /* An order that hasn't filled: no position, no money at risk, and
+               nothing to close — only a price to wait for, or an order to take
+               back off the book. */
+            <div className="mt-4 space-y-3">
+              <div className="rounded-2xl border-2 border-[#FFC93C]/40 bg-[#FFC93C]/5 p-4 space-y-2">
+                <p className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[0.8px] text-[#FFC93C]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#FFC93C] animate-pulse-soft" />
+                  Orden límite en espera
+                </p>
+                <Row
+                  label="Dirección"
+                  value={`${pendingOrder.direction === 'long' ? 'Long' : 'Short'} ${pendingOrder.leverage}x`}
+                />
+                <Row label="Precio límite" value={pendingOrder.limitPrice.toFixed(2)} tone="text-[#FFC93C]" />
+                <Row label="Precio ahora" value={price.toFixed(2)} />
+                <Row
+                  label="Le falta"
+                  value={`${((Math.abs(price - pendingOrder.limitPrice) / price) * 100).toFixed(2)}%`}
+                />
+                <Row label="Margen reservado" value={`${pendingOrder.margin} monedas`} />
+              </div>
+              <p className="text-[13px] leading-snug text-carbon-500">
+                Entra sola cuando el precio la toque, aunque cierres la app. Al ser una orden que
+                espera pagas comisión de maker ({(MAKER_FEE * 100).toFixed(3)}% en vez de{' '}
+                {(TAKER_FEE * 100).toFixed(3)}%), que es justo para lo que sirve una orden límite.
+              </p>
+              <Button variant="secondary" onClick={cancelOrder}>
+                Cancelar orden
+              </Button>
+            </div>
           ) : position ? (
             <div className="mt-4 space-y-3">
               <div className="rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-4 space-y-2">
@@ -506,6 +707,78 @@ export default function Simulator() {
             </div>
           ) : (
             <>
+              {/* Order type first, the way a venue lays its form out: what
+                  kind of order it is decides what the price field below even
+                  means. */}
+              <p className="mt-5 text-[13px] font-black uppercase tracking-[0.8px] text-carbon-500">
+                Tipo de orden
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {(['market', 'limit'] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setOrderType(t)}
+                    className={`rounded-xl border-2 px-3 py-2.5 text-left transition ${
+                      orderType === t
+                        ? 'border-lime-500 bg-lime-500/10'
+                        : 'border-carbon-800 bg-carbon-850 hover:border-carbon-700'
+                    }`}
+                  >
+                    <span
+                      className={`block text-[13px] font-black uppercase tracking-wide ${
+                        orderType === t ? 'text-lime-400' : 'text-carbon-300'
+                      }`}
+                    >
+                      {t === 'market' ? 'Market' : 'Límite'}
+                    </span>
+                    <span className="block text-[11px] text-carbon-500 leading-snug">
+                      {t === 'market' ? 'Entras ya, al precio de ahora' : 'Esperas a tu precio'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {orderType === 'limit' && (
+                <>
+                  <div className="mt-4 flex items-baseline justify-between gap-3">
+                    <p className="text-[13px] font-black uppercase tracking-[0.8px] text-carbon-500">
+                      Precio límite
+                    </p>
+                    <button
+                      onClick={() => setLimitText(price.toFixed(2))}
+                      className="text-[12px] font-black uppercase tracking-wide text-carbon-500 hover:text-carbon-300 transition"
+                    >
+                      Precio actual
+                    </button>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      placeholder={price.toFixed(2)}
+                      aria-label="Precio límite"
+                      value={limitText}
+                      onChange={(e) => setLimitText(percent(e.target.value))}
+                      className="flex-1 min-w-0 rounded-xl border-2 border-carbon-800 bg-carbon-900 px-4 py-3 text-lg font-black text-carbon-50 tabular-nums placeholder:text-carbon-600 focus:border-lime-500/60 focus:outline-none"
+                    />
+                    <span className="shrink-0 text-sm font-bold text-carbon-500">USDT</span>
+                  </div>
+                  {/* Which button is even possible follows from the price: an
+                      order under the market can only be waiting to buy, and one
+                      over it can only be waiting to sell. */}
+                  <p className="mt-2 text-[13px] leading-snug text-carbon-500">
+                    {limitPrice === null
+                      ? 'Pon el precio al que quieres entrar. Por debajo del actual sirve para un long; por encima, para un short.'
+                      : limitPrice < price
+                      ? `A un ${(((price - limitPrice) / price) * 100).toFixed(2)}% por debajo: sirve para un long, y entra sola si el precio baja hasta ahí.`
+                      : limitPrice > price
+                      ? `A un ${(((limitPrice - price) / price) * 100).toFixed(2)}% por encima: sirve para un short, y entra sola si el precio sube hasta ahí.`
+                      : 'Ese es el precio de ahora mismo: eso es una orden market, no una límite.'}
+                  </p>
+                </>
+              )}
+
               {/* Order panel. Same order as a venue: leverage, then amount,
                   then what that combination actually means. */}
               {/* Margin mode first, because it decides what the leverage
@@ -710,8 +983,10 @@ export default function Simulator() {
                   tone={risky ? 'text-danger-400' : 'text-carbon-200'}
                 />
                 <Row
-                  label={`Comisión ida y vuelta (${(TAKER_FEE * 100).toFixed(3)}% por lado)`}
-                  value={`${roundTripFee(preview, entryPrice).toFixed(1)} monedas`}
+                  label={`Comisión (${(entryFeeRate(preview) * 100).toFixed(3)}% al entrar${
+                    orderType === 'limit' ? ' como maker' : ''
+                  } y ${(TAKER_FEE * 100).toFixed(3)}% al salir)`}
+                  value={`${roundTripFee(preview, base.entry).toFixed(1)} monedas`}
                 />
                 <Row
                   label="Margen de mantenimiento"
@@ -739,12 +1014,15 @@ export default function Simulator() {
               </p>
 
               <div className="mt-4 grid grid-cols-2 gap-3">
-                <Button disabled={!allowed || margin <= 0 || !slReachable} onClick={() => open('long')}>
+                <Button
+                  disabled={!allowed || margin <= 0 || !slReachable || !canRest('long')}
+                  onClick={() => open('long')}
+                >
                   <Icon name="trending-up" size={18} /> Long
                 </Button>
                 <Button
                   variant="danger"
-                  disabled={!allowed || margin <= 0 || !slReachable}
+                  disabled={!allowed || margin <= 0 || !slReachable || !canRest('short')}
                   onClick={() => open('short')}
                 >
                   <Icon name="trending-down" size={18} /> Short
@@ -771,6 +1049,8 @@ export default function Simulator() {
               )}
             </>
           )}
+
+          <TradeHistory />
         </div>
       </div>
     </div>

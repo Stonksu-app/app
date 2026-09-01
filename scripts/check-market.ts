@@ -12,8 +12,13 @@ import {
   hasUnlimitedTrades,
 } from '../src/data/plans';
 import {
+  MAKER_FEE,
   TAKER_FEE,
   backing,
+  entryFeeRate,
+  limitCanRest,
+  limitFills,
+  positionSize,
   equity,
   priceForRoi,
   triggerIsValid,
@@ -286,6 +291,51 @@ check(
   triggeredBy(enLargo, 95, 200) === null &&
     triggeredBy(enLargo, liquidationPrice(enLargo), 200)?.reason === 'liquidation'
 );
+
+/*
+ * Órdenes market y límite.
+ *
+ * La diferencia que de verdad importa no es cuándo entras, es cuánto pagas por
+ * entrar: una orden que espera en el libro es maker y paga un tercio. Por eso
+ * la comisión no puede ser la misma en las dos, y por eso la liquidación
+ * tampoco cae en el mismo sitio.
+ */
+const aMercado = pos({ orderType: 'market' });
+const aLimite = pos({ orderType: 'limit' });
+
+check('una market paga taker al entrar', entryFeeRate(aMercado) === TAKER_FEE);
+check('una límite paga maker', entryFeeRate(aLimite) === MAKER_FEE);
+check('maker es más barata que taker', MAKER_FEE < TAKER_FEE);
+check(
+  'y por eso la ida y vuelta cuesta menos con una límite',
+  roundTripFee(aLimite, 100) < roundTripFee(aMercado, 100)
+);
+check(
+  'la salida siempre es taker: cerrar se lo lleva lo que haya',
+  Math.abs(roundTripFee(aLimite, 100) - (positionSize(aLimite) * 100 * MAKER_FEE + positionSize(aLimite) * 100 * TAKER_FEE)) < 1e-9
+);
+check(
+  'pagar menos al entrar aleja la liquidación',
+  liquidationPrice(aLimite) < liquidationPrice(aMercado),
+  `${liquidationPrice(aLimite).toFixed(4)} vs ${liquidationPrice(aMercado).toFixed(4)}`
+);
+check(
+  'una posición sin tipo se trata como market, que es lo que eran todas',
+  entryFeeRate(pos()) === TAKER_FEE
+);
+
+check('una compra en el libro espera por debajo del mercado', limitCanRest('long', 99, 100));
+check('y no por encima: eso se ejecutaría ya', !limitCanRest('long', 101, 100));
+check('una venta espera por encima', limitCanRest('short', 101, 100));
+check('y no por debajo', !limitCanRest('short', 99, 100));
+check('al precio exacto no hay nada que esperar', !limitCanRest('long', 100, 100));
+check('un precio imposible no es una orden', !limitCanRest('long', 0, 100) && !limitCanRest('long', -5, 100));
+
+check('la compra entra cuando el precio baja hasta ella', limitFills('long', 99, 98, 100));
+check('y no si nunca llega', !limitFills('long', 99, 99.5, 100));
+check('la venta entra cuando el precio sube hasta ella', limitFills('short', 101, 100, 102));
+check('y no si se queda corta', !limitFills('short', 101, 100, 100.5));
+check('tocarla justo cuenta como tocarla', limitFills('long', 99, 99, 100));
 
 console.log(failed === 0 ? '\nTodo correcto.' : `\n${failed} problema(s).`);
 process.exit(failed === 0 ? 0 : 1);

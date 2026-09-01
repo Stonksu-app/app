@@ -32,6 +32,13 @@ export type Leverage = (typeof LEVERAGES)[number];
  *  which is the single most expensive thing beginners fail to notice. */
 export const TAKER_FEE = 0.0006;
 
+/** Maker fee per side: what you pay when your order sat in the book waiting
+ *  instead of taking somebody else's. Around 0.02% on both Bitget and Bitunix,
+ *  a third of the taker fee — and the actual reason experienced traders use
+ *  limit orders, which is the lesson the order-type selector is there to
+ *  teach. */
+export const MAKER_FEE = 0.0002;
+
 /** Maintenance margin rate. Below this fraction of notional in equity, the
  *  engine closes you. It's why a 100x position dies at roughly 0.9% against
  *  you rather than at exactly 1%. */
@@ -89,6 +96,10 @@ export function generateCandles(seed: number, count: number, startPrice = 100): 
  */
 export type MarginMode = 'isolated' | 'cross';
 
+/** How the position was opened. A market order crosses the spread and pays the
+ *  taker fee; a limit order waits at your price and pays the maker fee. */
+export type OrderType = 'market' | 'limit';
+
 export interface Position {
   direction: Direction;
   leverage: Leverage;
@@ -105,6 +116,9 @@ export interface Position {
   /** The price that closes it at a loss you chose, instead of at the one the
    *  engine chooses for you. */
   stopLoss?: number | null;
+  /** How it was opened. Absent on positions stored before limit orders
+   *  existed, all of which were market orders. */
+  orderType?: OrderType;
 }
 
 /** Why a round ended. */
@@ -136,11 +150,23 @@ export function positionSize(p: Position): number {
   return p.entry > 0 ? notional(p) / p.entry : 0;
 }
 
-/** Both sides of the taker fee, in coins. Charged up front so the number on
- *  screen is what you'd actually walk away with. */
+/** What the entry cost in fees, as a rate: maker if the order waited, taker if
+ *  it crossed the spread. */
+export function entryFeeRate(p: Position): number {
+  return p.orderType === 'limit' ? MAKER_FEE : TAKER_FEE;
+}
+
+/**
+ * Both sides of the fee, in coins, charged up front so the number on screen is
+ * what you'd actually walk away with.
+ *
+ * The exit is always taker: closing at market, being liquidated and hitting a
+ * stop all take whatever is there. A limit entry is the only side you can
+ * choose to be paid the cheaper rate for.
+ */
 export function roundTripFee(p: Position, exitPrice: number): number {
   const size = positionSize(p);
-  return size * p.entry * TAKER_FEE + size * exitPrice * TAKER_FEE;
+  return size * p.entry * entryFeeRate(p) + size * exitPrice * TAKER_FEE;
 }
 
 /** Profit or loss before fees, in coins. */
@@ -185,7 +211,7 @@ export function liquidationPrice(p: Position): number {
   if (size <= 0) return 0;
   const maintenance = notional(p) * MAINTENANCE_MARGIN;
   // backing + (P - E)·size·dir - fees(P) = maintenance, fees linear in P.
-  const feeIn = size * p.entry * TAKER_FEE;
+  const feeIn = size * p.entry * entryFeeRate(p);
   const dir = p.direction === 'long' ? 1 : -1;
   const coefficient = size * dir - size * TAKER_FEE * (dir === 1 ? 1 : -1) * dir;
   const constant = maintenance - backing(p) + feeIn + size * dir * p.entry;
@@ -296,4 +322,28 @@ export function priceForRoi(p: Position, targetRoi: number): number {
       ? (wanted + p.entry * size * (1 + TAKER_FEE)) / (size * (1 - TAKER_FEE))
       : (p.entry * size * (1 - TAKER_FEE) - wanted) / (size * (1 + TAKER_FEE));
   return Math.max(0, price);
+}
+
+/**
+ * Whether a resting limit order would have been filled by a price range.
+ *
+ * A buy waits below the market and a sell above it, so a long fills on the way
+ * down and a short on the way up — the opposite of the direction the position
+ * then wants the price to go, which is exactly why the order can rest there in
+ * the first place.
+ */
+export function limitFills(direction: Direction, limitPrice: number, low: number, high: number): boolean {
+  return direction === 'long' ? low <= limitPrice : high >= limitPrice;
+}
+
+/**
+ * Whether a limit price is on the side of the market that lets it wait.
+ *
+ * A buy above the market or a sell below it would be filled the instant it
+ * arrived, at the current price — that's a market order wearing a limit
+ * order's name, and saying so is more useful than accepting it silently.
+ */
+export function limitCanRest(direction: Direction, limitPrice: number, market: number): boolean {
+  if (!Number.isFinite(limitPrice) || limitPrice <= 0) return false;
+  return direction === 'long' ? limitPrice < market : limitPrice > market;
 }

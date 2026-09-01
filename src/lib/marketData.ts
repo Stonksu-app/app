@@ -1,5 +1,5 @@
 import type { Candle, Direction, ExitReason, Position } from '../utils/market';
-import { liquidationPrice, triggeredBy } from '../utils/market';
+import { limitFills, liquidationPrice, triggeredBy } from '../utils/market';
 
 /*
  * Real market data for the simulator.
@@ -171,4 +171,23 @@ export function worstPrice(direction: Direction, candles: Candle[]): number | nu
   return direction === 'long'
     ? Math.min(...candles.map((c) => c.low))
     : Math.max(...candles.map((c) => c.high));
+}
+
+/**
+ * Which candle would have filled a resting limit order.
+ *
+ * Returns the index so the caller can carry on from there: an order that
+ * filled three candles ago has been a position for three candles, and those
+ * candles may well have taken it out. Ignoring them would hand the player a
+ * position that a real venue would already have closed.
+ */
+export function fillDuring(
+  direction: Direction,
+  limitPrice: number,
+  candles: Candle[]
+): number | null {
+  for (let i = 0; i < candles.length; i++) {
+    if (limitFills(direction, limitPrice, candles[i].low, candles[i].high)) return i;
+  }
+  return null;
 }

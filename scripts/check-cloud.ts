@@ -119,6 +119,14 @@ const cloudKeys = new Set(Object.keys(sample));
  *   that resets at midnight would need columns and a timezone argument, and
  *   the worst it buys is one extra round — of revision, or of a simulated
  *   trade whose coins are capped at the stake either way.
+ * - openTrade, pendingOrder: a live position and a resting order, both priced
+ *   off one device's clock. Syncing them would mean two devices agreeing on a
+ *   price at the same instant to decide whether a stop fired — a
+ *   synchronisation problem the feature doesn't need, and one whose failure
+ *   mode is settling the same trade twice.
+ * - tradeHistory: a record of what those local positions did, so it can only
+ *   be as local as they are. A phone's history arriving on a laptop that never
+ *   saw the trades would be a ledger with no positions behind it.
  * - daily*: the rotating daily missions' counters and claimed state. Same
  *   reasoning as practice*: a per-day rate limit rather than progress, and
  *   which three missions are on offer is a pure function of the date, so
@@ -138,6 +146,8 @@ const LOCAL_ONLY = new Set([
   'tradeDay',
   'tradesToday',
   'openTrade',
+  'pendingOrder',
+  'tradeHistory',
   'lessonsSincePitch',
   'lastStreakLoss',
   'reminderEnabled',

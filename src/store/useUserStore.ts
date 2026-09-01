@@ -100,7 +100,59 @@ interface UserState {
      *  the two above, and null when the trade was opened without them. */
     takeProfit?: number | null;
     stopLoss?: number | null;
+    /** Absent on trades stored before limit orders existed, all of which were
+     *  market orders. */
+    orderType?: 'market' | 'limit';
   } | null;
+  /**
+   * A limit order waiting for its price.
+   *
+   * Kept apart from the open position because that's what it is: nothing has
+   * been bought yet, no money is at risk, and it may never fill. It survives
+   * the app being closed for the same reason a position does — a venue's book
+   * doesn't forget your order because you locked your phone.
+   */
+  pendingOrder: {
+    direction: 'long' | 'short';
+    leverage: number;
+    margin: number;
+    /** The price it waits at, and the entry price if it fills. */
+    limitPrice: number;
+    /** Epoch ms, so the candles since can be replayed to see if it filled. */
+    placedAt: number;
+    mode: 'isolated' | 'cross';
+    wallet: number;
+    takeProfit?: number | null;
+    stopLoss?: number | null;
+    /** The ROI targets it was placed with, so they can be turned into prices
+     *  at the fill price rather than at the price when you placed it. */
+    tpRoi?: number | null;
+    slRoi?: number | null;
+  } | null;
+  /**
+   * Closed trades, newest first — the venue's own position history.
+   *
+   * Local for the same reason the open position is, and capped: this is a
+   * record to learn from, not an archive, and localStorage is not a database.
+   */
+  tradeHistory: {
+    id: string;
+    direction: 'long' | 'short';
+    leverage: number;
+    margin: number;
+    mode: 'isolated' | 'cross';
+    orderType: 'market' | 'limit';
+    entry: number;
+    exit: number;
+    /** Why it ended: liquidation, take profit, stop loss or your own hand. */
+    reason: 'liquidation' | 'takeProfit' | 'stopLoss' | 'manual';
+    /** Coins added to (or taken from) the balance, fees already in. */
+    coins: number;
+    /** Return on the margin, as a fraction. */
+    roi: number;
+    openedAt: number;
+    closedAt: number;
+  }[];
   /**
    * Today's counters for the rotating daily missions — what's rolled over is
    * the date they belong to, not progress in their own right, so they're
@@ -277,6 +329,13 @@ interface UserState {
   settleTrade: (coins: number) => void;
   /** Remembers a position across app closes, or forgets it once settled. */
   setOpenTrade: (trade: UserState['openTrade']) => void;
+  /** Places a limit order, or forgets it once filled or cancelled. */
+  setPendingOrder: (order: UserState['pendingOrder']) => void;
+  /** Gives back the day's turn when an order is cancelled without ever having
+   *  been filled: nothing was traded, so nothing should have been spent. */
+  refundTrade: () => void;
+  /** Files a closed trade at the top of the history. */
+  recordTrade: (trade: UserState['tradeHistory'][number]) => void;
   isChestOpened: (chestId: string) => boolean;
   /** Returns whether this chest also gifted a streak protector. */
   openChest: (chestId: string) => boolean;
@@ -318,6 +377,9 @@ export const COINS_PER_CORRECT = 2;
 export const CHEST_REWARD = { xp: 100, coins: 50 } as const;
 /** Owning more than this many protectors at once isn't useful. */
 export const MAX_PROTECTORS = 2;
+/** Trades kept in the position history. Enough to see a pattern in how you
+ *  trade, few enough that localStorage never becomes the problem. */
+export const MAX_TRADE_HISTORY = 50;
 /** Every this-many *newly* finished lessons, one is gifted for free — so
  *  running low on coins never means running out of ways to keep a streak
  *  alive. Doesn't count repeats of an already-completed lesson. */
@@ -469,6 +531,8 @@ export const useUserStore = create<UserState>()(
       tradeDay: null,
       tradesToday: 0,
       openTrade: null,
+      pendingOrder: null,
+      tradeHistory: [],
       dailyStatsDate: null,
       dailyXp: 0,
       dailyLessons: 0,
@@ -882,6 +946,14 @@ export const useUserStore = create<UserState>()(
 
       setOpenTrade: (trade) => set({ openTrade: trade }),
 
+      setPendingOrder: (order) => set({ pendingOrder: order }),
+
+      refundTrade: () =>
+        set((s) => ({ tradesToday: Math.max(0, s.tradesToday - 1) })),
+
+      recordTrade: (trade) =>
+        set((s) => ({ tradeHistory: [trade, ...s.tradeHistory].slice(0, MAX_TRADE_HISTORY) })),
+
       settleTrade: (coins) =>
         // Floored at zero: the stake is the most a round can cost, and a
         // balance that went negative would be a debt the shop can't explain.
@@ -1035,6 +1107,8 @@ export const useUserStore = create<UserState>()(
           tradeDay: null,
           tradesToday: 0,
           openTrade: null,
+          pendingOrder: null,
+          tradeHistory: [],
           dailyStatsDate: null,
           dailyXp: 0,
           dailyLessons: 0,
