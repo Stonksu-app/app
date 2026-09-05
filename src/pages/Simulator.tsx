@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar';
 import NavRail from '../components/NavRail';
@@ -59,10 +59,9 @@ import {
  * what every field means. An approximation that taught the wrong lesson would
  * be worse than no simulator.
  *
- * What it deliberately does not model is cross margin. On isolated margin the
- * engine closes you before the loss exceeds your margin, so nobody ends a
- * round owing coins — and "you can lose more than you put in" is a warning to
- * read, not a mechanic to hand somebody in a game with its own currency.
+ * The chart and order ticket share the desktop workspace. On a phone they
+ * remain mounted behind two views so switching does not discard order inputs
+ * or the chart's scale and position.
  */
 
 /** Quick stake buttons, as fractions of the balance — same idea as the
@@ -101,6 +100,8 @@ function Row({ label, value, tone = 'text-carbon-200' }: { label: string; value:
 
 export default function Simulator() {
   const navigate = useNavigate();
+  const [mobileView, setMobileView] = useState<'chart' | 'order'>('chart');
+  const mobileViews = useRef<HTMLDivElement>(null);
   const {
     plan,
     coins,
@@ -379,7 +380,7 @@ export default function Simulator() {
   };
 
   const open = (direction: Direction) => {
-    if (margin <= 0 || margin > coins || !slReachable || !canRest(direction)) return;
+    if (loading || price <= 0 || margin <= 0 || margin > coins || !slReachable || !canRest(direction)) return;
     if (!startTrade()) return;
 
     if (orderType === 'limit' && limitPrice !== null) {
@@ -517,26 +518,43 @@ export default function Simulator() {
       <div className="flex-1 min-w-0">
         <TopBar />
 
-        <div className="max-w-2xl mx-auto px-4 py-6 pb-32 lg:pb-6">
-          <div className="flex items-center gap-3">
+        <main className="max-w-[1600px] mx-auto px-3 sm:px-5 py-5 pb-32 lg:pb-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-black text-carbon-50">Simulador</h1>
+                <span className="rounded-md border border-lime-500/30 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-lime-400">Demo</span>
+              </div>
+              <p className="mt-1 text-xs text-carbon-400">Practica trading con monedas del juego.</p>
+            </div>
             <button
-              onClick={() => navigate(-1)}
-              aria-label="Volver"
-              className="text-carbon-500 hover:text-carbon-200 transition p-1 -ml-1"
+              onClick={() => navigate('/planes')}
+              className="flex items-center gap-2 rounded-xl border border-ultra-500/30 bg-ultra-500/10 px-3 py-2 text-xs font-bold text-ultra-300 hover:bg-ultra-500/20 transition"
             >
-              <Icon name="chevron-left" size={24} strokeWidth={2.4} />
+              <Icon name="sparkles" size={16} />
+              {unlimited ? 'Ultra · Operaciones ilimitadas' : 'Operaciones ilimitadas con Ultra'}
             </button>
-            <h1 className="text-2xl font-black text-carbon-50">Simulador</h1>
           </div>
-          <p className="mt-1 text-sm text-carbon-400">
-            {live
-              ? 'Precio real de BTC en vivo, monedas del juego. Margen aislado, comisión en cada lado y liquidación, como en un perpetuo.'
-              : 'Sin conexión al mercado: estás operando sobre un precio simulado. Las reglas son las mismas.'}
-          </p>
 
-          <div className="mt-4 rounded-3xl border-2 border-carbon-800 bg-carbon-850 p-4">
-            <div className="flex items-baseline justify-between gap-3">
-              <p className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[0.8px] text-carbon-500">
+          <div ref={mobileViews} className="mt-4 flex scroll-mt-16 rounded-xl bg-carbon-850 p-1 lg:hidden" aria-label="Vista del simulador">
+            {(['chart', 'order'] as const).map((view) => (
+              <button
+                key={view}
+                aria-pressed={mobileView === view}
+                aria-controls={view === 'chart' ? 'simulator-chart' : 'simulator-order'}
+                onClick={() => setMobileView(view)}
+                className={`flex-1 rounded-lg py-2.5 text-sm font-bold transition ${mobileView === view ? 'bg-carbon-700 text-carbon-50' : 'text-carbon-400'}`}
+              >
+                {view === 'chart' ? 'Gráfico' : position && !settled ? 'Posición abierta' : pendingOrder ? 'Orden pendiente' : 'Operar'}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
+          <section id="simulator-chart" aria-label="Gráfico e historial" className={`min-w-0 lg:sticky lg:top-4 ${mobileView === 'chart' ? 'block' : 'hidden lg:block'}`}>
+          <div className="rounded-2xl border border-carbon-700 bg-carbon-850 p-3 sm:p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="flex flex-wrap items-center gap-2 text-[12px] font-black uppercase tracking-[0.8px] text-carbon-300">
                 {live ? `${SYMBOL.replace('USDT', '')} / USDT · Perp` : 'STNK / USDT · Simulado'}
                 {live && (
                   // Only claimed when a socket is actually delivering ticks.
@@ -546,8 +564,11 @@ export default function Simulator() {
                   </span>
                 )}
               </p>
-              <p className="text-lg font-black text-carbon-50 tabular-nums">{price.toFixed(2)}</p>
+              <p className="text-xl font-black text-carbon-50 tabular-nums">{loading ? '—' : price.toFixed(2)}</p>
             </div>
+            <p className="mt-1 text-[11px] text-carbon-400">
+              {loading ? 'Conectando al mercado…' : live ? 'Mercado BTC · saldo virtual' : 'Sin conexión al mercado · precio simulado'}
+            </p>
 
             {/* Timeframes and the AUTO button, where a venue puts them: above
                 the chart, and AUTO on the right because it's about the view
@@ -557,6 +578,7 @@ export default function Simulator() {
                 <button
                   key={tf}
                   onClick={() => setTimeframe(tf)}
+                  aria-pressed={timeframe === tf}
                   className={`shrink-0 rounded-lg px-2.5 py-1 text-[12px] font-black uppercase transition ${
                     timeframe === tf
                       ? 'bg-carbon-800 text-lime-400'
@@ -591,6 +613,7 @@ export default function Simulator() {
                 stopLoss={shownPosition.stopLoss ?? null}
                 auto={auto}
                 onAutoChange={setAuto}
+                height={360}
               />
             )}
 
@@ -623,6 +646,24 @@ export default function Simulator() {
             )}
           </div>
 
+          <div className="mt-3 lg:hidden">
+            <Button onClick={() => {
+              setMobileView('order');
+              mobileViews.current?.scrollIntoView({ block: 'start' });
+            }}>
+              {position && !settled ? 'Gestionar posición' : pendingOrder ? 'Ver orden pendiente' : 'Operar'}
+            </Button>
+          </div>
+          <TradeHistory />
+          </section>
+
+          <section id="simulator-order" aria-label="Panel de órdenes" className={`min-w-0 rounded-2xl border border-carbon-700 bg-carbon-850/40 p-4 ${mobileView === 'order' ? 'block' : 'hidden lg:block'}`}>
+          <div className="flex items-center justify-between gap-2 border-b border-carbon-700 pb-3">
+            <h2 className="text-sm font-black text-carbon-50">
+              {settled ? 'Resultado' : pendingOrder && !position ? 'Orden pendiente' : position ? 'Posición abierta' : 'Crear orden'}
+            </h2>
+            <span className="text-xs font-bold text-carbon-400 tabular-nums">{loading ? '—' : price.toFixed(2)} USDT</span>
+          </div>
           {settled ? (
             <div className="mt-4 rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-5 text-center">
               <p className="text-[13px] font-black uppercase tracking-[0.8px] text-carbon-500">
@@ -646,10 +687,10 @@ export default function Simulator() {
                   : 'Monedas a tu saldo, comisiones ya descontadas.'}
               </p>
               <div className="mt-5 space-y-3">
-                <Button onClick={() => navigate('/tienda')}>Ir a la tienda</Button>
-                <Button variant="secondary" onClick={() => window.location.reload()}>
+                <Button onClick={() => window.location.reload()}>
                   {unlimited ? 'Otra operación' : 'Volver a intentarlo'}
                 </Button>
+                <Button variant="secondary" onClick={() => navigate('/tienda')}>Ir a la tienda</Button>
               </div>
             </div>
           ) : pendingOrder && !position ? (
@@ -685,6 +726,13 @@ export default function Simulator() {
             </div>
           ) : position ? (
             <div className="mt-4 space-y-3">
+              <div className="space-y-2 border-b border-carbon-700 pb-3">
+                <p className={`text-sm font-black ${position.direction === 'long' ? 'text-lime-400' : 'text-danger-400'}`}>
+                  {position.direction === 'long' ? 'Long' : 'Short'} · {position.leverage}x · {position.mode === 'cross' ? 'Cruzado' : 'Aislado'}
+                </p>
+                <Row label="PnL no realizado" value={`${pnl >= 0 ? '+' : ''}${pnl.toFixed(1)} monedas`} tone={pnl >= 0 ? 'text-lime-400' : 'text-danger-400'} />
+                <Row label="ROI" value={`${(roi(position, price) * 100).toFixed(1)}%`} tone={pnl >= 0 ? 'text-lime-400' : 'text-danger-400'} />
+              </div>
               <div className="rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-4 space-y-2">
                 <Row label="Margen" value={`${position.margin} monedas`} />
                 <Row label="Tamaño de posición" value={`${notional(position).toFixed(0)} monedas`} />
@@ -718,6 +766,7 @@ export default function Simulator() {
                   <button
                     key={t}
                     onClick={() => setOrderType(t)}
+                    aria-pressed={orderType === t}
                     className={`rounded-xl border-2 px-3 py-2.5 text-left transition ${
                       orderType === t
                         ? 'border-lime-500 bg-lime-500/10'
@@ -779,65 +828,30 @@ export default function Simulator() {
                 </>
               )}
 
-              {/* Order panel. Same order as a venue: leverage, then amount,
-                  then what that combination actually means. */}
-              {/* Margin mode first, because it decides what the leverage
-                  below it can cost you. */}
-              <p className="mt-5 text-[13px] font-black uppercase tracking-[0.8px] text-carbon-500">
-                Modo de margen
-              </p>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                {(['isolated', 'cross'] as const).map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setMode(m)}
-                    className={`rounded-xl border-2 px-3 py-2.5 text-left transition ${
-                      mode === m
-                        ? m === 'cross'
-                          ? 'border-danger-500 bg-danger-500/10'
-                          : 'border-lime-500 bg-lime-500/10'
-                        : 'border-carbon-800 bg-carbon-850 hover:border-carbon-700'
-                    }`}
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <label className="text-xs font-bold text-carbon-400">
+                  Modo de margen
+                  <select
+                    aria-label="Modo de margen"
+                    value={mode}
+                    onChange={(e) => setMode(e.target.value as MarginMode)}
+                    className="mt-2 block min-h-11 w-full rounded-xl border border-carbon-700 bg-carbon-850 px-3 text-sm font-bold text-carbon-50 focus:outline-lime-500"
                   >
-                    <span
-                      className={`block text-[13px] font-black uppercase tracking-wide ${
-                        mode === m
-                          ? m === 'cross'
-                            ? 'text-danger-400'
-                            : 'text-lime-400'
-                          : 'text-carbon-300'
-                      }`}
-                    >
-                      {m === 'isolated' ? 'Aislado' : 'Cruzado'}
-                    </span>
-                    <span className="block text-[11px] text-carbon-500 leading-snug">
-                      {m === 'isolated'
-                        ? 'Solo arriesgas el margen'
-                        : 'Todo tu saldo respalda la posición'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              <p className="mt-5 text-[13px] font-black uppercase tracking-[0.8px] text-carbon-500">
-                Apalancamiento
-              </p>
-              <div className="mt-2 grid grid-cols-5 gap-2">
-                {LEVERAGES.map((l) => (
-                  <button
-                    key={l}
-                    onClick={() => setLeverage(l)}
-                    className={`rounded-xl border-2 py-2 text-[13px] font-black transition ${
-                      leverage === l
-                        ? l >= 50
-                          ? 'border-danger-500 bg-danger-500/10 text-danger-400'
-                          : 'border-lime-500 bg-lime-500/10 text-lime-400'
-                        : 'border-carbon-800 bg-carbon-850 text-carbon-300 hover:border-carbon-700'
-                    }`}
+                    <option value="isolated">Aislado</option>
+                    <option value="cross">Cruzado</option>
+                  </select>
+                </label>
+                <label className="text-xs font-bold text-carbon-400">
+                  Apalancamiento
+                  <select
+                    aria-label="Apalancamiento"
+                    value={leverage}
+                    onChange={(e) => setLeverage(Number(e.target.value) as Leverage)}
+                    className="mt-2 block min-h-11 w-full rounded-xl border border-carbon-700 bg-carbon-850 px-3 text-sm font-bold text-carbon-50 focus:outline-lime-500"
                   >
-                    {l}x
-                  </button>
-                ))}
+                    {LEVERAGES.map((l) => <option key={l} value={l}>{l}x</option>)}
+                  </select>
+                </label>
               </div>
 
               <div className="mt-5 flex items-baseline justify-between gap-3">
@@ -882,9 +896,10 @@ export default function Simulator() {
                   described — but before the buttons, because deciding when to
                   get out *after* getting in is the mistake this feature is
                   here to prevent. */}
-              <p className="mt-5 text-[13px] font-black uppercase tracking-[0.8px] text-carbon-500">
-                Take profit y stop loss <span className="text-carbon-600">· opcional</span>
-              </p>
+              <details className="mt-4 rounded-xl border border-carbon-700 p-3">
+              <summary className="cursor-pointer text-xs font-bold text-carbon-200">
+                Take profit / Stop loss <span className="text-carbon-400">· {tpText || slText ? 'Configurado' : 'Opcional'}</span>
+              </summary>
               <div className="mt-2 grid grid-cols-2 gap-3">
                 {(
                   [
@@ -969,7 +984,11 @@ export default function Simulator() {
                 </p>
               )}
 
-              <div className="mt-4 rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-4 space-y-2">
+              </details>
+
+              <details className="mt-3 rounded-xl border border-carbon-700 p-3">
+                <summary className="cursor-pointer text-xs font-bold text-carbon-200">Detalles de riesgo y comisiones</summary>
+              <div className="mt-3 space-y-2">
                 <Row label="Tamaño de posición" value={`${notional(preview).toFixed(0)} monedas`} />
                 <Row
                   label="Pérdida máxima"
@@ -994,6 +1013,8 @@ export default function Simulator() {
                 />
               </div>
 
+              </details>
+
               {/* The warning scales with the actual danger rather than with a
                   round number of x's: what ends a round is how close the
                   liquidation price is, and at 100x it's less than half a
@@ -1015,14 +1036,14 @@ export default function Simulator() {
 
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <Button
-                  disabled={!allowed || margin <= 0 || !slReachable || !canRest('long')}
+                  disabled={loading || price <= 0 || !allowed || margin <= 0 || !slReachable || !canRest('long')}
                   onClick={() => open('long')}
                 >
                   <Icon name="trending-up" size={18} /> Long
                 </Button>
                 <Button
                   variant="danger"
-                  disabled={!allowed || margin <= 0 || !slReachable || !canRest('short')}
+                  disabled={loading || price <= 0 || !allowed || margin <= 0 || !slReachable || !canRest('short')}
                   onClick={() => open('short')}
                 >
                   <Icon name="trending-down" size={18} /> Short
@@ -1050,8 +1071,9 @@ export default function Simulator() {
             </>
           )}
 
-          <TradeHistory />
+          </section>
         </div>
+        </main>
       </div>
     </div>
   );

@@ -138,6 +138,16 @@ export default function Profile() {
             )}
           </div>
 
+          <Link
+            to="/tienda"
+            className="mt-4 flex items-center gap-3 rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-4 text-carbon-200 hover:border-lime-500/50 transition"
+          >
+            <Icon name="coins" size={24} className="text-lime-400" />
+            <span className="flex-1 font-bold">Tienda</span>
+            <span className="text-xs text-carbon-400">Vidas y protectores</span>
+            <Icon name="chevron-left" size={18} className="rotate-180" />
+          </Link>
+
           {/* Statistics */}
           <h2 className="mt-8 text-2xl font-black text-carbon-50">Estadísticas</h2>
           <div className="mt-3 grid grid-cols-2 gap-3">

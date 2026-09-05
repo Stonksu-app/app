@@ -8,7 +8,7 @@ Stonksu enseña trading en español mediante sesiones cortas de preguntas y mini
 
 - Entrada: splash, landing, onboarding (experiencia, objetivo, apodo), mapa de aprendizaje. Se puede jugar sin registrarse; con Supabase se crea primero una sesión anónima y se ofrece guardar la cuenta.
 - `src/App.tsx` define las rutas. `RequireOnboarded` espera sesión/sincronización antes de decidir entre landing, onboarding y contenido; no basta con comprobar solo el estado local al arrancar.
-- Navegación compartida en `components/navItems.ts`: Aprender (`/home`), Guía (`/guia`), Retos (`/misiones`, también `/liga`), Tienda (`/tienda`) y Perfil (`/profile`).
+- Navegación compartida en `components/navItems.ts`: Aprender (`/home`), Guía (`/guia`), Simulador (`/simulador`, destacado en el centro), Retos (`/misiones`, también `/liga`) y Perfil (`/profile`). La tienda sigue en la barra lateral de escritorio (`desktopOnly`) y tiene acceso directo desde Perfil; la barra inferior conserva cinco destinos.
 - Rutas adicionales: `/onboarding`, `/entrar`, `/lesson/:lessonId/intro`, `/lesson/:lessonId`, `/lesson/:lessonId/results`, `/guia/leer`, `/guia/repaso`, `/secciones`, `/simulador`, `/planes`, `/ultra`, `/logros`, `/avatar`, `/amigos`, `/amigos/:id`.
 - Perfil reúne estadísticas, calendario, personalización y ajustes de cuenta/recordatorios; muestra el identificador del build y el usuario para diagnosticar versiones instaladas.
 
@@ -65,6 +65,8 @@ Ligas: seis rangos, XP semanal, cron lunes 00:00 UTC; ascenso de los cuatro prim
 
 El simulador usa BTCUSDT: velas REST de Binance y precio por WebSocket, temporalidades de 1m a 1d. Tiene mercado sintético de respaldo identificado en pantalla. `lightweight-charts` implementa la interacción del gráfico, incluyendo AUTO y ajustes de escala.
 
+El propietario quiere que el simulador sea un destino principal y un atractivo de Ultra, con operativa familiar para principiantes y traders experimentados. La vista de escritorio coloca gráfico e historial a la izquierda y panel de órdenes a la derecha; en móvil se alterna entre Gráfico y Operar, manteniendo ambos montados para conservar inputs, temporalidad y AUTO. `PriceChart` observa su contenedor con ResizeObserver para ajustar el ancho al volver de una vista oculta. Margen/apalancamiento usan selectores compactos; TP/SL y detalles de riesgo/comisiones son desplegables. La posición muestra dirección, margen, PnL y ROI en el panel de órdenes. Se bloquea operar mientras carga el precio. El acceso a Ultra está visible en la cabecera.
+
 Long/short, apalancamiento 1–100x, margen aislado/cruzado, órdenes market/limit, take profit/stop loss, comisiones maker/taker y liquidación. Una posición u orden pendiente se conserva localmente; al volver se consulta el recorrido de velas para resolver ejecuciones/salidas. Historial local de las últimas 50 operaciones. Es una simulación con aproximaciones, no un motor de ejecución remoto.
 
 Gratis y Premium tienen una práctica y una operación por día. Premium (2,99 €/mes en la oferta del código) elimina anuncios propios. Ultra (6,99 €/mes) añade vidas, prácticas y trades ilimitados, y accesorios. Las comprobaciones para temas exclusivos existen, pero ningún tema está marcado Ultra. **No hay cobro integrado**: planes no disponibles para compra real y cambio de plan de prueba en `testMode`.
@@ -92,10 +94,12 @@ Vercel se documenta desde `dev`; `vercel.json` resuelve rutas SPA a index y cont
 
 ## Desajustes documentales conocidos
 
-Priorizar implementación y checks sobre comentarios antiguos: `supabase/README.md` enumera solo cuatro migraciones y dice que faltan ligas, aunque hay quince migraciones y ligas implementadas. Hay comentarios que aún llaman azul al platino, dicen que no hay margen cruzado o hablan de splash de diez segundos: CSS, motor y `utils/splash.ts` prevalecen (5 s frío, 900 ms reciente, más transición). Las instrucciones remotas de SMTP, OAuth y despliegue son documentación, no prueba de la configuración desplegada.
+Priorizar implementación y checks sobre comentarios antiguos: `supabase/README.md` enumera solo cuatro migraciones y dice que faltan ligas, aunque hay quince migraciones y ligas implementadas. Hay comentarios que aún llaman azul al platino, o hablan de splash de diez segundos: CSS, motor y `utils/splash.ts` prevalecen (5 s frío, 900 ms reciente, más transición). Las instrucciones remotas de SMTP, OAuth y despliegue son documentación, no prueba de la configuración desplegada.
 
 ## Mantenimiento de esta memoria
 
 Usar este mapa como punto de partida, inspeccionar el diff y abrir solo los módulos afectados. Actualizar las secciones que cambien, sin acumular diarios de cada tarea. Las preferencias duraderas están en `AGENTS.md`; no depender de que una conversación anterior permanezca en contexto.
 
 Validación de la revisión inicial: `npm run check` pasó los 15 scripts; `npm run lint` terminó sin errores y con ocho avisos existentes (Fast Refresh y dependencias de hooks); `npm run build` pasó, con aviso de bundle superior a 500 kB. Graphify no estaba instalado. Esta tarea añade documentación, sin modificar la aplicación. No se verificaron visualmente pantallas en navegador, backend desplegado, OAuth real ni binarios móviles; no considerar esos flujos certificados por estos resultados.
+
+Validación de navegación y simulador (2026-09-05): pruebas de interacción en Chromium con precios de prueba controlados, a 320/390/768/1024/1440 px; acceso a tienda, preservación de inputs/AUTO/temporalidad, abrir/cerrar market, persistir/cancelar límite, límite diario gratis y acceso a Ultra, y carga del gráfico oculto. Revisión visual móvil/escritorio. No equivale a probar precios externos reales ni binarios nativos. Referencias de interacción: [panel de Paper Trading de TradingView](https://www.tradingview.com/support/solutions/43000516466-paper-trading-main-functionality/) y [tipos de orden de Bitget](https://www.bitget.com/support/articles/12560603809539).

@@ -168,11 +168,17 @@ export default function PriceChart({
     series.current = s;
     applyScale(scaleRef.current, true);
 
-    const resize = () => c.applyOptions({ width: box.current?.clientWidth ?? 0 });
+    // The phone's chart/order switch changes the container without resizing
+    // the window. Keep the chart mounted, but resize when its panel returns.
+    const resize = () => {
+      const width = box.current?.clientWidth ?? 0;
+      if (width > 0) c.applyOptions({ width });
+    };
+    const observer = new ResizeObserver(resize);
+    observer.observe(box.current);
     resize();
-    window.addEventListener('resize', resize);
     return () => {
-      window.removeEventListener('resize', resize);
+      observer.disconnect();
       c.remove();
       chart.current = null;
       series.current = null;

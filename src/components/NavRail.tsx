@@ -12,16 +12,19 @@ export default function NavRail() {
         <Mascot size={32} mood="happy" />
         <span className="text-2xl font-black text-lime-500 tracking-tight">Stonksu</span>
       </Link>
-      <nav className="mt-4 flex flex-col gap-2">
+      <nav aria-label="Navegación principal" className="mt-4 flex flex-col gap-2">
         {NAV_ITEMS.map((item) => {
           const active = navItemIsActive(item, pathname);
           return (
             <Link
               key={item.to}
               to={item.to}
+              aria-current={active ? 'page' : undefined}
               className={`h-[52px] flex items-center gap-3 px-4 rounded-xl border-2 text-[15px] font-black uppercase tracking-[0.8px] transition ${
                 active
                   ? 'bg-lime-500/10 border-lime-500/50 text-lime-400'
+                  : item.featured
+                  ? 'border-lime-500/20 bg-lime-500/5 text-lime-400 hover:bg-lime-500/10'
                   : 'border-transparent text-carbon-300 hover:bg-carbon-850'
               }`}
             >
