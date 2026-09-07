@@ -68,8 +68,10 @@ echo
 # y sus tablas ya existen en test con la versión que use su servicio de auth.
 # Por eso de ellos se copian datos y nunca estructura: recrearlos machacaría
 # unas tablas que no son nuestras y que el servicio espera tal cual están.
-# Su tabla de migraciones queda fuera por lo mismo — dice en qué versión está
-# ese servicio, no qué datos tienes.
+# Quedan fuera por lo mismo dos tablas que no son datos tuyos sino del propio
+# servicio: `schema_migrations`, que dice en qué versión está, y `instances`,
+# que identifica la instancia de GoTrue del proyecto. Machacar esa con la de
+# dev deja la autenticación de test hablando de un proyecto que no es el suyo.
 has_schema() {
   [ "$(psql "$1" -tAc "select 1 from information_schema.schemata where schema_name='$2'")" = "1" ]
 }
@@ -107,7 +109,8 @@ pg_dump "$DEV_DB_URL" --schema=public --clean --if-exists --no-owner > "$PUBLIC_
 
 echo "==> Volcando los datos de auth de dev"
 pg_dump "$DEV_DB_URL" --data-only --no-owner --no-privileges \
-  --schema=auth --exclude-table=auth.schema_migrations > "$AUTH_SQL"
+  --schema=auth --exclude-table=auth.schema_migrations \
+  --exclude-table=auth.instances > "$AUTH_SQL"
 
 if has_schema "$DEV_DB_URL" storage; then
   echo "==> Volcando los datos de storage de dev"
@@ -155,7 +158,8 @@ do \$\$
 declare t record;
 begin
   for t in select tablename from pg_tables
-           where schemaname = 'auth' and tablename <> 'schema_migrations'
+           where schemaname = 'auth'
+             and tablename not in ('schema_migrations', 'instances')
   loop
     execute format('truncate table auth.%I cascade', t.tablename);
   end loop;
