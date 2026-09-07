@@ -441,18 +441,26 @@ En local, en un `.env` de esa rama. En GitHub Actions, con los `_TEST` de la tab
 
 `VITE_APP_ENV` no elige la base de datos: solo etiqueta el build para el aviso del perfil. La base la eligen la URL y la clave. Ponerlo a `test` apuntando a dev no rompe nada, pero te miente en pantalla justo cuando más te importa saber dónde estás.
 
-### Cargar test con una copia de dev
+### Clonar dev entera sobre test
 
-Con el proyecto `stonksu-test` creado y las migraciones de `supabase/migrations` aplicadas en él (mismo orden que en dev, desde el **SQL Editor**):
+Con el proyecto `stonksu-test` recién creado, sin necesidad de aplicarle las migraciones: el clon trae también el esquema.
 
 ```bash
 DEV_DB_URL='...' TEST_DB_URL='...' npm run db:copy-dev-to-test
 ```
 
-Las cadenas salen de **Project Settings → Database → Connection string → URI**, con el puerto **5432**, no el 6543: `pg_dump` necesita sentencias preparadas y el pooler de transacciones no las tiene.
+Las cadenas salen del botón **Connect** del proyecto, pestaña **URI**, con el puerto **5432** y no el 6543: `pg_dump` necesita sentencias preparadas y el pooler de transacciones no las tiene. Son dos, una por proyecto.
 
-El script vuelca `auth.users`, `auth.identities` y todo `public` de dev a `.db-backups/` (ignorado por git — son datos reales), **vacía test** y carga la copia. Pide confirmación escrita antes de borrar nada, y `--dump-only` se queda en el volcado sin tocar test, que es la forma de usarlo como copia de seguridad a secas.
+Copia el esquema de `public` entero —tablas, funciones, políticas RLS, triggers y los `grant` a `anon`/`authenticated`, sin los cuales la copia quedaría perfecta e inaccesible desde la app—, todos sus datos, y el contenido de `auth` (usuarios, identidades, sesiones, MFA, tokens) y de `storage`. Los volcados quedan en `.db-backups/`, ignorado por git porque son datos reales. `--dump-only` se queda ahí sin tocar test, que es la forma de usarlo como copia de seguridad a secas.
 
-Es un volcado de **datos**, no de esquema. El esquema de test se crea con las migraciones, porque copiarlo con `pg_dump --schema=public` dejaría fuera lo que vive en `auth` — el trigger que crea el perfil al registrarse, sobre todo — y eso no se nota hasta que alguien intenta darse de alta.
+Todo el volcado se aplica en **una sola transacción**: si algo falla a mitad, test se queda exactamente como estaba en lugar de medio borrado.
 
-Las sesiones no viajan: cada proyecto firma sus JWT con otra clave, así que al cambiar a un build de test hay que volver a entrar aunque el usuario exista en la copia.
+Tres detalles que el orden de las operaciones tiene que respetar, y que cuestan una tarde si se descubren sobre datos reales:
+
+- **`auth` se carga antes que `public`.** El volcado de `public` recrea sus claves ajenas con `alter table … add constraint`, que valida las filas en el acto recorriendo la tabla. Eso no es un trigger, así que `session_replication_role = replica` no lo silencia: con los usuarios sin cargar todavía, cada perfil apunta a un usuario inexistente y el clon entero se cae.
+- **De `auth` y `storage` se copian datos, nunca estructura.** Esas tablas las provisiona Supabase y su servicio espera su propia versión; `auth.schema_migrations` queda fuera por lo mismo, porque dice en qué versión está el servicio, no qué datos tienes. Si los dos proyectos van con versiones distintas del servicio de auth, el clon falla por una columna que no existe: actualiza el atrasado desde el panel.
+- **Los triggers que la app cuelga de `auth.users`** (`on_auth_user_created`, `on_auth_user_status_changed`) no viven en `public`, así que el volcado de `public` no se los lleva. El script los lee aparte con `pg_get_triggerdef` y el `search_path` vacío, para que salgan cualificados, y los recrea al final. También hay que quitarlos de test antes de empezar: sus funciones están en `public` y el volcado va a borrarlas, cosa que Postgres no permite mientras un trigger dependa de ellas.
+
+Lo que **no** viaja, porque no es contenido de la base: los proveedores de acceso (Google, anónimo), el SMTP, las plantillas de correo y las tareas de `pg_cron`. Eso se configura en el panel del proyecto de test.
+
+Las sesiones tampoco sirven aunque se copien: cada proyecto firma sus JWT con otra clave, así que al abrir un build de test hay que volver a entrar aunque el usuario exista en la copia. Como sí viajan las identidades, al entrar con Google caes en tu mismo perfil.
