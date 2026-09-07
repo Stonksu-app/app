@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "check": "node scripts/check-all.mjs",
     "graph": "graphify update .",
+    "db:copy-dev-to-test": "bash scripts/db-copy-dev-to-test.sh",
     "postbuild": "graphify update . || echo \"[graphify] no instalado; el grafo queda como estaba\"",
     "preview": "vite preview",
     "icons": "node scripts/make-app-icons.mjs && capacitor-assets generate --ios --android",

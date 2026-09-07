@@ -7,14 +7,16 @@ name: Build Android APK
 #
 # The tag decides which Supabase project it talks to, exactly as on iOS:
 #
-#   v0.8.0-dev  ->  dev          v0.8.0  ->  production
+#   v0.8.0-dev   ->  dev
+#   v0.8.0-test  ->  test (rigby-branch, *_TEST)
+#   v0.8.0       ->  production
 on:
   workflow_dispatch:
     inputs:
       environment:
         description: Qué proyecto de Supabase usar
         type: choice
-        options: [dev, production]
+        options: [dev, test, production]
         default: dev
   push:
     tags:
@@ -35,11 +37,16 @@ jobs:
             NAME="${{ inputs.environment }}"
           else
             case "${{ github.ref_name }}" in
+              *-test|*-rigby) NAME=test ;;
               *-dev|*-beta|*-rc|*-rc.*) NAME=dev ;;
               *) NAME=production ;;
             esac
           fi
-          SUFFIX=$([ "$NAME" = "dev" ] && echo DEV || echo PROD)
+          case "$NAME" in
+            dev) SUFFIX=DEV ;;
+            test) SUFFIX=TEST ;;
+            *) SUFFIX=PROD ;;
+          esac
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "suffix=$SUFFIX" >> "$GITHUB_OUTPUT"
           echo "Compilando para: $NAME (usando *_$SUFFIX)"
@@ -107,6 +114,10 @@ jobs:
                 || (steps.target.outputs.name == 'dev' && secrets.VITE_SUPABASE_ANON_KEY) }}
         run: |
           if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            if [ "$TARGET" = "test" ]; then
+              echo "::error::Faltan VITE_SUPABASE_URL_TEST y/o VITE_SUPABASE_ANON_KEY_TEST."
+              exit 1
+            fi
             if [ "$TARGET" = "production" ]; then
               echo "::error::Faltan VITE_SUPABASE_URL_PROD y/o VITE_SUPABASE_ANON_KEY_PROD."
               exit 1
