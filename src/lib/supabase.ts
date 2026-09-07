@@ -38,9 +38,28 @@ export const isCloudEnabled = Boolean(url && anonKey);
  * Surfaced in Profile because a sideloaded .ipa gives no other way to tell a
  * dev build from a production one, and "why is my progress missing?" is almost
  * always the answer being "you're on the other database".
+ *
+ * `test` is the environment of the `rigby-branch` branch: its own Supabase
+ * project, loaded from a copy of dev, so that a destructive test cannot take
+ * dev's data with it. Anything unrecognised reads as dev, which is the safe
+ * default: it never mistakes an unconfigured build for production.
  */
-export const appEnv: 'dev' | 'production' =
-  import.meta.env.VITE_APP_ENV === 'production' ? 'production' : 'dev';
+export type AppEnv = 'dev' | 'test' | 'production';
+
+export const appEnv: AppEnv =
+  import.meta.env.VITE_APP_ENV === 'production'
+    ? 'production'
+    : import.meta.env.VITE_APP_ENV === 'test'
+    ? 'test'
+    : 'dev';
+
+/**
+ * True for any build that is not pointed at the production project.
+ *
+ * What the Profile badge actually cares about: the warning is "this is not
+ * your real progress", and that holds for dev and for test alike.
+ */
+export const isTestingBackend = appEnv !== 'production';
 
 export const supabase: SupabaseClient | null = isCloudEnabled
   ? createClient(url as string, anonKey as string, {

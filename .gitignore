@@ -55,3 +55,6 @@ graphify-out/
 # CLI, so sharing it would fire a missing binary on anyone else's checkout.
 # CLAUDE.md is shared on purpose; the wiring behind it is not.
 .claude/
+
+# Volcados de scripts/db-copy-dev-to-test.sh — datos reales, nunca al repo.
+.db-backups/

@@ -28,6 +28,7 @@ function check(name: string, cond: boolean, detail = '') {
 /** Every field filled with a value distinct from its default, so a mapping that
  *  drops one shows up as a difference rather than as a coincidental match. */
 const sample: CloudState = {
+  simulatorRevision: 7,
   name: 'Chris',
   onboarded: true,
   onboardingAnswers: { experience: 'novato', goal: 'aprender' },
@@ -115,18 +116,13 @@ const cloudKeys = new Set(Object.keys(sample));
  * - lastStreakLoss: an explanation of what happened on this device, not
  *   progress. Syncing it would mean explaining a phone's lost streak on a
  *   laptop that never saw it.
- * - practice*, trade*: daily rate limits, not progress. Syncing a counter
+ * - practice*: daily rate limits, not progress. Syncing a counter
  *   that resets at midnight would need columns and a timezone argument, and
  *   the worst it buys is one extra round — of revision, or of a simulated
  *   trade whose coins are capped at the stake either way.
- * - openTrade, pendingOrder: a live position and a resting order, both priced
- *   off one device's clock. Syncing them would mean two devices agreeing on a
- *   price at the same instant to decide whether a stop fired — a
- *   synchronisation problem the feature doesn't need, and one whose failure
- *   mode is settling the same trade twice.
- * - tradeHistory: a record of what those local positions did, so it can only
- *   be as local as they are. A phone's history arriving on a laptop that never
- *   saw the trades would be a ledger with no positions behind it.
+ * - openTrade, pendingOrder, tradeHistory, tradeDay, tradesToday: synchronized
+ *   by simulator_commit, deliberately excluded from the delayed profile save.
+ * - simulatorOwnerId: identifies the owner of this device's trading cache.
  * - daily*: the rotating daily missions' counters and claimed state. Same
  *   reasoning as practice*: a per-day rate limit rather than progress, and
  *   which three missions are on offer is a pure function of the date, so
@@ -143,6 +139,7 @@ const LOCAL_ONLY = new Set([
   'testMode',
   'practiceDay',
   'practiceRoundsToday',
+  'simulatorOwnerId', // Device cache ownership; the simulator RPC syncs the following five fields.
   'tradeDay',
   'tradesToday',
   'openTrade',

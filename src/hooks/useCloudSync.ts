@@ -4,6 +4,7 @@ import { ensureSession, hasProgress, pullState, pushState, restartSession, type 
 import { suffixName } from '../lib/names';
 import { useUserStore } from '../store/useUserStore';
 import { useSyncStore } from '../store/useSyncStore';
+import { emptySimulator } from '../lib/simulatorSync';
 
 /**
  * Keeps the local game state and the Supabase profile in step.
@@ -23,9 +24,10 @@ import { useSyncStore } from '../store/useSyncStore';
 const DEBOUNCE_MS = 2000;
 
 /** The cloud-bound slice, pulled out of the full store state. */
-function snapshot(): CloudState {
+export function snapshot(): CloudState {
   const s = useUserStore.getState();
   return {
+    simulatorRevision: s.simulatorRevision,
     name: s.name,
     onboarded: s.onboarded,
     onboardingAnswers: s.onboardingAnswers,
@@ -145,6 +147,11 @@ export function useCloudSync(): void {
     /** Pulls and adopts whichever account `id` belongs to. Used both for the
      *  session found at mount and for one that arrives afterwards. */
     const adoptSession = async (id: string) => {
+      // Claim legacy device-only trades once; an account switch must not import them.
+      if (!useUserStore.getState().simulatorOwnerId) useUserStore.setState({ simulatorOwnerId: userId.current ?? id });
+      if (useUserStore.getState().simulatorOwnerId !== id) {
+        useUserStore.setState({ ...emptySimulator(), simulatorRevision: 0, simulatorOwnerId: id });
+      }
       userId.current = id;
       setUserId(id);
 

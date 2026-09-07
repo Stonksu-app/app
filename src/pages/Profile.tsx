@@ -18,7 +18,7 @@ import { byRelevance, computeAchievements } from '../data/achievements';
 import { getLessonById } from '../data/lessons';
 import { useUserStore, xpToLevel } from '../store/useUserStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { appEnv, isCloudEnabled } from '../lib/supabase';
+import { appEnv, isCloudEnabled, isTestingBackend } from '../lib/supabase';
 import { signOut } from '../lib/cloud';
 import { useSyncStore } from '../store/useSyncStore';
 import type { IconName } from '../types';
@@ -271,8 +271,11 @@ export default function Profile() {
               : authStatus === 'registered'
               ? 'progreso guardado en la nube'
               : 'sin cuenta — progreso solo local'}
-            {appEnv === 'dev' && isCloudEnabled && (
-              <span className="text-[#FFC93C]"> · base de datos de pruebas</span>
+            {isTestingBackend && isCloudEnabled && (
+              <span className="text-[#FFC93C]">
+                {' '}
+                · base de datos de {appEnv === 'test' ? 'test (rigby)' : 'pruebas'}
+              </span>
             )}
             {/* The first characters of the account id. "Why am I not my old
                 self?" is almost always "you are signed into a different

@@ -16,6 +16,7 @@ import type { Plan } from '../data/plans';
 
 /** The slice of store state that belongs in the cloud. */
 export interface CloudState {
+  simulatorRevision: number;
   name: string;
   onboarded: boolean;
   onboardingAnswers: OnboardingAnswers;
@@ -64,6 +65,7 @@ export interface PulledProfile extends CloudState {
 }
 
 export interface ProfileRow {
+  simulator_revision: number;
   name: string;
   onboarded: boolean;
   onboarding_answers: OnboardingAnswers;
@@ -101,6 +103,7 @@ export interface ProfileRow {
 export function toRow(s: CloudState, id: string) {
   return {
     id,
+    simulator_revision: s.simulatorRevision,
     name: s.name,
     onboarded: s.onboarded,
     onboarding_answers: s.onboardingAnswers,
@@ -134,6 +137,7 @@ export function toRow(s: CloudState, id: string) {
 
 export function fromRow(row: ProfileRow, attempts: LessonAttempt[]): PulledProfile {
   return {
+    simulatorRevision: row.simulator_revision ?? 0,
     name: row.name,
     onboarded: row.onboarded,
     onboardingAnswers: row.onboarding_answers,
@@ -177,7 +181,7 @@ export function fromRow(row: ProfileRow, attempts: LessonAttempt[]): PulledProfi
 }
 
 const PROFILE_COLUMNS =
-  'name, onboarded, onboarding_answers, xp, coins, hearts, last_heart_lost_at, streak, ' +
+  'simulator_revision, name, onboarded, onboarding_answers, xp, coins, hearts, last_heart_lost_at, streak, ' +
   'last_active_date, streak_protectors, completed_lesson_ids, unlocked_badge_ids, ' +
   'seen_intro_node_ids, opened_chest_ids, claimed_mission_ids, unlocked_accessories, ' +
   'pending_mistakes, node_stage_progress, term_mastery, plan, plan_started_at, avatar, ' +
@@ -315,7 +319,7 @@ export type PullResult =
 export async function pullState(userId: string): Promise<PullResult> {
   if (!supabase) return { status: 'error' };
 
-  const [profile, attempts] = await Promise.all([
+  const [initialProfile, attempts] = await Promise.all([
     supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle(),
     supabase
       .from('attempts')
@@ -324,6 +328,10 @@ export async function pullState(userId: string): Promise<PullResult> {
       .order('completed_at', { ascending: true }),
   ]);
 
+  // Older databases can still sync learning while the simulator migration is pending.
+  const profile = initialProfile.error?.message.includes('simulator_revision')
+    ? await supabase.from('profiles').select(PROFILE_COLUMNS.replace('simulator_revision, ', '')).eq('id', userId).maybeSingle()
+    : initialProfile;
   if (profile.error) {
     console.warn('[cloud] could not read profile:', profile.error.message);
     return { status: 'error' };

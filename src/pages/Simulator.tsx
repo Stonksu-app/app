@@ -6,6 +6,10 @@ import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
 import { Button } from '../components/Button';
 import { useUserStore } from '../store/useUserStore';
+import { useSimulatorSync } from '../hooks/useSimulatorSync';
+import type { SimulatorState } from '../lib/simulatorSync';
+import { isCloudEnabled } from '../lib/supabase';
+import { todayLocal } from '../utils/streak';
 import { FREE_TRADES_PER_DAY, hasUnlimitedTrades } from '../data/plans';
 import PriceChart from '../components/PriceChart';
 import TradeHistory from '../components/TradeHistory';
@@ -106,15 +110,10 @@ export default function Simulator() {
     plan,
     coins,
     canTrade,
-    startTrade,
-    settleTrade,
     openTrade,
-    setOpenTrade,
     pendingOrder,
-    setPendingOrder,
-    refundTrade,
-    recordTrade,
   } = useUserStore();
+  const sync = useSimulatorSync();
   const unlimited = hasUnlimitedTrades(plan);
   const allowed = canTrade();
 
@@ -217,10 +216,15 @@ export default function Simulator() {
     return raw.trim() !== '' && Number.isFinite(n) && n > 0 ? (sign * n) / 100 : null;
   };
 
-  const [position, setPosition] = useState<Position | null>(null);
-  /** When the open position was opened, for the history row it will become. */
-  const [openedAt, setOpenedAt] = useState<number | null>(null);
-  const [settled, setSettled] = useState<{ coins: number; reason: ExitReason } | null>(null);
+  const position: Position | null = openTrade ? {
+    ...openTrade, leverage: openTrade.leverage as Leverage,
+    mode: openTrade.mode ?? 'isolated', wallet: openTrade.wallet ?? openTrade.margin,
+    takeProfit: openTrade.takeProfit ?? null, stopLoss: openTrade.stopLoss ?? null,
+    orderType: openTrade.orderType ?? 'market',
+  } : null;
+  const openedAt = openTrade?.openedAt ?? null;
+  const [result, setSettled] = useState<{ coins: number; reason: ExitReason } | null>(null);
+  const settled = openTrade || pendingOrder ? null : result;
 
   /*
    * A position left open keeps running, and the path decides its fate.
@@ -232,7 +236,7 @@ export default function Simulator() {
    * counts even if the price came back before you looked.
    */
   useEffect(() => {
-    if (!openTrade || position || settled) return;
+    if (!sync.ready || !openTrade) return;
     let cancelled = false;
     void (async () => {
       const restored: Position = {
@@ -262,14 +266,12 @@ export default function Simulator() {
         finish(restored, at, hit.reason, openTrade.openedAt);
         return;
       }
-      setPosition(restored);
-      setOpenedAt(openTrade.openedAt);
     })();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [openTrade?.openedAt, sync.ready]);
 
   /*
    * An order left waiting doesn't wait for you to come back either.
@@ -281,7 +283,7 @@ export default function Simulator() {
    * without the other one.
    */
   useEffect(() => {
-    if (!pendingOrder || position || settled) return;
+    if (!sync.ready || !pendingOrder || position) return;
     let cancelled = false;
     void (async () => {
       const since = await fetchCandles(1000, pendingOrder.placedAt);
@@ -290,7 +292,7 @@ export default function Simulator() {
       if (at === null) return;
 
       const when = since[at].time * 1000;
-      const opened = fill(pendingOrder.limitPrice, when);
+      const opened = await fill(pendingOrder.limitPrice, when);
       if (!opened) return;
 
       const after = since.slice(at);
@@ -298,16 +300,16 @@ export default function Simulator() {
       if (!hit) return;
       const exit =
         hit.reason === 'liquidation' ? worstPrice(opened.direction, after) ?? hit.price : hit.price;
-      setPosition(null);
       finish(opened, exit, hit.reason, when);
     })();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pendingOrder?.placedAt, sync.ready]);
 
   const price = livePrice ?? candles[candles.length - 1]?.close ?? 0;
+  const marketReady = !loading && price > 0 && (!isCloudEnabled || live);
   const entryPrice = price;
 
   const tpRoi = asRoi(tpText, 1);
@@ -357,11 +359,9 @@ export default function Simulator() {
    * is known: a row written later from the position alone couldn't say what
    * closed it or when.
    */
-  const finish = (p: Position, at: number, reason: ExitReason, since: number) => {
+  const finish = async (p: Position, at: number, reason: ExitReason, since: number) => {
     const change = settleCoins(p, at);
-    settleTrade(change);
-    setOpenTrade(null);
-    recordTrade({
+    const record = {
       id: `${since}-${Math.random().toString(36).slice(2, 8)}`,
       direction: p.direction,
       leverage: p.leverage,
@@ -375,23 +375,32 @@ export default function Simulator() {
       roi: roi(p, at),
       openedAt: since,
       closedAt: Date.now(),
-    });
-    setSettled({ coins: change, reason });
+    };
+    const accepted = await sync.commit(s => s.openTrade?.openedAt !== since ? null : ({
+      state: { ...s, openTrade: null, tradeHistory: [record, ...s.tradeHistory].slice(0, 50) }, coinDelta: change,
+    }));
+    if (accepted) setSettled({ coins: change, reason });
   };
 
-  const open = (direction: Direction) => {
-    if (loading || price <= 0 || margin <= 0 || margin > coins || !slReachable || !canRest(direction)) return;
-    if (!startTrade()) return;
+  const open = async (direction: Direction) => {
+    if (!sync.ready || !marketReady || openTrade || pendingOrder || margin <= 0 || margin > coins || !slReachable || !canRest(direction)) return;
+    const now = Date.now();
+    const today = todayLocal();
+    const submit = (trade: SimulatorState['openTrade'], order: SimulatorState['pendingOrder']) => sync.commit(s => {
+      const used = s.tradeDay === today ? s.tradesToday : 0;
+      if (s.openTrade || s.pendingOrder || (!unlimited && used >= FREE_TRADES_PER_DAY)) return null;
+      return { state: { ...s, openTrade: trade, pendingOrder: order, tradeDay: today, tradesToday: used + 1 } };
+    });
 
     if (orderType === 'limit' && limitPrice !== null) {
       // Nothing is bought yet and nothing is at risk: the order waits, and the
       // targets wait with it as percentages, to be priced off the fill.
-      setPendingOrder({
+      await submit(null, {
         direction,
         leverage,
         margin,
         limitPrice,
-        placedAt: Date.now(),
+        placedAt: now,
         mode,
         wallet: coins,
         tpRoi,
@@ -413,27 +422,25 @@ export default function Simulator() {
     // above the entry on a long and below it on a short.
     opened.takeProfit = tpRoi !== null ? priceForRoi(opened, tpRoi) : null;
     opened.stopLoss = slRoi !== null ? priceForRoi(opened, slRoi) : null;
-    setPosition(opened);
-    setOpenedAt(Date.now());
     // Remembered before anything else can go wrong: a position that exists on
     // screen but not in storage is one that vanishes when the app is closed.
-    setOpenTrade({
+    await submit({
       direction,
       leverage,
       margin,
       entry: entryPrice,
-      openedAt: Date.now(),
+      openedAt: now,
       mode,
       wallet: coins,
       takeProfit: opened.takeProfit,
       stopLoss: opened.stopLoss,
       orderType: 'market',
-    });
+    }, null);
   };
 
   /** Turns a waiting order into a position at its own price. */
-  const fill = (at: number, when: number) => {
-    if (!pendingOrder) return;
+  const fill = async (at: number, when: number) => {
+    if (!sync.ready || !pendingOrder) return;
     const opened: Position = {
       direction: pendingOrder.direction,
       leverage: pendingOrder.leverage as Leverage,
@@ -445,10 +452,7 @@ export default function Simulator() {
     };
     opened.takeProfit = pendingOrder.tpRoi != null ? priceForRoi(opened, pendingOrder.tpRoi) : null;
     opened.stopLoss = pendingOrder.slRoi != null ? priceForRoi(opened, pendingOrder.slRoi) : null;
-    setPendingOrder(null);
-    setPosition(opened);
-    setOpenedAt(when);
-    setOpenTrade({
+    const trade = {
       direction: opened.direction,
       leverage: opened.leverage,
       margin: opened.margin,
@@ -458,19 +462,22 @@ export default function Simulator() {
       wallet: opened.wallet,
       takeProfit: opened.takeProfit,
       stopLoss: opened.stopLoss,
-      orderType: 'limit',
-    });
-    return opened;
+      orderType: 'limit' as const,
+    };
+    const accepted = await sync.commit(s => s.pendingOrder?.placedAt !== pendingOrder.placedAt ? null : ({
+      state: { ...s, pendingOrder: null, openTrade: trade },
+    }));
+    return accepted ? opened : undefined;
   };
 
   const cancelOrder = () => {
-    setPendingOrder(null);
-    // Nothing was ever traded, so the day's turn goes back.
-    refundTrade();
+    void sync.commit(s => !pendingOrder || s.pendingOrder?.placedAt !== pendingOrder.placedAt ? null : ({
+      state: { ...s, pendingOrder: null, tradesToday: Math.max(0, s.tradesToday - 1) },
+    }));
   };
 
   const closeAt = (at: number, reason: ExitReason) => {
-    if (!position || settled) return;
+    if (!sync.ready || !marketReady || !position || settled) return;
     finish(position, at, reason, openedAt ?? Date.now());
   };
 
@@ -487,21 +494,21 @@ export default function Simulator() {
    * lose on arrival, before a single real tick, purely because its own fetch
    * came back before the chart's.
    */
-  const trigger = position && !settled && price > 0 ? triggeredBy(position, price, price) : null;
+  const trigger = position && !settled && marketReady ? triggeredBy(position, price, price) : null;
   useEffect(() => {
-    if (trigger) closeAt(trigger.price, trigger.reason);
+    if (sync.ready && trigger) closeAt(trigger.price, trigger.reason);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trigger?.reason, trigger?.price]);
+  }, [trigger?.reason, trigger?.price, sync.ready]);
 
   // And what it does to an order still waiting for its price.
   const fills =
-    pendingOrder && !position && !settled && price > 0
+    pendingOrder && !position && !settled && marketReady
       ? limitFills(pendingOrder.direction, pendingOrder.limitPrice, price, price)
       : false;
   useEffect(() => {
-    if (fills && pendingOrder) fill(pendingOrder.limitPrice, Date.now());
+    if (sync.ready && fills && pendingOrder) void fill(pendingOrder.limitPrice, Date.now());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fills]);
+  }, [fills, sync.ready]);
 
   const shownPosition = position ?? preview;
   const liqPrice = liquidationPrice(shownPosition);
@@ -658,6 +665,25 @@ export default function Simulator() {
           </section>
 
           <section id="simulator-order" aria-label="Panel de órdenes" className={`min-w-0 rounded-2xl border border-carbon-700 bg-carbon-850/40 p-4 ${mobileView === 'order' ? 'block' : 'hidden lg:block'}`}>
+          {!sync.ready && (
+            <div role="status" className="mb-4 rounded-xl border border-carbon-700 bg-carbon-800 p-3 text-sm text-carbon-200">
+              {sync.status === 'error' ? sync.message : sync.status === 'saving' ? 'Confirmando operación…' : 'Comprobando tus operaciones…'}
+              {sync.status === 'error' && <button className="mt-2 block font-black text-lime-400" onClick={() => void sync.refresh()}>Reintentar</button>}
+            </div>
+          )}
+          {sync.ready && sync.message && <p role="status" className="mb-3 text-sm text-carbon-300">{sync.message}</p>}
+          {/* A build with no Supabase keys trades entirely on this device. Left
+              unsaid, that is indistinguishable from a bug: the position opened
+              on the computer is simply absent on the phone, and the panel
+              cheerfully offers to open another. Saying it here is what turns
+              "my operation vanished" into something you can act on. */}
+          {!isCloudEnabled && (
+            <p role="status" className="mb-3 text-sm text-[#FFC93C]">
+              Esta operación solo existe en este dispositivo: no hay cuenta conectada, así que no la verás en otro.
+            </p>
+          )}
+          {isCloudEnabled && !loading && !live && <p role="status" className="mb-3 text-sm text-carbon-300">Esperando precios de mercado. Tu operación se conserva; el gráfico de demostración no ejecuta operaciones de tu cuenta.</p>}
+          <fieldset disabled={!sync.ready} className="min-w-0">
           <div className="flex items-center justify-between gap-2 border-b border-carbon-700 pb-3">
             <h2 className="text-sm font-black text-carbon-50">
               {settled ? 'Resultado' : pendingOrder && !position ? 'Orden pendiente' : position ? 'Posición abierta' : 'Crear orden'}
@@ -679,7 +705,7 @@ export default function Simulator() {
               </p>
               <p className="mt-1 text-sm text-carbon-400">
                 {settled.reason === 'liquidation'
-                  ? `Con ${position?.leverage}x bastó un ${liqDistance.toFixed(2)}% en contra para llevarse tu margen entero.`
+                  ? 'El precio alcanzó el nivel de liquidación de tu posición.'
                   : settled.reason === 'stopLoss'
                   ? 'Tu stop cerró la posición donde tú dijiste, no donde lo habría hecho la liquidación.'
                   : settled.reason === 'takeProfit'
@@ -749,7 +775,7 @@ export default function Simulator() {
                 )}
                 <Row label="Precio de liquidación" value={liqPrice.toFixed(2)} tone="text-danger-400" />
               </div>
-              <Button variant={pnl >= 0 ? 'primary' : 'danger'} onClick={() => closeAt(price, 'manual')}>
+              <Button disabled={!marketReady} variant={pnl >= 0 ? 'primary' : 'danger'} onClick={() => closeAt(price, 'manual')}>
                 Cerrar posición
               </Button>
             </div>
@@ -1036,14 +1062,14 @@ export default function Simulator() {
 
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <Button
-                  disabled={loading || price <= 0 || !allowed || margin <= 0 || !slReachable || !canRest('long')}
+                  disabled={!sync.ready || !marketReady || !allowed || margin <= 0 || !slReachable || !canRest('long')}
                   onClick={() => open('long')}
                 >
                   <Icon name="trending-up" size={18} /> Long
                 </Button>
                 <Button
                   variant="danger"
-                  disabled={loading || price <= 0 || !allowed || margin <= 0 || !slReachable || !canRest('short')}
+                  disabled={!sync.ready || !marketReady || !allowed || margin <= 0 || !slReachable || !canRest('short')}
                   onClick={() => open('short')}
                 >
                   <Icon name="trending-down" size={18} /> Short
@@ -1071,6 +1097,7 @@ export default function Simulator() {
             </>
           )}
 
+          </fieldset>
           </section>
         </div>
         </main>

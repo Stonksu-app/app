@@ -8,10 +8,11 @@ El progreso vive en localStorage y se refleja en Supabase. **Sin claves configur
 
 En [supabase.com](https://supabase.com) → New project. Uno por entorno:
 
-| Proyecto        | Para          |
-| --------------- | ------------- |
-| `stonksu-dev`   | rama `dev`    |
-| `stonksu-prod`  | producción    |
+| Proyecto        | Para                   |
+| --------------- | ---------------------- |
+| `stonksu-dev`   | rama `dev`             |
+| `stonksu-test`  | rama `rigby-branch`    |
+| `stonksu-prod`  | producción             |
 
 Elige la región más cercana (`eu-west-3` París, por ejemplo). Guarda la contraseña de la base de datos en tu gestor: no vuelve a mostrarse.
 
@@ -270,12 +271,14 @@ Las variables y secrets de repositorio en GitHub son **únicos por repositorio**
 | --- | --- | --- |
 | *Variables* | `VITE_SUPABASE_URL_DEV` | URL del proyecto dev |
 | *Secrets* | `VITE_SUPABASE_ANON_KEY_DEV` | clave anon de dev |
+| *Variables* | `VITE_SUPABASE_URL_TEST` | URL del proyecto de test (`rigby-branch`) |
+| *Secrets* | `VITE_SUPABASE_ANON_KEY_TEST` | clave anon de test |
 | *Variables* | `VITE_SUPABASE_URL_PROD` | URL del proyecto de producción |
 | *Secrets* | `VITE_SUPABASE_ANON_KEY_PROD` | clave anon de producción |
 
 La URL va como variable porque no es secreta; la clave va como secret solo para no dejarla escrita en el repositorio — en el bundle acaba igual, y no pasa nada, porque lo que protege los datos es RLS.
 
-Los nombres **sin sufijo** siguen valiendo, pero solo para dev. Producción exige los `_PROD` explícitos y el build **falla** si faltan: un `.ipa` distribuido hablando con la base de datos de pruebas es peor que no tener `.ipa`.
+Los nombres **sin sufijo** siguen valiendo, pero solo para dev. Producción exige los `_PROD` explícitos y el build **falla** si faltan: un `.ipa` distribuido hablando con la base de datos de pruebas es peor que no tener `.ipa`. Test exige los `_TEST` por el mismo motivo al revés: si cayera al respaldo sin sufijo, un build de `rigby-branch` estaría escribiendo en dev y la separación no serviría de nada.
 
 ### Qué entorno usa cada build
 
@@ -284,11 +287,12 @@ Lo decide el tag:
 | Tag | Entorno |
 | --- | --- |
 | `v0.8.0-dev`, `v0.8.0-beta`, `v0.8.0-rc1` | dev |
+| `v0.8.0-test`, `v0.8.0-rigby` | test |
 | `v0.8.0` | producción |
 
 También puedes lanzarlo a mano desde la pestaña **Actions**, eligiendo el entorno en un desplegable.
 
-El artefacto sale nombrado `Stonksu-dev-v0.8.0-dev` o `Stonksu-production-v0.8.0`, para que dos `.ipa` descargados no se confundan. Y dentro de la app, el pie de **Perfil** avisa en ámbar **"base de datos de pruebas"** cuando el build es de dev.
+El artefacto sale nombrado `Stonksu-dev-v0.8.0-dev` o `Stonksu-production-v0.8.0`, para que dos `.ipa` descargados no se confundan. Y dentro de la app, el pie de **Perfil** avisa en ámbar **"base de datos de pruebas"** cuando el build es de dev y **"base de datos de test (rigby)"** cuando es de test.
 
 **El `.ipa` solo se construye al crear un tag `v*`.** Es la causa habitual de "la app del móvil no se ha actualizado": hay commits nuevos en `dev` pero ningún tag desde el último build.
 
@@ -422,3 +426,33 @@ delete from auth.users where id = '<el user_id de la consulta anterior>';
 - **Ranking / ligas**, que necesitarían una vista con datos agregados, no acceso directo a `profiles`.
 - **Recuperar la cuenta al desinstalar**: si borras la app antes de registrarte, la sesión anónima se pierde y el perfil queda huérfano en la base de datos. Merece un borrado periódico de anónimos sin actividad.
 - **Reducir el bundle**: con las claves puestas, `supabase-js` ya no se puede descartar por tree-shaking y añade unos 52 kB comprimidos (de 127 a 179 kB). Cargarlo de forma diferida detrás de la pantalla de carga lo sacaría del camino crítico, que además dura 10 segundos.
+
+## El entorno de test (`rigby-branch`)
+
+`rigby-branch` habla con su propio proyecto de Supabase, para que una prueba destructiva no se lleve por delante los datos de dev. Lo único que lo distingue es la configuración:
+
+| Variable | Valor en `rigby-branch` |
+| --- | --- |
+| `VITE_SUPABASE_URL` | URL del proyecto `stonksu-test` |
+| `VITE_SUPABASE_ANON_KEY` | clave anon de `stonksu-test` |
+| `VITE_APP_ENV` | `test` |
+
+En local, en un `.env` de esa rama. En GitHub Actions, con los `_TEST` de la tabla de arriba. En Vercel, en **Settings → Environment Variables** marcando solo la rama `rigby-branch` (Preview → *Branch*), porque si no las tres ramas comparten las mismas.
+
+`VITE_APP_ENV` no elige la base de datos: solo etiqueta el build para el aviso del perfil. La base la eligen la URL y la clave. Ponerlo a `test` apuntando a dev no rompe nada, pero te miente en pantalla justo cuando más te importa saber dónde estás.
+
+### Cargar test con una copia de dev
+
+Con el proyecto `stonksu-test` creado y las migraciones de `supabase/migrations` aplicadas en él (mismo orden que en dev, desde el **SQL Editor**):
+
+```bash
+DEV_DB_URL='...' TEST_DB_URL='...' npm run db:copy-dev-to-test
+```
+
+Las cadenas salen de **Project Settings → Database → Connection string → URI**, con el puerto **5432**, no el 6543: `pg_dump` necesita sentencias preparadas y el pooler de transacciones no las tiene.
+
+El script vuelca `auth.users`, `auth.identities` y todo `public` de dev a `.db-backups/` (ignorado por git — son datos reales), **vacía test** y carga la copia. Pide confirmación escrita antes de borrar nada, y `--dump-only` se queda en el volcado sin tocar test, que es la forma de usarlo como copia de seguridad a secas.
+
+Es un volcado de **datos**, no de esquema. El esquema de test se crea con las migraciones, porque copiarlo con `pg_dump --schema=public` dejaría fuera lo que vive en `auth` — el trigger que crea el perfil al registrarse, sobre todo — y eso no se nota hasta que alguien intenta darse de alta.
+
+Las sesiones no viajan: cada proyecto firma sus JWT con otra clave, así que al cambiar a un build de test hay que volver a entrar aunque el usuario exista en la copia.
