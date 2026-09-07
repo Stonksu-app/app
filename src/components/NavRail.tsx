@@ -24,7 +24,7 @@ export default function NavRail() {
                 active
                   ? 'bg-lime-500/10 border-lime-500/50 text-lime-400'
                   : item.featured
-                  ? 'border-lime-500/20 bg-lime-500/5 text-lime-400 hover:bg-lime-500/10'
+                  ? 'border-purple-300/40 bg-purple-300/10 text-purple-400 hover:bg-purple-500/20'
                   : 'border-transparent text-carbon-300 hover:bg-carbon-850'
               }`}
             >
