@@ -31,6 +31,8 @@ const LEVEL_UP_COINS = 20;
 const LEVEL_MILESTONE_COINS = 100;
 
 interface UserState {
+  simulatorRevision: number;
+  simulatorOwnerId: string | null;
   name: string;
   onboarded: boolean;
   onboardingAnswers: OnboardingAnswers;
@@ -81,9 +83,8 @@ interface UserState {
    *
    * The simulator runs on real prices now, so a position keeps running while
    * the app is closed, exactly as it would on a venue. Kept here so coming
-   * back finds it — and local, because a position opened on a phone and
-   * closed on a laptop would need the two to agree on a price at the same
-   * instant, which is a synchronisation problem this feature doesn't need.
+   * back finds it. Cloud builds commit the whole simulator document through
+   * a versioned server transaction; this store is its device cache.
    */
   openTrade: {
     direction: 'long' | 'short';
@@ -132,8 +133,7 @@ interface UserState {
   /**
    * Closed trades, newest first — the venue's own position history.
    *
-   * Local for the same reason the open position is, and capped: this is a
-   * record to learn from, not an archive, and localStorage is not a database.
+   * Synced with the open position and capped at the latest 50 trades.
    */
   tradeHistory: {
     id: string;
@@ -509,6 +509,8 @@ export const useUserStore = create<UserState>()(
   persist(
     (set, get) => ({
       name: '',
+      simulatorRevision: 0,
+      simulatorOwnerId: null,
       onboarded: false,
       onboardingAnswers: { experience: null, goal: null },
       xp: 0,
@@ -1085,6 +1087,8 @@ export const useUserStore = create<UserState>()(
       resetProgress: () =>
         set({
           name: '',
+          simulatorRevision: 0,
+          simulatorOwnerId: null,
           onboarded: false,
           onboardingAnswers: { experience: null, goal: null },
           xp: 0,
