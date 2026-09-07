@@ -83,32 +83,46 @@ if [ "$ASSUME_YES" -eq 0 ]; then
   [ "$reply" = "test" ] || { echo "Cancelado."; exit 1; }
 fi
 
-# El esquema tiene que existir ya en test. Si no, esto falla en el primer COPY
-# y no habrá dejado nada a medias, porque todo va en una transacción.
-echo "==> Vaciando test"
-psql "$TEST_DB_URL" -v ON_ERROR_STOP=1 --single-transaction <<'SQL'
+# Vaciar y cargar van en la MISMA transacción, y ese es el punto entero.
+# Separarlas deja el peor final posible: el vaciado confirmado y la carga
+# abortada a mitad, o sea test en blanco y la copia sin aplicar. TRUNCATE es
+# transaccional en Postgres, así que cualquier error aquí deshace también el
+# vaciado y test se queda exactamente como estaba.
+#
+# session_replication_role = replica apaga los triggers de clave ajena durante
+# la carga: pg_dump ordena las tablas alfabéticamente, no por dependencias, así
+# que sin esto un COPY a `attempts` antes que a `profiles` revienta. Va lo
+# primero para que un rol sin permiso para tocarlo falle antes de vaciar nada.
+WIPE_SQL="
 delete from auth.users;
-do $$
+do \$\$
 declare t record;
 begin
-  for t in
-    select tablename from pg_tables where schemaname = 'public'
+  for t in select tablename from pg_tables where schemaname = 'public'
   loop
     execute format('truncate table public.%I restart identity cascade', t.tablename);
   end loop;
-end $$;
-SQL
+end \$\$;
+"
 
-# session_replication_role = replica apaga los triggers de clave ajena durante
-# la carga: pg_dump ordena las tablas alfabéticamente, no por dependencias, así
-# que sin esto un COPY a `attempts` antes que a `profiles` revienta.
-echo "==> Restaurando auth en test"
-psql "$TEST_DB_URL" -v ON_ERROR_STOP=1 --single-transaction \
-  -c 'set session_replication_role = replica' -f "$AUTH_SQL"
-
-echo "==> Restaurando public en test"
-psql "$TEST_DB_URL" -v ON_ERROR_STOP=1 --single-transaction \
-  -c 'set session_replication_role = replica' -f "$PUBLIC_SQL"
+# El esquema tiene que existir ya en test; si no, esto falla en el primer COPY.
+echo "==> Vaciando y cargando test en una sola transacción"
+if ! psql "$TEST_DB_URL" -q -v ON_ERROR_STOP=1 --single-transaction \
+     -c 'set session_replication_role = replica' \
+     -c "$WIPE_SQL" \
+     -f "$AUTH_SQL" -f "$PUBLIC_SQL"; then
+  echo >&2
+  echo "No se cargó nada: test se queda exactamente como estaba." >&2
+  echo >&2
+  echo 'Si el error es «permission denied to set parameter "session_replication_role"»,' >&2
+  echo "conecta como el rol postgres del proyecto (Connection string > URI, no el" >&2
+  echo "usuario de solo lectura): hace falta poder apagar los triggers de clave" >&2
+  echo "ajena mientras se carga." >&2
+  echo >&2
+  echo "Si el error es que no existe una tabla, a test le faltan las migraciones:" >&2
+  echo "aplica supabase/migrations en orden desde el SQL Editor y vuelve a lanzarlo." >&2
+  exit 1
+fi
 
 echo
 echo "Listo. Comprobación rápida:"
