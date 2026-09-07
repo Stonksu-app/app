@@ -37,7 +37,9 @@ No hay servidor propio en el repo. La SPA habla con Supabase y obtiene precios p
 
 ## Aprendizaje y reglas
 
-- Ocho temas en cuatro secciones: fundamentos y velas; soportes/resistencias e indicadores; riesgo y psicología; órdenes y análisis fundamental. El contenido está en TypeScript, no en un CMS.
+- Once temas en cinco secciones: fundamentos y velas; soportes/resistencias e indicadores; riesgo y psicología; órdenes y análisis fundamental; uso de exchanges. El contenido está en TypeScript, no en un CMS.
+- `src/data/exchangeLessons.ts` añade «Tu primer exchange» al final de `SKILL_TREE`: conocer la plataforma y proteger la cuenta → compras/órdenes spot → depósitos/retiradas. Se desbloquea tras `fundamentales`, conservando IDs y progreso anteriores. Tres unidades básicas de tres etapas cada una, con 24 preguntas, 18 tarjetas, seis secuencias de cuatro pasos y explicaciones por etapa. Ejemplos genéricos y ficticios, sin integrar un exchange ni enviar fondos; el simulador existente sigue siendo un producto distinto de la práctica spot descrita.
+- Referencias editoriales del contenido exchange: [tipos de orden](https://help.coinbase.com/en/coinbase/trading-and-funding/advanced-trade/order-types), [gestión de órdenes](https://help.coinbase.com/en/coinbase/trading-and-funding/advanced-trade/order-management), [doble factor](https://help.coinbase.com/en-gb/coinbase/getting-started/getting-started-with-coinbase/2-step-verification), [redes de envío](https://help.coinbase.com/en-gb/coinbase/trading-and-funding/cryptocurrency-trading-pairs/steps-to-send-crypto) y [memo/tag](https://help.coinbase.com/en-gb/coinbase/trading-and-funding/sending-or-receiving-cryptocurrency/destination-tag-memo-faq). No se recomiendan plataformas ni se fijan tarifas o requisitos regionales.
 - Los temas tienen dependencias y 3/4/5 etapas según dificultad. La última es repaso; las anteriores reparten vocabulario y actividades. `introKey(nodeId, stage)` evita saltarse la presentación de términos nuevos.
 - Actividades: quiz, emparejar, clasificar, ordenar y completar frases. `buildStage` intercala juegos/preguntas, recupera hasta cinco errores compatibles y puede incluir una pregunta de un tema ya completado.
 - El estado de entrada de una sesión se congela para que una respuesta no reconstruya ni reordene el ejercicio en curso. `useComboFeedback` centraliza aciertos, errores, vidas y feedback.
@@ -97,6 +99,9 @@ Vercel se documenta desde `dev`; `vercel.json` resuelve rutas SPA a index y cont
 Priorizar implementación y checks sobre comentarios antiguos: `supabase/README.md` enumera solo cuatro migraciones y dice que faltan ligas, aunque hay quince migraciones y ligas implementadas. Hay comentarios que aún llaman azul al platino, o hablan de splash de diez segundos: CSS, motor y `utils/splash.ts` prevalecen (5 s frío, 900 ms reciente, más transición). Las instrucciones remotas de SMTP, OAuth y despliegue son documentación, no prueba de la configuración desplegada.
 
 ## Mantenimiento de esta memoria
+
+Validación del contenido exchange (2026-09-07): `npm ci`, los 15 scripts de `npm run check`, `npm run lint` y `npm run build` completados. Persisten ocho avisos de lint y el aviso de tamaño del bundle; Graphify no está instalado. La instalación informa de 10 vulnerabilidades en las dependencias existentes (3 moderadas, 6 altas y 1 crítica); no se modificaron dependencias ni el lockfile en esta tarea.
+Prueba de interacción en Chromium del contenido exchange a 390×844 y 1440×1000: completadas las nueve etapas en ambos tamaños, recorriendo tarjetas, respuestas, secuencias con flechas y llegada a resultados; incluye preguntas de repaso del curso anterior. Inspección visual de mapa, secciones, tarjetas y ejercicios. Se usó progreso local preparado para acceder a cada etapa, sin Supabase ni operaciones reales; no sustituye pruebas en binarios nativos.
 
 Usar este mapa como punto de partida, inspeccionar el diff y abrir solo los módulos afectados. Actualizar las secciones que cambien, sin acumular diarios de cada tarea. Las preferencias duraderas están en `AGENTS.md`; no depender de que una conversación anterior permanezca en contexto.
 

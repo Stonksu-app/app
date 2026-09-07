@@ -1,4 +1,5 @@
 import type { QuizQuestion, SkillNode } from '../types';
+import { EXCHANGE_NODES } from './exchangeLessons';
 
 export const SKILL_TREE: SkillNode[] = [
   {
@@ -1954,6 +1955,7 @@ export const SKILL_TREE: SkillNode[] = [
       },
     ],
   },
+  ...EXCHANGE_NODES,
 ];
 
 export interface Section {
