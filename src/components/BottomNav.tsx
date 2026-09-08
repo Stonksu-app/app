@@ -3,7 +3,24 @@ import Icon from './Icon';
 import { NAV_ITEMS, navItemIsActive } from './navItems';
 
 /** Phone navigation, pinned to the bottom. Hidden from lg up, where NavRail
- *  takes over. */
+ *  takes over.
+ *
+ *  The featured item wears the platinum metal in both states, so its shine
+ *  never disappears at the moment you land on it — being there shouldn't look
+ *  flatter than being one tap away. What tells them apart is the border, and
+ *  the text is white because that gradient is built for white: `purple-400`
+ *  on it scored badly enough to read as smudged rather than as a colour.
+ *
+ *  The violet comes from the ultra tokens, not Tailwind's `purple-*`. Two
+ *  near-identical purples in one bar is the kind of thing you feel before you
+ *  can name it.
+ *
+ *  The border and the halo do the attracting, because the violet can't: the
+ *  metal runs 3.1:1 down to 1.6:1 against this bar, darker than the dimmed
+ *  items at 5.5:1, while the lime of an active item sits at 15:1. Attention
+ *  follows luminance, not hue, so the edge is `ultra-400` at 6.6:1 and the
+ *  glow gives the shape a lit outline instead of leaving it to fade into a
+ *  dark bar. */
 export default function BottomNav() {
   const { pathname } = useLocation();
   return (
@@ -22,11 +39,11 @@ export default function BottomNav() {
               aria-current={active ? 'page' : undefined}
               className={`flex-1 max-w-[110px] flex flex-col items-center gap-0.5 py-2 rounded-xl border-2 transition relative overflow-hidden ${
                 item.featured && active
-                ? 'bg-purple-500/20 border-purple-500/50 text-purple-400'
-                :active
+                  ? 'platinum-node border-ultra-200 text-white shadow-[0_0_20px_rgba(167,139,250,0.45)]'
+                  : active
                   ? 'bg-lime-500/10 border-lime-500/50 text-lime-400'
                   : item.featured
-                  ? 'platinum-node border-purple-300/40 bg-purple-300/10 text-purple-400 hover:bg-purple-300/20'
+                  ? 'platinum-node border-ultra-400 text-white shadow-[0_0_14px_rgba(167,139,250,0.28)] hover:border-ultra-300 hover:shadow-[0_0_20px_rgba(167,139,250,0.45)]'
                   : 'border-transparent text-carbon-400'
               }`}
             >

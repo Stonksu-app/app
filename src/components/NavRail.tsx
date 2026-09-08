@@ -22,11 +22,11 @@ export default function NavRail() {
               aria-current={active ? 'page' : undefined}
               className={`h-[52px] flex items-center gap-3 px-4 rounded-xl border-2 text-[15px] font-black uppercase tracking-[0.8px] transition relative overflow-hidden ${
                 item.featured && active
-                  ? 'bg-purple-500/20 border-purple-500/50 text-purple-400 '
+                  ? 'platinum-node border-ultra-200 text-white shadow-[0_0_20px_rgba(167,139,250,0.45)]'
                   : active
                   ? 'bg-lime-500/10 border-lime-500/50 text-lime-400'
                   : item.featured
-                  ? 'platinum-node border-purple-300/40 bg-purple-300/10 text-purple-400 hover:bg-purple-300/20'
+                  ? 'platinum-node border-ultra-400 text-white shadow-[0_0_14px_rgba(167,139,250,0.28)] hover:border-ultra-300 hover:shadow-[0_0_20px_rgba(167,139,250,0.45)]'
                   : 'border-transparent text-carbon-300 hover:bg-carbon-850'
               }`}
             >
