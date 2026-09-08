@@ -20,11 +20,13 @@ export default function NavRail() {
               key={item.to}
               to={item.to}
               aria-current={active ? 'page' : undefined}
-              className={`h-[52px] flex items-center gap-3 px-4 rounded-xl border-2 text-[15px] font-black uppercase tracking-[0.8px] transition ${
-                active
+              className={`h-[52px] flex items-center gap-3 px-4 rounded-xl border-2 text-[15px] font-black uppercase tracking-[0.8px] transition relative overflow-hidden ${
+                item.featured && active
+                  ? 'bg-purple-500/20 border-purple-500/50 text-purple-400'
+                  : active
                   ? 'bg-lime-500/10 border-lime-500/50 text-lime-400'
                   : item.featured
-                  ? 'border-purple-300/40 bg-purple-300/10 text-purple-400 hover:bg-purple-500/20'
+                  ? 'platinum-node border-purple-300/40 bg-purple-300/10 text-purple-400 hover:bg-purple-300/20'
                   : 'border-transparent text-carbon-300 hover:bg-carbon-850'
               }`}
             >
