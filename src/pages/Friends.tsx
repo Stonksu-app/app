@@ -10,6 +10,8 @@ import ConfirmModal from '../components/ConfirmModal';
 import PlanBadge from '../components/PlanBadge';
 import LeagueMark from '../components/LeagueMark';
 import { formatCountdown } from '../hooks/useHeartRegen';
+import { settledStreak, todayLocal } from '../utils/streak';
+import { MAX_PROTECTORS } from '../store/useUserStore';
 import {
   listFriends,
   pingCooldownRemaining,
@@ -62,6 +64,12 @@ function FriendRow({
 
   const navigate = useNavigate();
 
+  /* Their stored streak only moves on their own device, so one that broke
+   * while they were away keeps showing until they come back. Settled here
+   * with the same rule the profile uses, or the list and the profile would
+   * print different numbers for the same person. */
+  const streak = settledStreak(friend.streak, friend.lastActive, MAX_PROTECTORS, todayLocal());
+
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     await fn();
@@ -89,8 +97,8 @@ function FriendRow({
         </p>
         <p className="text-sm text-carbon-400 flex items-center gap-2.5 tabular-nums">
           <span className="inline-flex items-center gap-1">
-            <Icon name="flame" size={14} className={friend.streak > 0 ? 'text-lime-500' : 'text-carbon-600'} />
-            {friend.streak}
+            <Icon name="flame" size={14} className={streak > 0 ? 'text-lime-500' : 'text-carbon-600'} />
+            {streak}
           </span>
           <span className="inline-flex items-center gap-1">
             <Icon name="star" size={14} className="text-lime-500" />

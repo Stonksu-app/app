@@ -155,6 +155,37 @@ export function shiftDay(day: string, delta: number): string {
 }
 
 /**
+ * Somebody else's streak, settled for display.
+ *
+ * The stored number only ever moves on its owner's device: nothing recomputes
+ * a streak from time passing, so a friend who stopped playing nine days ago
+ * still shows the streak they had the last time they opened the app. Two
+ * friends who both stopped then look contradictory — the one who came back
+ * shows 0, the one who never did still shows their old number.
+ *
+ * It can't be recounted from their calendar: that only reaches back 60 days,
+ * so a longer streak would come out clipped. And their protector count is
+ * theirs, not something the server tells anyone else. What can be settled is
+ * the part that needs no private data: past MAX_PROTECTORS missed days no
+ * amount of protectors could have bridged the gap, so the streak is provably
+ * gone whatever they were holding.
+ *
+ * Below that threshold the number stands, exactly as it does for your own
+ * streak while today is still unearned.
+ *
+ * @param maxProtectors the most anyone can hold — the generous assumption, so
+ *                      this never zeroes a streak that might still be alive
+ */
+export function settledStreak(
+  streak: number,
+  lastActiveDate: string | null,
+  maxProtectors: number,
+  today: string
+): number {
+  return isStreakUnrecoverable(lastActiveDate, maxProtectors, today) ? 0 : streak;
+}
+
+/**
  * Whether today's activity is already in the bag.
  *
  * The flame used to go grey only at zero, so a streak of nine looked
