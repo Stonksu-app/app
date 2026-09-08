@@ -12,8 +12,8 @@ import { MonthGrid } from '../components/StreakCalendar';
 import { Button } from '../components/Button';
 import ConfirmModal from '../components/ConfirmModal';
 import { fetchFriendProfile, pingFriend, removeFriend, type FriendProfile } from '../lib/friends';
-import { useUserStore } from '../store/useUserStore';
-import { inferredFrozenDays, practisedToday } from '../utils/streak';
+import { MAX_PROTECTORS, useUserStore } from '../store/useUserStore';
+import { inferredFrozenDays, practisedToday, settledStreak, todayLocal } from '../utils/streak';
 import type { IconName } from '../types';
 
 /*
@@ -141,9 +141,19 @@ export default function FriendProfile() {
     ...(profile?.activeDays ?? []),
     ...(profile?.lastActive ? [profile.lastActive] : []),
   ]);
+  /* The number they left behind, settled against the days that have passed
+   * since. Without this a friend who stopped playing keeps their old streak
+   * on screen until they open the app again — while one who did come back
+   * and lost it shows 0, so the two contradict each other. */
+  const theirStreak = settledStreak(
+    profile?.streak ?? 0,
+    profile?.lastActive ?? null,
+    MAX_PROTECTORS,
+    todayLocal()
+  );
   const theirFrozenDays = new Set([
     ...(profile?.frozenDays ?? []),
-    ...inferredFrozenDays(profile?.streak ?? 0, profile?.lastActive ?? null, theirActiveDays),
+    ...inferredFrozenDays(theirStreak, profile?.lastActive ?? null, theirActiveDays),
   ]);
   const [busy, setBusy] = useState(false);
 
@@ -248,7 +258,7 @@ export default function FriendProfile() {
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <Stat
                   icon="flame"
-                  value={String(profile.streak)}
+                  value={String(theirStreak)}
                   label="Días de racha"
                   onClick={() => setShowCalendar((v) => !v)}
                   open={showCalendar}
@@ -284,7 +294,7 @@ export default function FriendProfile() {
                     <p className="mt-2 text-center text-[13px] text-carbon-500">
                       {practisedToday(profile.lastActive)
                         ? 'Hoy ya ha practicado.'
-                        : `Hoy todavía no. Su racha sube a ${profile.streak + 1} cuando practique.`}
+                        : `Hoy todavía no. Su racha sube a ${theirStreak + 1} cuando practique.`}
                     </p>
                   )}
                 </div>
@@ -298,7 +308,7 @@ export default function FriendProfile() {
                 <Compare
                   label="Racha"
                   mine={myStreak}
-                  theirs={profile.streak}
+                  theirs={theirStreak}
                   theirName={profile.name}
                 />
               </div>

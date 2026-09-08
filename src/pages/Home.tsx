@@ -38,12 +38,18 @@ const CHEST_EVERY = 1;
 
 /** One banner style per unit, cycling if more units get added later — same
  *  idea as Duolingo's colour-coded section banners, so each stretch of the
- *  path reads as its own chapter instead of one long undifferentiated list. */
+ *  path reads as its own chapter instead of one long undifferentiated list.
+ *
+ *  None of them is violet on purpose. Violet is spoken for — it's what Ultra
+ *  and a platinumed unit wear — and a chapter colour in the same family reads
+ *  as "almost platinum", which is exactly what a colour you earn must not
+ *  look like. The fourth slot was fuchsia and landed next to the platinum
+ *  nodes on the path, close enough to look like a mistake. */
 const UNIT_STYLES = [
   { bg: 'bg-lime-500', text: 'text-carbon-900', sub: 'text-carbon-900/70', chip: 'bg-carbon-900/15 hover:bg-carbon-900/25 text-carbon-900' },
   { bg: 'bg-sky-500', text: 'text-carbon-900', sub: 'text-carbon-900/70', chip: 'bg-carbon-900/15 hover:bg-carbon-900/25 text-carbon-900' },
   { bg: 'bg-amber-500', text: 'text-carbon-900', sub: 'text-carbon-900/70', chip: 'bg-carbon-900/15 hover:bg-carbon-900/25 text-carbon-900' },
-  { bg: 'bg-fuchsia-500', text: 'text-carbon-50', sub: 'text-carbon-50/70', chip: 'bg-carbon-50/15 hover:bg-carbon-50/25 text-carbon-50' },
+  { bg: 'bg-rose-500', text: 'text-carbon-50', sub: 'text-carbon-50/70', chip: 'bg-carbon-50/15 hover:bg-carbon-50/25 text-carbon-50' },
 ];
 
 /** A unit you've platinumed drops its chapter colour for the same blue the

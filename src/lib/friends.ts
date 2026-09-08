@@ -24,6 +24,11 @@ export interface Friend {
   plan: Plan;
   /** Index into LEAGUE_RANKS — see src/data/leagues.ts. */
   leagueRank: number;
+  /** Their last practice day. Needed to tell a live streak from one that
+   *  broke while they were away — see settledStreak. Null on a database
+   *  that predates migration 0017, which reads as "can't tell", so the
+   *  stored number is shown untouched rather than wrongly zeroed. */
+  lastActive: string | null;
   relation: Relation;
   since: string;
 }
@@ -156,6 +161,7 @@ export async function listFriends(): Promise<Friend[]> {
     // which is the safe way to be wrong: it under-promises a badge.
     plan: (r.plan as Plan) ?? 'free',
     leagueRank: (r.league_rank as number) ?? 0,
+    lastActive: (r.last_active as string) ?? null,
     relation: r.relation as Relation,
     since: r.since as string,
   }));
