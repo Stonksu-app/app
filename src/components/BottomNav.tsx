@@ -20,11 +20,13 @@ export default function BottomNav() {
               key={item.to}
               to={item.to}
               aria-current={active ? 'page' : undefined}
-              className={`flex-1 max-w-[110px] flex flex-col items-center gap-0.5 py-2 rounded-xl border-2 transition ${
-                active
+              className={`flex-1 max-w-[110px] flex flex-col items-center gap-0.5 py-2 rounded-xl border-2 transition relative overflow-hidden ${
+                item.featured && active
+                ? 'bg-purple-500/20 border-purple-500/50 text-purple-400'
+                :active
                   ? 'bg-lime-500/10 border-lime-500/50 text-lime-400'
                   : item.featured
-                  ? 'border-lime-500/20 bg-lime-500/5 text-lime-400'
+                  ? 'platinum-node border-purple-300/40 bg-purple-300/10 text-purple-400 hover:bg-purple-300/20'
                   : 'border-transparent text-carbon-400'
               }`}
             >
