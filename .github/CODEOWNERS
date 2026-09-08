@@ -1,0 +1,13 @@
+# Quién puede aprobar un cambio.
+#
+# Con "Require review from Code Owners" activo en el ruleset de dev, una
+# aprobación solo desbloquea la mezcla si viene de alguien de esta lista.
+# Cualquier otro puede revisar y comentar, pero su visto bueno no cuenta.
+#
+# GitHub lee este fichero de la rama DESTINO de la PR, así que para que
+# aplique a las PR hacia dev tiene que estar en dev.
+#
+# Y nadie puede aprobar su propia PR: si la abre uno de los dos, el que
+# aprueba es forzosamente el otro.
+
+*  @stonksu-lab @xhris-spec
