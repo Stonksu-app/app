@@ -7,7 +7,8 @@ import Icon from './Icon';
 import { Button, ButtonLink } from './Button';
 import { listFriends, type Friend } from '../lib/friends';
 import { useAuthStore } from '../store/useAuthStore';
-import { useUserStore } from '../store/useUserStore';
+import { MAX_PROTECTORS, useUserStore } from '../store/useUserStore';
+import { settledStreak, todayLocal } from '../utils/streak';
 
 /*
  * The friends list as it appears on the profile.
@@ -33,6 +34,12 @@ const FLASH_MS = 3000;
    between hitting a link and hitting the gap beside it is the difference
    between the feature existing and not. */
 function FriendPreviewRow({ friend }: { friend: Friend }) {
+  /* Settled here too, with the same rule the friends page and their profile
+     use. Their stored streak only moves on their own device, so one that broke
+     while they were away keeps showing until they come back — and three
+     screens printing three different numbers for the same person is worse
+     than any of them being wrong alone. */
+  const streak = settledStreak(friend.streak, friend.lastActive, MAX_PROTECTORS, todayLocal());
   return (
     <Link
       to={`/amigos/${friend.id}`}
@@ -52,10 +59,10 @@ function FriendPreviewRow({ friend }: { friend: Friend }) {
 
       <LeagueMark rank={friend.leagueRank} size={30} />
 
-      {friend.streak > 0 && (
+      {streak > 0 && (
         <span className="shrink-0 inline-flex items-center gap-1 text-sm font-black text-carbon-300 tabular-nums">
           <Icon name="flame" size={16} className="text-lime-500" />
-          {friend.streak}
+          {streak}
         </span>
       )}
 
