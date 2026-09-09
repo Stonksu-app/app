@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { inferredFrozenDays, localDayKey, practisedToday } from '../utils/streak';
+import { coveredDays, inferredFrozenDays, localDayKey, practisedToday, todayLocal } from '../utils/streak';
 import { MAX_HEARTS, useUserStore, xpToLevel } from '../store/useUserStore';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import Icon from './Icon';
@@ -41,9 +41,27 @@ function useFrozenDays(activeDays: Set<string>) {
   const frozenDates = useUserStore((s) => s.frozenDates);
   const streak = useUserStore((s) => s.streak);
   const lastActiveDate = useUserStore((s) => s.lastActiveDate);
-  // Recorded plus implied — see inferredFrozenDays. The union means the
-  // calendar agrees with the streak beside it however the streak got there.
-  return new Set([...frozenDates, ...inferredFrozenDays(streak, lastActiveDate, activeDays)]);
+  const streakProtectors = useUserStore((s) => s.streakProtectors);
+  /*
+   * Three sources, and the third is the one you can watch happening.
+   *
+   * `frozenDates` is only written the moment a protector is actually spent —
+   * when you next practise, or when the streak provably dies. So a gap that is
+   * open right now had nothing to draw: you practised on Monday, missed
+   * Tuesday, and Tuesday sat blank under a panel promising that your protector
+   * covers exactly one missed day.
+   *
+   * It isn't a guess. Both futures spend it on the same day: practise today
+   * and completeLesson covers it, let it lapse and settleStreak covers it on
+   * the way out. Leaving it blank was the calendar being coy about something
+   * already decided — and it's the half of the picture that tells you the
+   * cover is being used up, which is exactly when you'd want to know.
+   */
+  return new Set([
+    ...frozenDates,
+    ...inferredFrozenDays(streak, lastActiveDate, activeDays),
+    ...coveredDays(lastActiveDate, todayLocal(), streakProtectors),
+  ]);
 }
 
 export default function StatPanel({ stat, compact = false }: { stat: StatKey; compact?: boolean }) {

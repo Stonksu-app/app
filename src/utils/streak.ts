@@ -155,6 +155,30 @@ export function shiftDay(day: string, delta: number): string {
 }
 
 /**
+ * The days a protector covers across a gap, in order.
+ *
+ * Not the whole gap: when the protectors run out mid-gap they pay for the
+ * first days and the streak breaks on the first one they couldn't reach. Only
+ * the paid-for days turn blue, so the calendar shows exactly where the cover
+ * ran out.
+ *
+ * Used twice, and that's the point. The store calls it when it actually spends
+ * the protectors, and the calendar calls it to draw the days a gap already
+ * open is going to cost. Both answers come from the same function, so what the
+ * calendar promises today is what gets written tomorrow — a second
+ * implementation would be free to drift, and the drift would show up as blue
+ * squares that move.
+ */
+export function coveredDays(
+  lastActiveDate: string | null,
+  today: string,
+  protectorsUsed: number
+): string[] {
+  if (!lastActiveDate || protectorsUsed <= 0) return [];
+  return datesBetween(lastActiveDate, today).slice(0, protectorsUsed);
+}
+
+/**
  * Somebody else's streak, settled for display.
  *
  * The stored number only ever moves on its owner's device: nothing recomputes

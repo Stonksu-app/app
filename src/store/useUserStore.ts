@@ -8,7 +8,7 @@ import { stagesForDifficulty } from '../utils/mastery';
 import { leaguePromotionReward } from '../data/leagues';
 import {
   computeStreakUpdate,
-  datesBetween,
+  coveredDays,
   daysBetween,
   isStreakUnrecoverable,
   localDayKey,
@@ -384,23 +384,6 @@ export const MAX_TRADE_HISTORY = 50;
  *  running low on coins never means running out of ways to keep a streak
  *  alive. Doesn't count repeats of an already-completed lesson. */
 export const LESSON_PROTECTOR_GIFT_EVERY = 3;
-
-/**
- * The days a protector actually covered, in order.
- *
- * Not the whole gap: when the protectors run out mid-gap they pay for the
- * first days and the streak breaks on the first one they couldn't reach. Only
- * the paid-for days turn blue, so the calendar shows exactly where the cover
- * ran out.
- */
-function coveredDays(
-  lastActiveDate: string | null,
-  today: string,
-  protectorsUsed: number
-): string[] {
-  if (!lastActiveDate || protectorsUsed <= 0) return [];
-  return datesBetween(lastActiveDate, today).slice(0, protectorsUsed);
-}
 
 /**
  * Notes a broken streak, and only a broken one.
