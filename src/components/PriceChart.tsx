@@ -408,6 +408,12 @@ export default function PriceChart({
         className="w-full"
         aria-label="Gráfico de precio"
         role="img"
+        /* A click on the candles puts the menu away. The listener below only
+           catches clicks outside the whole chart, which left the odd case of
+           a menu sitting open over the very thing you were trying to look at.
+           Safe on the press that opens it too: pointerdown runs first and
+           contextmenu re-opens it a moment later, at the new place. */
+        onPointerDown={() => setMenu(null)}
         onContextMenu={(e) => {
           e.preventDefault();
           openMenu(e.clientX, e.clientY, true);
