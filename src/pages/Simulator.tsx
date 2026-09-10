@@ -137,7 +137,12 @@ export default function Simulator() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const real = await fetchCandles(120, undefined, timeframe);
+      /* A thousand is what Binance gives in one request, and it's the
+         difference between a chart you can read and one you can plan on: on
+         30m it's three weeks of context instead of two days. The view still
+         opens on the last hundred and something — the rest is there for when
+         you turn AUTO off and pan back. */
+      const real = await fetchCandles(1000, undefined, timeframe);
       if (cancelled) return;
       if (real) {
         setCandles(real);
@@ -684,6 +689,20 @@ export default function Simulator() {
     return `${change >= 0 ? '+' : '−'}${Math.abs(Math.round(change))} monedas`;
   };
 
+  /**
+   * How far the price has to move before the round is worth one coin.
+   *
+   * The balance is whole coins, and settleCoins truncates towards zero, so
+   * anything under one — win or loss — settles at nothing. Combined with a
+   * round-trip fee that's charged on the notional, a scalp on a one-minute
+   * candle with a small margin is mathematically incapable of paying: the
+   * move has to cover the fee *and* clear a whole coin before the balance
+   * notices. Saying it as a percentage of the price makes it something you
+   * can compare against the candles you're looking at.
+   */
+  const minMove =
+    notional(preview) > 0 ? (1 + roundTripFee(preview, base.entry)) / notional(preview) : 0;
+
   const shownPosition = position ?? preview;
   const liqPrice = liquidationPrice(shownPosition);
   const liqDistance = liquidationDistance(shownPosition) * 100;
@@ -807,6 +826,16 @@ export default function Simulator() {
                 auto={auto}
                 onAutoChange={setAuto}
                 actionsAt={chartActions}
+                targets={
+                  position
+                    ? {
+                        takeProfit: position.takeProfit ?? null,
+                        stopLoss: position.stopLoss ?? null,
+                        validAt: (kind, at) => triggerIsValid(position, kind, at),
+                        onDrop: (kind, at) => void setTarget(kind, at),
+                      }
+                    : undefined
+                }
                 height={360}
               />
             )}
@@ -899,6 +928,18 @@ export default function Simulator() {
                   ? 'Tu take profit cerró la posición sola al llegar al objetivo.'
                   : 'Monedas a tu saldo, comisiones ya descontadas.'}
               </p>
+              {/* The moment the rule bites, explained where it bit. Closing
+                  "in profit" for zero looks like the app eating your money
+                  until somebody tells you the balance has no decimals. */}
+              {settled.coins === 0 && (
+                <p className="mt-2 text-[13px] text-carbon-500">
+                  Cero no es un error: el saldo va en monedas enteras y lo que no llega a una se
+                  queda en nada, ganes o pierdas. Con este tamaño el precio tenía que moverse un{' '}
+                  {(minMove * 100).toFixed(2)}% solo para pagar la comisión y valer una moneda, así
+                  que en velas de un minuto casi siempre saldrá cero. Sube el margen o busca
+                  movimientos más grandes.
+                </p>
+              )}
               <div className="mt-5 space-y-3">
                 <Button onClick={() => window.location.reload()}>
                   {unlimited ? 'Otra operación' : 'Volver a intentarlo'}
@@ -1223,6 +1264,14 @@ export default function Simulator() {
                 <Row
                   label="Margen de mantenimiento"
                   value={`${(MAINTENANCE_MARGIN * 100).toFixed(1)}%`}
+                />
+                {/* The one number that explains "I closed in profit and got
+                    nothing": the balance is whole coins, so a move that pays
+                    less than one pays zero. */}
+                <Row
+                  label="Movimiento mínimo para ganar 1 moneda"
+                  value={`${(minMove * 100).toFixed(2)}%`}
+                  tone={minMove > 0.005 ? 'text-[#FFC93C]' : 'text-carbon-200'}
                 />
               </div>
 
