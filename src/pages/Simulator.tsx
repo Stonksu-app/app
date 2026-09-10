@@ -137,7 +137,12 @@ export default function Simulator() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const real = await fetchCandles(120, undefined, timeframe);
+      /* A thousand is what Binance gives in one request, and it's the
+         difference between a chart you can read and one you can plan on: on
+         30m it's three weeks of context instead of two days. The view still
+         opens on the last hundred and something — the rest is there for when
+         you turn AUTO off and pan back. */
+      const real = await fetchCandles(1000, undefined, timeframe);
       if (cancelled) return;
       if (real) {
         setCandles(real);
@@ -821,6 +826,16 @@ export default function Simulator() {
                 auto={auto}
                 onAutoChange={setAuto}
                 actionsAt={chartActions}
+                targets={
+                  position
+                    ? {
+                        takeProfit: position.takeProfit ?? null,
+                        stopLoss: position.stopLoss ?? null,
+                        validAt: (kind, at) => triggerIsValid(position, kind, at),
+                        onDrop: (kind, at) => void setTarget(kind, at),
+                      }
+                    : undefined
+                }
                 height={360}
               />
             )}

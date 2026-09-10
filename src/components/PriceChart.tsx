@@ -74,6 +74,17 @@ export interface ChartAction {
 const MENU_W = 236;
 const MENU_H = 430;
 
+/**
+ * How many candles the chart shows when it's driving.
+ *
+ * The series holds far more than this — history you can pan back through once
+ * AUTO is off. Fitting all of it would be the wrong reading of "auto": a
+ * thousand candles squeezed into the width of a phone is a texture, not a
+ * price, and the recent ones are what a running position is about. So the
+ * chart parks itself at the right-hand end and leaves the rest behind it.
+ */
+const VISIBLE_BARS = 120;
+
 export default function PriceChart({
   candles,
   entry,
@@ -85,6 +96,7 @@ export default function PriceChart({
   auto = true,
   onAutoChange,
   actionsAt,
+  targets,
 }: {
   candles: TimedCandle[];
   entry: number | null;
@@ -127,6 +139,21 @@ export default function PriceChart({
    * rest a second ago is a market order once the price crosses it.
    */
   actionsAt?: (price: number) => ChartAction[];
+  /**
+   * The targets you can grab and move, the way a venue lets you.
+   *
+   * Typing a price is fine when you already know it; a level is something you
+   * pick by looking at the chart, and dragging is how you say "there" without
+   * translating it into a number first. `validAt` is asked while you drag so
+   * the handle can refuse before you let go, rather than swallowing the drop
+   * and leaving you wondering.
+   */
+  targets?: {
+    takeProfit: number | null;
+    stopLoss: number | null;
+    validAt: (kind: 'takeProfit' | 'stopLoss', price: number) => boolean;
+    onDrop: (kind: 'takeProfit' | 'stopLoss', price: number) => void;
+  };
 }) {
   const box = useRef<HTMLDivElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
@@ -135,6 +162,17 @@ export default function PriceChart({
 
   const [scale, setScale] = useState<ScaleState>(INITIAL_SCALE);
   const [menu, setMenu] = useState<{ x: number; y: number; price: number | null } | null>(null);
+  /** The target currently under the finger, and where it is right now. */
+  const [dragging, setDragging] = useState<{ kind: 'takeProfit' | 'stopLoss'; price: number } | null>(null);
+  /*
+   * Bumped whenever the chart moves, so the handles are re-placed against it.
+   *
+   * They live in the DOM, not on the canvas, so nothing repositions them on
+   * their own: pan, zoom or a rescale would leave them floating at a price
+   * that's no longer under them. New candles arrive as a prop and re-render
+   * by themselves; panning and zooming need to be listened for.
+   */
+  const [, setMoved] = useState(0);
   // Mirrored in a ref because the chart is created once, in an effect that
   // deliberately doesn't re-run: without this it would come back with the
   // library's defaults and silently undo whatever the menu had set.
@@ -282,6 +320,25 @@ export default function PriceChart({
    * all: the library refuses to move the price while the axis is on auto, and
    * treats a vertical touch drag as page scrolling unless told otherwise.
    */
+  // Pan and zoom, so the handles follow the price they're pinned to.
+  useEffect(() => {
+    const c = chart.current;
+    if (!c || !targets) return;
+    const bump = () => setMoved((n) => n + 1);
+    c.timeScale().subscribeVisibleLogicalRangeChange(bump);
+    return () => c.timeScale().unsubscribeVisibleLogicalRangeChange(bump);
+  }, [targets]);
+
+  /** Park the view on the newest candles without throwing the older ones away. */
+  const showRecent = useCallback(() => {
+    const c = chart.current;
+    if (!c || candles.length === 0) return;
+    c.timeScale().setVisibleLogicalRange({
+      from: Math.max(0, candles.length - VISIBLE_BARS),
+      to: candles.length,
+    });
+  }, [candles.length]);
+
   useEffect(() => {
     const c = chart.current;
     if (!c) return;
@@ -292,8 +349,8 @@ export default function PriceChart({
         : { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: true },
       handleScale: auto ? false : { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
     });
-    if (auto) c.timeScale().fitContent();
-  }, [auto]);
+    if (auto) showRecent();
+  }, [auto, showRecent]);
 
   useEffect(() => {
     if (!series.current || candles.length === 0) return;
@@ -310,8 +367,8 @@ export default function PriceChart({
         })
       )
     );
-    if (auto) chart.current?.timeScale().fitContent();
-  }, [candles, auto]);
+    if (auto) showRecent();
+  }, [candles, auto, showRecent]);
 
   // Entry and liquidation as price lines rather than drawings: the chart keeps
   // them pinned to the scale as it moves, and puts the number on the axis —
@@ -373,6 +430,62 @@ export default function PriceChart({
       >
         <Icon name="ruler" size={14} />
       </button>
+
+      {/* The grab handles. Only for targets that exist: putting one where
+          there is no target would be offering to drag nothing. */}
+      {targets &&
+        (['takeProfit', 'stopLoss'] as const).map((kind) => {
+          const live = dragging?.kind === kind ? dragging.price : targets[kind];
+          if (live == null) return null;
+          const y = series.current?.priceToCoordinate(live);
+          if (y == null) return null;
+          const held = dragging?.kind === kind;
+          const ok = !held || targets.validAt(kind, live);
+          return (
+            <button
+              key={kind}
+              type="button"
+              aria-label={`Mover ${kind === 'takeProfit' ? 'take profit' : 'stop loss'}`}
+              onPointerDown={(e) => {
+                // Kept off the canvas underneath: with AUTO off a drag there
+                // pans the chart, and the target would slide away from the
+                // finger that was supposed to be carrying it.
+                e.preventDefault();
+                e.stopPropagation();
+                e.currentTarget.setPointerCapture(e.pointerId);
+                setDragging({ kind, price: live });
+              }}
+              onPointerMove={(e) => {
+                if (dragging?.kind !== kind) return;
+                const rect = box.current?.getBoundingClientRect();
+                if (!rect || !series.current) return;
+                const at = series.current.coordinateToPrice(e.clientY - rect.top);
+                if (typeof at === 'number' && Number.isFinite(at) && at > 0) setDragging({ kind, price: at });
+              }}
+              onPointerUp={() => {
+                if (dragging?.kind !== kind) return;
+                const dropped = dragging.price;
+                setDragging(null);
+                // Refused rather than clamped: a stop dropped past the
+                // liquidation isn't a stop the venue could honour, and moving
+                // it somewhere you didn't point at is worse than not moving it.
+                if (targets.validAt(kind, dropped)) targets.onDrop(kind, dropped);
+              }}
+              style={{ top: y - 11, left: 8 }}
+              className={`absolute z-20 touch-none cursor-ns-resize select-none rounded-md border-2 px-1.5 py-0.5 text-[11px] font-black tabular-nums transition-colors ${
+                !ok
+                  ? 'border-danger-500 bg-danger-500/25 text-danger-400'
+                  : kind === 'takeProfit'
+                  ? 'border-lime-500/60 bg-carbon-900/90 text-lime-400'
+                  : 'border-[#FFC93C]/60 bg-carbon-900/90 text-[#FFC93C]'
+              }`}
+            >
+              {kind === 'takeProfit' ? 'TP' : 'SL'}
+              {held && ` ${live.toFixed(2)}`}
+              {held && !ok && ' ✕'}
+            </button>
+          );
+        })}
 
       {menu && (
         <div
