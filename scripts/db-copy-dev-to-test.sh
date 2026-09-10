@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Clona la base de datos de dev entera sobre la de test (rigby-branch).
+# Clona la base de datos de dev entera sobre la de test.
 #
 # Entera de verdad: el esquema de `public` con sus funciones, políticas RLS y
 # triggers, todos sus datos, y todo el contenido de `auth` — usuarios,

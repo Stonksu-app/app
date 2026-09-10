@@ -274,7 +274,7 @@ export default function Profile() {
             {isTestingBackend && isCloudEnabled && (
               <span className="text-[#FFC93C]">
                 {' '}
-                · base de datos de {appEnv === 'test' ? 'test (rigby)' : 'pruebas'}
+                · base de datos de {appEnv === 'test' ? 'test' : 'pruebas'}
               </span>
             )}
             {/* The first characters of the account id. "Why am I not my old
