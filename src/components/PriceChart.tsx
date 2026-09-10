@@ -52,6 +52,22 @@ const MODES: { mode: PriceScaleMode; label: string; hint: string }[] = [
   { mode: PriceScaleMode.Logarithmic, label: 'Logarítmica', hint: 'Misma distancia por cada % igual' },
 ];
 
+/**
+ * One order the chart can offer at the price you right-clicked.
+ *
+ * Built by whoever owns the trading rules and handed down as data, so this
+ * component stays what it is — geometry and a menu. It knows how to turn a
+ * click into a price; it has no business knowing what a margin call is.
+ */
+export interface ChartAction {
+  label: string;
+  hint?: string;
+  onSelect: () => void;
+  disabled?: boolean;
+  /** Long or short, so the item can wear the colour of the side it opens. */
+  tone?: 'long' | 'short';
+}
+
 /** Roughly the menu's own size, used only to keep it inside the chart when it
  *  opens near an edge. Being a few pixels off is invisible; opening half
  *  outside the box is not. */
@@ -64,9 +80,11 @@ export default function PriceChart({
   liquidation,
   takeProfit = null,
   stopLoss = null,
+  labels,
   height = 220,
   auto = true,
   onAutoChange,
+  actionsAt,
 }: {
   candles: TimedCandle[];
   entry: number | null;
@@ -76,6 +94,15 @@ export default function PriceChart({
    *  glance for the liquidation line right under it. */
   takeProfit?: number | null;
   stopLoss?: number | null;
+  /**
+   * What each level is worth, written on the line itself.
+   *
+   * A target at 78.433,88 says nothing you can act on; "+280 monedas" is the
+   * question you were actually asking. The amounts are computed by whoever
+   * owns the position — fees, leverage and margin mode all land in them — and
+   * arrive here already said in words.
+   */
+  labels?: { entry?: string; liquidation?: string; takeProfit?: string; stopLoss?: string };
   height?: number;
   /**
    * Who drives the view: the chart or you.
@@ -92,6 +119,14 @@ export default function PriceChart({
   auto?: boolean;
   /** Flip AUTO from the chart's own menu. */
   onAutoChange?: (auto: boolean) => void;
+  /**
+   * What can be ordered at the price under the pointer.
+   *
+   * Asked at the moment of the right-click rather than kept in state, because
+   * the answer depends on where the market is right now — a limit that could
+   * rest a second ago is a market order once the price crosses it.
+   */
+  actionsAt?: (price: number) => ChartAction[];
 }) {
   const box = useRef<HTMLDivElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
@@ -99,7 +134,7 @@ export default function PriceChart({
   const series = useRef<ISeriesApi<'Candlestick'> | null>(null);
 
   const [scale, setScale] = useState<ScaleState>(INITIAL_SCALE);
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; price: number | null } | null>(null);
   // Mirrored in a ref because the chart is created once, in an effect that
   // deliberately doesn't re-run: without this it would come back with the
   // library's defaults and silently undo whatever the menu had set.
@@ -193,14 +228,24 @@ export default function PriceChart({
    * to the top. Flipping up when it doesn't fit below is what puts it on the
    * screen and, as it happens, what a venue does with the gear in the corner.
    */
-  const openMenu = useCallback((clientX: number, clientY: number) => {
+  const openMenu = useCallback((clientX: number, clientY: number, withPrice = false) => {
     const rect = wrap.current?.getBoundingClientRect();
     if (!rect) return;
     const x = clientX + MENU_W > window.innerWidth ? clientX - MENU_W : clientX;
     const y = clientY + MENU_H > window.innerHeight ? clientY - MENU_H : clientY;
+    /* The price under the pointer, read off the series rather than guessed
+       from the visible range: the axis can be logarithmic or inverted, and
+       only the chart knows which. Null when the menu comes from the gear,
+       which is a button in a corner and not a price. */
+    const boxRect = box.current?.getBoundingClientRect();
+    const raw =
+      withPrice && boxRect && series.current
+        ? series.current.coordinateToPrice(clientY - boxRect.top)
+        : null;
     setMenu({
       x: Math.max(8, x) - rect.left,
       y: Math.max(8, y) - rect.top,
+      price: typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : null,
     });
   }, []);
 
@@ -276,22 +321,22 @@ export default function PriceChart({
     if (!s) return;
     const lines = [
       entry !== null
-        ? s.createPriceLine({ price: entry, color: '#8f8f8f', lineWidth: 1, lineStyle: 2, title: 'Entrada' })
+        ? s.createPriceLine({ price: entry, color: '#8f8f8f', lineWidth: 1, lineStyle: 2, title: labels?.entry ?? 'Entrada' })
         : null,
       liquidation !== null
-        ? s.createPriceLine({ price: liquidation, color: DOWN, lineWidth: 1, lineStyle: 2, title: 'Liq.' })
+        ? s.createPriceLine({ price: liquidation, color: DOWN, lineWidth: 1, lineStyle: 2, title: labels?.liquidation ?? 'Liq.' })
         : null,
       takeProfit !== null
-        ? s.createPriceLine({ price: takeProfit, color: UP, lineWidth: 1, lineStyle: 3, title: 'TP' })
+        ? s.createPriceLine({ price: takeProfit, color: UP, lineWidth: 1, lineStyle: 3, title: labels?.takeProfit ?? 'TP' })
         : null,
       stopLoss !== null
-        ? s.createPriceLine({ price: stopLoss, color: WARN, lineWidth: 1, lineStyle: 3, title: 'SL' })
+        ? s.createPriceLine({ price: stopLoss, color: WARN, lineWidth: 1, lineStyle: 3, title: labels?.stopLoss ?? 'SL' })
         : null,
     ];
     return () => {
       lines.forEach((l) => l && s.removePriceLine(l));
     };
-  }, [entry, liquidation, takeProfit, stopLoss]);
+  }, [entry, liquidation, takeProfit, stopLoss, labels?.entry, labels?.liquidation, labels?.takeProfit, labels?.stopLoss]);
 
   const item =
     'w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] font-bold text-carbon-200 hover:bg-carbon-800 transition';
@@ -308,7 +353,7 @@ export default function PriceChart({
         role="img"
         onContextMenu={(e) => {
           e.preventDefault();
-          openMenu(e.clientX, e.clientY);
+          openMenu(e.clientX, e.clientY, true);
         }}
       />
 
@@ -335,6 +380,45 @@ export default function PriceChart({
           style={{ left: menu.x, top: menu.y, width: MENU_W }}
           className="absolute z-30 rounded-2xl border-2 border-carbon-700 bg-carbon-900 py-1.5 shadow-2xl overflow-hidden"
         >
+          {/* Orders first, and the price they'd use as the heading. It's the
+              reason you right-clicked *there* rather than anywhere else, and
+              a menu that buries it under four scale modes is a menu you stop
+              opening. Empty when the gear opened this, or when nothing can be
+              ordered at that level. */}
+          {menu.price !== null && actionsAt && actionsAt(menu.price).length > 0 && (
+            <>
+              <p className="px-3 pt-1 pb-1.5 text-[11px] font-black uppercase tracking-[0.6px] text-carbon-500 tabular-nums">
+                {menu.price.toFixed(2)} USDT
+              </p>
+              {actionsAt(menu.price).map((a) => (
+                <button
+                  key={a.label}
+                  type="button"
+                  role="menuitem"
+                  disabled={a.disabled}
+                  className={`${item} disabled:opacity-40 disabled:hover:bg-transparent ${
+                    a.disabled ? '' : a.tone === 'long' ? 'text-lime-400' : a.tone === 'short' ? 'text-danger-400' : ''
+                  }`}
+                  onClick={() => {
+                    setMenu(null);
+                    a.onSelect();
+                  }}
+                >
+                  <span className="w-4 shrink-0">
+                    {a.tone && <Icon name={a.tone === 'long' ? 'trending-up' : 'trending-down'} size={14} strokeWidth={3} />}
+                  </span>
+                  <span>
+                    {a.label}
+                    {a.hint && (
+                      <span className="block text-[11px] font-semibold text-carbon-500">{a.hint}</span>
+                    )}
+                  </span>
+                </button>
+              ))}
+              <div className="my-1 h-px bg-carbon-800" />
+            </>
+          )}
+
           <button
             type="button"
             role="menuitem"
