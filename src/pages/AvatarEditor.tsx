@@ -114,7 +114,7 @@ export default function AvatarEditor() {
         <h2 className="text-[20px] font-black text-carbon-300">Editar avatar</h2>
         <button
           onClick={save}
-          className="btn-3d h-12 px-5 rounded-xl bg-lime-500 hover:bg-lime-400 text-carbon-900 font-bold text-[16px] uppercase tracking-[0.64px]"
+          className="btn-3d h-9 px-4 rounded-lg bg-lime-500 hover:bg-lime-400 text-carbon-900 font-black text-[13px] uppercase tracking-[0.64px]"
           style={{ ['--btn-lip' as string]: 'var(--color-lime-700)' }}
         >
           Guardar

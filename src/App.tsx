@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigationType } from 'react-router-dom';
 import SplashScreen from './components/SplashScreen';
 import Landing from './pages/Landing';
 import Guide from './pages/Guide';
@@ -56,6 +56,29 @@ function RequireOnboarded({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Every new screen starts at the top, the way opening one does.
+ *
+ * A single-page app keeps the window's scroll across a route change, so
+ * tapping "ver todos" halfway down Perfil landed on Logros already scrolled
+ * past its own heading — the page looked like it had opened broken, or like
+ * the tap had done nothing but shuffle the content.
+ *
+ * Only on the way forward. Going back is the one case where the old position
+ * is the right one: you were reading something, you went to look at a detail,
+ * and you expect to come back to where you left off rather than to the top of
+ * a list you'd already scrolled through.
+ */
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  const navigation = useNavigationType();
+  useEffect(() => {
+    if (navigation === 'POP') return;
+    window.scrollTo({ top: 0 });
+  }, [pathname, navigation]);
+  return null;
+}
+
 function App() {
   // App mounts once per launch, so this runs on cold start only — not on
   // navigation between routes.
@@ -85,6 +108,7 @@ function App() {
 
   return (
     <>
+      <ScrollToTop />
       {booting && <SplashScreen onDone={() => setBooting(false)} />}
       {!booting && <RegisterGate />}
       {!booting && <PingBanner />}
