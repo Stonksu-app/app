@@ -11,7 +11,7 @@ import type { SimulatorState } from '../lib/simulatorSync';
 import { isCloudEnabled } from '../lib/supabase';
 import { todayLocal } from '../utils/streak';
 import { FREE_TRADES_PER_DAY, hasUnlimitedTrades } from '../data/plans';
-import PriceChart from '../components/PriceChart';
+import PriceChart, { type ChartAction } from '../components/PriceChart';
 import TradeHistory from '../components/TradeHistory';
 import {
   INTERVALS,
@@ -382,8 +382,168 @@ export default function Simulator() {
     if (accepted) setSettled({ coins: change, reason });
   };
 
-  const open = async (direction: Direction) => {
-    if (!sync.ready || !marketReady || openTrade || pendingOrder || margin <= 0 || margin > coins || !slReachable || !canRest(direction)) return;
+  /**
+   * Opens a position, or leaves an order waiting for one.
+   *
+   * `at` overrides what the panel is showing, which is what the chart's
+   * right-click menu needs: the order it offers is priced off the level you
+   * clicked, not off whatever is typed in the limit box. Left out, the panel
+   * decides, exactly as before.
+   */
+  /**
+   * Moves a target on a position that's already running, or takes it off.
+   *
+   * The panel only ever set these at the moment of opening, so a stop you
+   * wanted after the fact meant closing the trade and opening it again — which
+   * pays the fee twice and loses the entry you had. The RPC was always fine
+   * with it: the document changes, no coins move, and the revision guard makes
+   * two devices editing at once resolve like anything else.
+   *
+   * Guarded on the position that was on screen when you clicked. A target
+   * dropped onto a trade that closed a second ago would otherwise land on
+   * whatever opened next.
+   */
+  const setTarget = async (kind: 'takeProfit' | 'stopLoss', at: number | null) => {
+    if (!position || !sync.ready) return;
+    if (at !== null && !triggerIsValid(position, kind, at)) return;
+    await sync.commit((st) => {
+      if (!st.openTrade || st.openTrade.openedAt !== openedAt) return null;
+      return { state: { ...st, openTrade: { ...st.openTrade, [kind]: at } } };
+    });
+  };
+
+  /**
+   * What the chart offers where you right-click, the way a venue does it.
+   *
+   * Only one side can rest at a given level — a buy waits below the market and
+   * a sell above it — so the menu offers the one that can actually wait there
+   * instead of listing both and refusing one. The market pair is always there,
+   * because "get me in now" is the other half of what a right-click is for.
+   *
+   * Everything is gated on the same conditions as the panel's own buttons, and
+   * a blocked item says why rather than being silently absent: an option that
+   * disappears reads as a bug, one that explains itself reads as a rule.
+   */
+  const chartActions = (at: number): ChartAction[] => {
+    /* With a position running, the click is about the trade you're in, not
+       about opening another one — you can't have two anyway. So the menu turns
+       into what a venue offers on a live position: move the target, move the
+       stop, or take one off. */
+    if (position) {
+      const acciones: ChartAction[] = [];
+      const busy = !sync.ready ? 'Comprobando tus operaciones' : null;
+      const tpOk = triggerIsValid(position, 'takeProfit', at);
+      const slOk = triggerIsValid(position, 'stopLoss', at);
+
+      if (tpOk) {
+        acciones.push({
+          label: `${position.takeProfit != null ? 'Mover' : 'Poner'} take profit aquí`,
+          hint: busy ?? `Cierras en ${at.toFixed(2)} · ${coinsAt(position, at)}`,
+          tone: 'long',
+          disabled: busy !== null,
+          onSelect: () => void setTarget('takeProfit', at),
+        });
+      }
+      if (slOk) {
+        acciones.push({
+          label: `${position.stopLoss != null ? 'Mover' : 'Poner'} stop loss aquí`,
+          hint: busy ?? `Cierras en ${at.toFixed(2)} · ${coinsAt(position, at)}`,
+          tone: 'short',
+          disabled: busy !== null,
+          onSelect: () => void setTarget('stopLoss', at),
+        });
+      }
+      // Naming why nothing can go here beats an empty menu: below the
+      // liquidation there is no stop to speak of, because the venue closes you
+      // first — the one case the lesson is worth spelling out.
+      if (!tpOk && !slOk) {
+        acciones.push({
+          label: 'Aquí no cabe ningún objetivo',
+          hint:
+            (position.direction === 'long' ? at <= liqPrice : at >= liqPrice)
+              ? 'Pasado el precio de liquidación ya te habrían cerrado'
+              : 'Un objetivo tiene que quedar a un lado u otro de tu entrada',
+          disabled: true,
+          onSelect: () => {},
+        });
+      }
+      if (position.takeProfit != null) {
+        acciones.push({
+          label: 'Quitar take profit',
+          hint: busy ?? 'La posición se queda sin objetivo',
+          disabled: busy !== null,
+          onSelect: () => void setTarget('takeProfit', null),
+        });
+      }
+      if (position.stopLoss != null) {
+        acciones.push({
+          label: 'Quitar stop loss',
+          hint: busy ?? 'Solo te cerraría la liquidación',
+          disabled: busy !== null,
+          onSelect: () => void setTarget('stopLoss', null),
+        });
+      }
+      return acciones;
+    }
+
+    const money = `${margin} monedas · ${leverage}x`;
+    const why = !sync.ready
+      ? 'Comprobando tus operaciones'
+      : pendingOrder
+      ? 'Ya tienes una orden esperando'
+      : !marketReady
+      ? 'Esperando precios de mercado'
+      : !allowed
+      ? 'Sin operaciones libres hoy'
+      : margin <= 0
+      ? 'Pon un margen primero'
+      : margin > coins
+      ? 'No te llegan las monedas'
+      : !slReachable
+      ? 'El stop loss no es alcanzable'
+      : null;
+
+    // Below the market a buy can wait; above it, a sell. Exactly at it,
+    // neither — which is what the market pair below is for.
+    const side: Direction | null = at < price ? 'long' : at > price ? 'short' : null;
+    const acciones: ChartAction[] = [];
+    if (side) {
+      acciones.push({
+        label: `${side === 'long' ? 'Comprar' : 'Vender'} a límite en ${at.toFixed(2)}`,
+        hint: why ?? money,
+        tone: side,
+        disabled: why !== null,
+        onSelect: () => void open(side, { type: 'limit', price: at }),
+      });
+    }
+    acciones.push(
+      {
+        label: 'Comprar a mercado',
+        hint: why ?? `${money} · entra en ${price.toFixed(2)}`,
+        tone: 'long',
+        disabled: why !== null,
+        onSelect: () => void open('long', { type: 'market' }),
+      },
+      {
+        label: 'Vender a mercado',
+        hint: why ?? `${money} · entra en ${price.toFixed(2)}`,
+        tone: 'short',
+        disabled: why !== null,
+        onSelect: () => void open('short', { type: 'market' }),
+      },
+    );
+    return acciones;
+  };
+
+  const open = async (
+    direction: Direction,
+    at: { type: 'market' } | { type: 'limit'; price: number } | null = null,
+  ) => {
+    const kind = at?.type ?? orderType;
+    const restingAt = at?.type === 'limit' ? at.price : limitPrice;
+    const rests = kind === 'limit' && restingAt !== null && limitCanRest(direction, restingAt, price);
+    if (!sync.ready || !marketReady || openTrade || pendingOrder || margin <= 0 || margin > coins || !slReachable) return;
+    if (kind === 'limit' && !rests) return;
     const now = Date.now();
     const today = todayLocal();
     const submit = (trade: SimulatorState['openTrade'], order: SimulatorState['pendingOrder']) => sync.commit(s => {
@@ -392,14 +552,14 @@ export default function Simulator() {
       return { state: { ...s, openTrade: trade, pendingOrder: order, tradeDay: today, tradesToday: used + 1 } };
     });
 
-    if (orderType === 'limit' && limitPrice !== null) {
+    if (kind === 'limit' && restingAt !== null) {
       // Nothing is bought yet and nothing is at risk: the order waits, and the
       // targets wait with it as percentages, to be priced off the fill.
       await submit(null, {
         direction,
         leverage,
         margin,
-        limitPrice,
+        limitPrice: restingAt,
         placedAt: now,
         mode,
         wallet: coins,
@@ -510,6 +670,20 @@ export default function Simulator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fills, sync.ready]);
 
+  /**
+   * What each line on the chart is worth, in the only unit that matters here.
+   *
+   * `settleCoins` is what the position would actually pay at that price —
+   * leverage, margin mode and the round-trip fee already inside it — so the
+   * target says what lands in your balance and not what the move is worth
+   * before the venue takes its cut. Signed on purpose: a stop is a number you
+   * should see as negative before you agree to it.
+   */
+  const coinsAt = (p: Position, at: number) => {
+    const change = settleCoins(p, at);
+    return `${change >= 0 ? '+' : '−'}${Math.abs(Math.round(change))} monedas`;
+  };
+
   const shownPosition = position ?? preview;
   const liqPrice = liquidationPrice(shownPosition);
   const liqDistance = liquidationDistance(shownPosition) * 100;
@@ -618,8 +792,21 @@ export default function Simulator() {
                 liquidation={position ? liqPrice : null}
                 takeProfit={shownPosition.takeProfit ?? null}
                 stopLoss={shownPosition.stopLoss ?? null}
+                labels={
+                  position
+                    ? {
+                        entry: `Entrada · ${coinsAt(position, price)}`,
+                        liquidation: `Liq. · ${coinsAt(position, liqPrice)}`,
+                        takeProfit:
+                          position.takeProfit != null ? `TP · ${coinsAt(position, position.takeProfit)}` : undefined,
+                        stopLoss:
+                          position.stopLoss != null ? `SL · ${coinsAt(position, position.stopLoss)}` : undefined,
+                      }
+                    : undefined
+                }
                 auto={auto}
                 onAutoChange={setAuto}
+                actionsAt={chartActions}
                 height={360}
               />
             )}
