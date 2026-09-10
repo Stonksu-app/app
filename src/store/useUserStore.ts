@@ -702,10 +702,20 @@ export const useUserStore = create<UserState>()(
       settleStreak: () => {
         const s = get();
         const today = todayStr();
-        // A streak already at 0 or 1 has nothing left to settle, and one that
-        // just got raised by repairStreak (which runs first) is live by
-        // definition — recomputing here would only repeat that work.
-        if (s.streak <= 1) return;
+        /*
+         * Sólo un cero se queda quieto.
+         *
+         * Antes se salía también con una racha de 1, y eso la volvía
+         * inmortal: repairStreak nunca baja —solo sube, si el historial
+         * prueba más— así que si esto tampoco la tocaba, un 1 muerto se
+         * quedaba en pantalla para siempre. El panel seguía prometiendo que
+         * una lección "la mantiene" cuando lo que iba a hacer era empezarla
+         * otra vez desde 1.
+         *
+         * No genera ruido: recordLoss pide una racha mayor que 1 para
+         * anotarla, así que perder un solo día no se anuncia como pérdida.
+         */
+        if (s.streak <= 0) return;
         if (!isStreakUnrecoverable(s.lastActiveDate, s.streakProtectors, today)) return;
 
         const missed = daysBetween(s.lastActiveDate as string, today) - 1;
