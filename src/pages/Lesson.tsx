@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, optionLip } from '../components/Button';
 import CandleChart from '../components/CandleChart';
-import ComboCelebration from '../components/ComboCelebration';
 import DirectionBadge from '../components/DirectionBadge';
 import Icon from '../components/Icon';
 import LessonHeader from '../components/LessonHeader';
@@ -15,10 +14,12 @@ import SentenceRoundCard from '../components/SentenceRoundCard';
 import SequenceGame from '../components/SequenceGame';
 import SortClassifyGame from '../components/SortClassifyGame';
 import StreakPill from '../components/StreakPill';
-import { getLessonById, getNodeById } from '../data/lessons';
+import { getLessonById, getNodeById, getReviewPool } from '../data/lessons';
+import { canPlayUltraLessons } from '../data/plans';
 import { useComboFeedback } from '../hooks/useComboFeedback';
 import { useUserStore } from '../store/useUserStore';
 import { buildStage, mistakeKey } from '../utils/buildActivityStream';
+import { shuffle } from '../utils/shuffle';
 import type { Activity, IconName } from '../types';
 
 const XP_PER_CORRECT = 10;
@@ -44,11 +45,14 @@ export default function Lesson() {
     getNodeMaxStage,
     recordMistake,
     clearMistake,
+    completedLessonIds,
+    // Aliased: `plan` in this file already means the stage's activity plan.
+    plan: subscription,
   } = useUserStore();
   const {
     hearts,
     combo,
-    celebration,
+    tier,
     heartsLost,
     outOfHearts,
     registerResult,
@@ -66,6 +70,11 @@ export default function Lesson() {
   // Frozen at entry: misses made during this run belong to the NEXT lesson, and
   // a live subscription would rebuild the plan mid-run.
   const [mistakesAtEntry] = useState(() => useUserStore.getState().pendingMistakes);
+  // Same idea for the review pool: fixed at entry so the one dropped-in
+  // question doesn't shuffle out from under the player mid-run.
+  const [reviewPoolAtEntry] = useState(() =>
+    data ? getReviewPool(completedLessonIds, data.node.id) : []
+  );
   const plan = useMemo(
     () =>
       data
@@ -74,11 +83,13 @@ export default function Lesson() {
             data.lesson.questions,
             stageAtEntry,
             getNodeMaxStage(data.node.id),
-            mistakesAtEntry
+            mistakesAtEntry,
+            reviewPoolAtEntry
           )
         : null,
-    // getNodeMaxStage is a stable store getter; stageAtEntry is frozen for the run.
-    [data, stageAtEntry, getNodeMaxStage, mistakesAtEntry]
+    // getNodeMaxStage is a stable store getter; stageAtEntry/mistakesAtEntry/
+    // reviewPoolAtEntry are all frozen for the run.
+    [data, stageAtEntry, getNodeMaxStage, mistakesAtEntry, reviewPoolAtEntry]
   );
   const activities = plan?.activities ?? [];
 
@@ -89,6 +100,28 @@ export default function Lesson() {
   const [showOutOfHearts, setShowOutOfHearts] = useState(false);
   const [enteredWithNoHearts] = useState(() => hearts <= 0);
 
+  // A fixed answer position is a position to memorise instead of a question
+  // to answer. Shuffled once per question, not on every render, so picking
+  // an option doesn't reorder it out from under the tap.
+  const currentActivity = activities[index];
+  const shuffledOptions = useMemo(
+    () => (currentActivity?.type === 'quiz' ? shuffle(currentActivity.question.options) : []),
+    [currentActivity]
+  );
+
+  // Above the early returns below, and it has to stay there: those returns
+  // skip everything after them, so a hook placed lower is called on some
+  // renders and not others. React counts hooks by order, so the first render
+  // where the condition flips crashes the lesson outright.
+  useEffect(() => {
+    if (!outOfHearts) return;
+    // Just long enough for the red flash on the wrong answer to register —
+    // any longer and there's a window to tap "continuar" or another option
+    // before the lock screen takes over.
+    const t = setTimeout(() => setShowOutOfHearts(true), 700);
+    return () => clearTimeout(t);
+  }, [outOfHearts]);
+
   if (!data || activities.length === 0) {
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-carbon-900 p-6 text-center">
@@ -96,6 +129,30 @@ export default function Lesson() {
         <button onClick={() => navigate('/home')} className="text-lime-400 font-bold">
           Volver al mapa
         </button>
+      </div>
+    );
+  }
+
+  // Checked on the route, not only in the dialog that leads here: a topic
+  // that's exclusive has to be exclusive to someone typing the URL too.
+  if (data.node.ultra && !canPlayUltraLessons(subscription)) {
+    return (
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-carbon-900 p-6 text-center">
+        <div className="w-20 h-20 rounded-3xl relative platinum-node flex items-center justify-center">
+          <Icon name="diamond" size={38} className="relative z-10 text-white" />
+        </div>
+        <p className="font-black text-xl text-carbon-50">Este tema es de Ultra</p>
+        <p className="text-sm text-carbon-400 max-w-xs">
+          Desbloquéalo con Stonksu Ultra, junto a las vidas infinitas y el repaso sin límite.
+        </p>
+        <div className="w-[240px] space-y-3 mt-2">
+          <Button variant="platinum" onClick={() => navigate('/planes')}>
+            Ver Ultra
+          </Button>
+          <Button variant="secondary" onClick={() => navigate('/home')}>
+            Volver al mapa
+          </Button>
+        </div>
       </div>
     );
   }
@@ -111,6 +168,9 @@ export default function Lesson() {
   /** Coming back from an earlier miss. Flagged so it reads as a second chance
    *  rather than as new material you're inexplicably seeing twice. */
   const isRepeat = plan?.replayIds.includes(activity.id) ?? false;
+  /** Pulled in from a different, already-completed lesson to keep it from
+   *  fading — flagged so it reads as a memory check, not new material. */
+  const isReviewQuestion = plan?.reviewIds.includes(activity.id) ?? false;
 
   const isQuiz = activity.type === 'quiz';
   const isCorrect = isQuiz && checked && selectedId === activity.question.correctOptionId;
@@ -121,7 +181,7 @@ export default function Lesson() {
     const wasFirstEverLesson = attempts.length === 0;
     const alreadyCompleted = isLessonCompleted(lesson.id);
 
-    completeLesson({
+    const { protectorGifted, levelUp } = completeLesson({
       lessonId: lesson.id,
       nodeId: node.id,
       completedAt: new Date().toISOString(),
@@ -153,6 +213,8 @@ export default function Lesson() {
         newBadgeIds: newBadges,
         stage: getNodeStage(node.id),
         maxStage: getNodeMaxStage(node.id),
+        protectorGifted,
+        levelUp,
       },
       replace: true,
     });
@@ -191,17 +253,10 @@ export default function Lesson() {
     trackResult(correct);
   };
 
-  useEffect(() => {
-    if (!outOfHearts) return;
-    const t = setTimeout(() => setShowOutOfHearts(true), 1400);
-    return () => clearTimeout(t);
-  }, [outOfHearts]);
-
   if (showOutOfHearts) return <OutOfHeartsScreen />;
 
   return (
     <div className={`h-dvh bg-carbon-900 flex flex-col relative overflow-hidden ${zoomPulse} ${shakeClass}`}>
-      {celebration && <ComboCelebration tier={celebration} />}
 
       {lastResult && (
         <div
@@ -212,7 +267,7 @@ export default function Lesson() {
         />
       )}
 
-      <LessonHeader progressPct={progressPct} hearts={hearts} />
+      <LessonHeader progressPct={progressPct} hearts={hearts} comboTier={tier} combo={combo} />
 
       {/* min-h-0 lets this flex child actually shrink so it scrolls instead of
           pushing the footer button off-screen on short phone viewports. */}
@@ -227,6 +282,11 @@ export default function Lesson() {
               <span className="flex items-center gap-1 text-[10px] font-black text-[#FFC93C] bg-[#FFC93C]/15 border border-[#FFC93C]/30 px-2 py-0.5 rounded-full uppercase whitespace-nowrap">
                 <Icon name="refresh" size={11} />
                 Repetición
+              </span>
+            ) : isReviewQuestion ? (
+              <span className="flex items-center gap-1 text-[10px] font-black text-lime-400 bg-lime-500/15 border border-lime-500/30 px-2 py-0.5 rounded-full uppercase whitespace-nowrap">
+                <Icon name="brain" size={11} />
+                Repaso
               </span>
             ) : (
               badge && (
@@ -251,6 +311,12 @@ export default function Lesson() {
           </p>
         )}
 
+        {isReviewQuestion && !isRepeat && (
+          <p className="mb-3 text-sm font-bold text-lime-400">
+            De una lección anterior. A ver si te acuerdas.
+          </p>
+        )}
+
         {isQuiz && (
           <>
             <h1 className="text-xl sm:text-2xl font-black text-carbon-50">{activity.question.prompt}</h1>
@@ -263,7 +329,7 @@ export default function Lesson() {
             )}
 
             <div className="mt-6 grid grid-cols-1 gap-3">
-              {activity.question.options.map((opt) => {
+              {shuffledOptions.map((opt) => {
                 const isSelected = selectedId === opt.id;
                 const showCorrect = checked && opt.id === activity.question.correctOptionId;
                 const showIncorrect = checked && isSelected && opt.id !== activity.question.correctOptionId;

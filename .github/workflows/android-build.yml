@@ -1,0 +1,151 @@
+name: Build Android APK
+
+# Builds a debug-signed APK, which installs on any phone with "unknown
+# sources" enabled and needs no keystore or secrets. It is the Android
+# equivalent of the unsigned .ipa: good enough to hand someone a build,
+# not something you can put on the Play Store.
+#
+# The tag decides which Supabase project it talks to, exactly as on iOS:
+#
+#   v0.8.0-dev   ->  dev
+#   v0.8.0-test  ->  test (*_TEST)
+#   v0.8.0       ->  production
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Qué proyecto de Supabase usar
+        type: choice
+        options: [dev, test, production]
+        default: dev
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Decide target environment
+        id: target
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            NAME="${{ inputs.environment }}"
+          else
+            case "${{ github.ref_name }}" in
+              *-test) NAME=test ;;
+              *-dev|*-beta|*-rc|*-rc.*) NAME=dev ;;
+              *) NAME=production ;;
+            esac
+          fi
+          case "$NAME" in
+            dev) SUFFIX=DEV ;;
+            test) SUFFIX=TEST ;;
+            *) SUFFIX=PROD ;;
+          esac
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "suffix=$SUFFIX" >> "$GITHUB_OUTPUT"
+          echo "Compilando para: $NAME (usando *_$SUFFIX)"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Capacitor 8 needs a JDK for Gradle; 21 is what its template targets.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      # Gradle's debug signing config reads ~/.android/debug.keystore, which
+      # a fresh runner otherwise generates fresh every run — a different
+      # random key each time. Android refuses to install a debug APK signed
+      # by a different key over one already on the phone ("app not installed"
+      # or a silent no-op depending on the installer), so every build looked
+      # like a fresh app rather than an update, and testing an old build
+      # while believing it was the new one was the easy way to not notice.
+      - name: Restore (or start) a stable debug keystore
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore-v1
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Names each candidate as present or missing. Repository variables and
+      # secrets are invisible from outside the run, so without this the only
+      # signal is a build that quietly ships with no backend — which is exactly
+      # what happened.
+      - name: Check the Supabase configuration
+        env:
+          SUFFIXED_URL: ${{ vars[format('VITE_SUPABASE_URL_{0}', steps.target.outputs.suffix)] }}
+          SUFFIXED_KEY: ${{ secrets[format('VITE_SUPABASE_ANON_KEY_{0}', steps.target.outputs.suffix)] }}
+          PLAIN_URL: ${{ vars.VITE_SUPABASE_URL }}
+          PLAIN_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUFFIX: ${{ steps.target.outputs.suffix }}
+        run: |
+          say() { [ -n "$2" ] && echo "  presente  $1" || echo "  FALTA     $1"; }
+          echo "Variables de repositorio (Settings > Secrets and variables > Actions):"
+          say "VITE_SUPABASE_URL_$SUFFIX  (variable)" "$SUFFIXED_URL"
+          say "VITE_SUPABASE_ANON_KEY_$SUFFIX  (secret)" "$SUFFIXED_KEY"
+          say "VITE_SUPABASE_URL  (variable, respaldo solo para dev)" "$PLAIN_URL"
+          say "VITE_SUPABASE_ANON_KEY  (secret, respaldo solo para dev)" "$PLAIN_KEY"
+          echo
+          echo "Deben ser de repositorio, no de un Environment: los de Environment"
+          echo "no se ven a menos que el job declare 'environment:', y este no lo hace."
+
+      - name: Build web assets
+        env:
+          TARGET: ${{ steps.target.outputs.name }}
+          VITE_APP_ENV: ${{ steps.target.outputs.name }}
+          VITE_SUPABASE_URL: >-
+            ${{ vars[format('VITE_SUPABASE_URL_{0}', steps.target.outputs.suffix)]
+                || (steps.target.outputs.name == 'dev' && vars.VITE_SUPABASE_URL) }}
+          VITE_SUPABASE_ANON_KEY: >-
+            ${{ secrets[format('VITE_SUPABASE_ANON_KEY_{0}', steps.target.outputs.suffix)]
+                || (steps.target.outputs.name == 'dev' && secrets.VITE_SUPABASE_ANON_KEY) }}
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            if [ "$TARGET" = "test" ]; then
+              echo "::error::Faltan VITE_SUPABASE_URL_TEST y/o VITE_SUPABASE_ANON_KEY_TEST."
+              exit 1
+            fi
+            if [ "$TARGET" = "production" ]; then
+              echo "::error::Faltan VITE_SUPABASE_URL_PROD y/o VITE_SUPABASE_ANON_KEY_PROD."
+              exit 1
+            fi
+            echo "::warning::Sin claves de Supabase — este APK guardará el progreso solo en el dispositivo."
+          fi
+          npm run build
+
+      - name: Sync web assets into the Android project
+        run: npx cap sync android
+
+      - name: Assemble the APK
+        run: ./gradlew assembleDebug --no-daemon
+        working-directory: android
+
+      - name: Rename it after the build
+        run: |
+          SRC=android/app/build/outputs/apk/debug/app-debug.apk
+          if [ ! -f "$SRC" ]; then
+            echo "No se encontró $SRC"
+            find android/app/build/outputs -type f || true
+            exit 1
+          fi
+          cp "$SRC" "Stonksu-${{ steps.target.outputs.name }}.apk"
+          ls -lh Stonksu-*.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Stonksu-android-${{ steps.target.outputs.name }}-${{ github.ref_name }}
+          path: Stonksu-*.apk
+          retention-days: 30

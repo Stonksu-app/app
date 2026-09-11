@@ -4,6 +4,10 @@ const config: CapacitorConfig = {
   appId: 'com.stonksu.app',
   appName: 'Stonksu',
   webDir: 'dist',
+  android: {
+    // Same carbon as iOS, so there's no white flash before the web view paints.
+    backgroundColor: '#171717',
+  },
   ios: {
     // Matches --color-carbon-900 so there's no white flash before the web view paints.
     backgroundColor: '#171717',

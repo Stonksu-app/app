@@ -7,6 +7,7 @@ import Avatar from '../components/Avatar';
 import OutOfHeartsScreen from '../components/OutOfHeartsScreen';
 import { getLessonById } from '../data/lessons';
 import { buildStage } from '../utils/buildActivityStream';
+import { introKey } from '../utils/mastery';
 import { useUserStore } from '../store/useUserStore';
 
 const GOAL_MESSAGES: Record<string, string> = {
@@ -48,7 +49,7 @@ export default function LessonIntro() {
   const goalMessage = GOAL_MESSAGES[onboardingAnswers.goal ?? ''] ?? 'Aquí tienes un poco de contexto antes de empezar.';
 
   const finish = () => {
-    markIntroSeen(node.id);
+    markIntroSeen(introKey(node.id, getNodeStage(node.id)));
     navigate(`/lesson/${lesson.id}`, { replace: true });
   };
 

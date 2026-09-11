@@ -1,0 +1,78 @@
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+
+/**
+ * Trims a project URL back to its origin.
+ *
+ * The Supabase dashboard shows several URLs side by side, and the REST one
+ * (`https://xxx.supabase.co/rest/v1/`) is the easy one to copy by mistake. The
+ * client then builds `/rest/v1/auth/v1/signup` and every request 404s with no
+ * error message at all, which is a miserable thing to debug. Normalising here
+ * means the same slip in a Vercel env var can't reach production either.
+ */
+function projectOrigin(raw: string | undefined): string | undefined {
+  if (!raw?.trim()) return undefined;
+  try {
+    return new URL(raw.trim()).origin;
+  } catch {
+    console.warn(`[supabase] VITE_SUPABASE_URL is not a valid URL: ${raw}`);
+    return undefined;
+  }
+}
+
+const url = projectOrigin(import.meta.env.VITE_SUPABASE_URL);
+const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+
+/**
+ * Whether this build is wired to a Supabase project.
+ *
+ * Deliberately optional: with no keys the app runs exactly as it did before,
+ * entirely on localStorage. That keeps the repo cloneable and the dev server
+ * usable without credentials, and it means a misconfigured deploy degrades to
+ * "progress stays on this device" rather than to a blank screen.
+ */
+export const isCloudEnabled = Boolean(url && anonKey);
+
+/**
+ * Which backend this build talks to.
+ *
+ * Surfaced in Profile because a sideloaded .ipa gives no other way to tell a
+ * dev build from a production one, and "why is my progress missing?" is almost
+ * always the answer being "you're on the other database".
+ *
+ * The road is dev -> test -> production, one branch and one Supabase project
+ * each. Anything unrecognised reads as dev, which is the safe default: it
+ * never mistakes an unconfigured build for production.
+ */
+export type AppEnv = 'dev' | 'test' | 'production';
+
+export const appEnv: AppEnv =
+  import.meta.env.VITE_APP_ENV === 'production'
+    ? 'production'
+    : import.meta.env.VITE_APP_ENV === 'test'
+    ? 'test'
+    : 'dev';
+
+/**
+ * True for any build that is not pointed at the production project.
+ *
+ * What the Profile badge actually cares about: the warning is "this is not
+ * your real progress", and that holds for dev and for test alike.
+ */
+export const isTestingBackend = appEnv !== 'production';
+
+export const supabase: SupabaseClient | null = isCloudEnabled
+  ? createClient(url as string, anonKey as string, {
+      auth: {
+        // The session lives in localStorage, which is also what the Capacitor
+        // webview persists, so a phone stays signed in between launches.
+        persistSession: true,
+        autoRefreshToken: true,
+        // Must stay true now that there is an OAuth provider. Google sends the
+        // player back with the new credentials in the URL, and if the client
+        // doesn't read them the link silently never completes: the session
+        // stays anonymous, so the "save your progress" nag reappears as if
+        // nothing had happened. This was false while email was the only route.
+        detectSessionInUrl: true,
+      },
+    })
+  : null;

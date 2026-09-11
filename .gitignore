@@ -37,3 +37,24 @@ DerivedData
 
 # Generated icon sources (rebuild with: npm run icons)
 assets/
+
+# Capacitor / Android build output
+android/app/build
+android/app/src/main/assets/public
+android/app/src/main/assets/capacitor.config.json
+android/.gradle
+android/build
+android/local.properties
+android/app/release
+*.apk
+*.aab
+
+graphify-out/
+
+# Claude Code hooks: the graphify guard hard-codes this machine's path to the
+# CLI, so sharing it would fire a missing binary on anyone else's checkout.
+# CLAUDE.md is shared on purpose; the wiring behind it is not.
+.claude/
+
+# Volcados de scripts/db-copy-dev-to-test.sh — datos reales, nunca al repo.
+.db-backups/

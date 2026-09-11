@@ -2,6 +2,9 @@ export type IconName =
   | 'bull'
   | 'map'
   | 'user'
+  | 'users'
+  | 'eye'
+  | 'eye-off'
   | 'flame'
   | 'star'
   | 'heart'
@@ -124,6 +127,13 @@ export type Activity =
 export interface NodeIntro {
   flashcards: Flashcard[];
   games: IntroGame[];
+  /**
+   * One short paragraph per teaching stage (so index 0 is stage 0, and so on
+   * — the review stage has no entry, since it teaches nothing new), covering
+   * that stage's flashcard terms in context instead of as isolated
+   * definitions. Optional so content can land node by node.
+   */
+  explanations?: string[];
 }
 
 export type NodeDifficulty = 'easy' | 'medium' | 'hard';
@@ -153,6 +163,16 @@ export interface SkillNode {
   position: { x: number; y: number };
   intro?: NodeIntro;
   difficulty: NodeDifficulty;
+  /** SECTION: Represents the Duolingo "section" (e.g., Section 1, Section 2).
+   *  Nodes sharing a section render under one section banner. */
+  section?: { number: number; title: string };
+  /** UNIT: Represents the Duolingo "unit" within a section (e.g., Unit 1, Unit 2).
+   *  Nodes sharing both section and unit render under one unit banner. */
+  unit?: { number: number; title: string };
+  /** Playable only on Ultra. Nothing carries it yet — the whole course is
+   *  free — but the path, the node dialog and the lesson route all honour it,
+   *  so making a topic exclusive is one word rather than a feature. */
+  ultra?: boolean;
 }
 
 export interface Badge {

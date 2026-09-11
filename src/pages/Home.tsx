@@ -1,14 +1,21 @@
-import { useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import TopBar from '../components/TopBar';
 import NavRail from '../components/NavRail';
 import BottomNav from '../components/BottomNav';
 import Icon from '../components/Icon';
+import NodeRing from '../components/NodeRing';
+import AdSlot from '../components/AdSlot';
+import UltraPromo from '../components/UltraPromo';
+import LeaguePromotionCelebration from '../components/LeaguePromotionCelebration';
 import { Button } from '../components/Button';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
 import { SKILL_TREE } from '../data/lessons';
 import StatPanel, { type StatKey } from '../components/StatPanels';
 import { CHEST_REWARD, useUserStore, xpToLevel } from '../store/useUserStore';
+import { canPlayUltraLessons, hasUnlimitedHearts } from '../data/plans';
+import { practisedToday } from '../utils/streak';
+import { introKey } from '../utils/mastery';
 import type { IconName, SkillNode } from '../types';
 
 /* Three-column learn layout, in the shape Duolingo uses: nav rail on the left,
@@ -18,6 +25,9 @@ import type { IconName, SkillNode } from '../types';
 /** Horizontal offsets, in px, that give the path its serpentine walk. Cycles. */
 const SWAY = [0, -44, -70, -44, 0, 44, 70, 44];
 const NODE_PITCH = 116;
+/** Room above the node wearing the "empezar" flag: the flag's 48px offset plus
+ *  its own height, so it never lands on the line above it. */
+const MARKER_CLEARANCE = 56;
 
 /** A chest sits after every CHEST_EVERY topics and opens once the topic before
  *  it is platinum, so it pays out for mastering a subject rather than for
@@ -25,6 +35,34 @@ const NODE_PITCH = 116;
  *  at two, you'd have to platinum two whole subjects before seeing one.
  *  The payout itself lives in the store as CHEST_REWARD. */
 const CHEST_EVERY = 1;
+
+/** One banner style per unit, cycling if more units get added later — same
+ *  idea as Duolingo's colour-coded section banners, so each stretch of the
+ *  path reads as its own chapter instead of one long undifferentiated list.
+ *
+ *  None of them is violet on purpose. Violet is spoken for — it's what Ultra
+ *  and a platinumed unit wear — and a chapter colour in the same family reads
+ *  as "almost platinum", which is exactly what a colour you earn must not
+ *  look like. The fourth slot was fuchsia and landed next to the platinum
+ *  nodes on the path, close enough to look like a mistake. */
+const UNIT_STYLES = [
+  { bg: 'bg-lime-500', text: 'text-carbon-900', sub: 'text-carbon-900/70', chip: 'bg-carbon-900/15 hover:bg-carbon-900/25 text-carbon-900' },
+  { bg: 'bg-sky-500', text: 'text-carbon-900', sub: 'text-carbon-900/70', chip: 'bg-carbon-900/15 hover:bg-carbon-900/25 text-carbon-900' },
+  { bg: 'bg-amber-500', text: 'text-carbon-900', sub: 'text-carbon-900/70', chip: 'bg-carbon-900/15 hover:bg-carbon-900/25 text-carbon-900' },
+  { bg: 'bg-rose-500', text: 'text-carbon-50', sub: 'text-carbon-50/70', chip: 'bg-carbon-50/15 hover:bg-carbon-50/25 text-carbon-50' },
+];
+
+/** A unit you've platinumed drops its chapter colour for the same blue the
+ *  nodes wear, so the banner reads as something you earned rather than as a
+ *  label that happens to be there. */
+const PLATINUM_STYLE = {
+  // platinum-position-ok: the banner this lands on is sticky, so it already
+  // establishes the containing block the shine needs.
+  bg: 'platinum-node platinum-banner',
+  text: 'text-white',
+  sub: 'text-white/85',
+  chip: 'bg-carbon-900/25 hover:bg-carbon-900/40 text-white',
+};
 
 function StatRail({
   hearts,
@@ -35,7 +73,9 @@ function StatRail({
   msUntilNextHeart: number | null;
   active: { node: SkillNode; stage: number; maxStage: number } | null;
 }) {
-  const { streak, xp, coins } = useUserStore();
+  const { streak, xp, coins, plan, lastActiveDate } = useUserStore();
+  // Grey until today's activity lands, number intact — same rule as the phone.
+  const streakDone = practisedToday(lastActiveDate);
   const { level } = xpToLevel(xp);
   const [hovered, setHovered] = useState<StatKey | null>(null);
   // Measured rather than derived from the index: the counters are laid out with
@@ -43,11 +83,26 @@ function StatRail({
   const [arrowX, setArrowX] = useState(0);
   const rowRef = useRef<HTMLDivElement>(null);
 
-  const STATS: { key: StatKey; icon: IconName; value: number; dim?: boolean }[] = [
-    { key: 'streak', icon: 'flame', value: streak, dim: streak === 0 },
+  // The desktop rail counts the same things the phone's bar does, so Ultra has
+  // to read the same in both: an infinity in the plan's violet, not a five
+  // that never moves.
+  const unlimitedHearts = hasUnlimitedHearts(plan);
+  const STATS: {
+    key: StatKey;
+    icon: IconName;
+    value: number | string;
+    dim?: boolean;
+    tone?: string;
+  }[] = [
+    { key: 'streak', icon: 'flame', value: streak, dim: !streakDone || streak === 0 },
     { key: 'xp', icon: 'star', value: xp },
     { key: 'coins', icon: 'coins', value: coins },
-    { key: 'hearts', icon: 'heart', value: hearts },
+    {
+      key: 'hearts',
+      icon: 'heart',
+      value: unlimitedHearts ? '∞' : hearts,
+      tone: unlimitedHearts ? 'ultra' : undefined,
+    },
   ];
 
   const reveal = (key: StatKey, el: HTMLElement) => {
@@ -60,6 +115,7 @@ function StatRail({
 
   return (
     <aside className="hidden xl:block w-[368px] shrink-0 p-6 space-y-4">
+      <UltraPromo />
       {/* Hovering a counter reveals its panel, pointed at by a small arrow —
           the desktop counterpart to tapping it open on a phone. */}
       <div className="relative" onMouseLeave={() => setHovered(null)}>
@@ -74,15 +130,25 @@ function StatRail({
               onFocus={(e) => reveal(s.key, e.currentTarget)}
               onBlur={() => setHovered(null)}
               aria-expanded={hovered === s.key}
-              className={`flex items-center gap-1.5 font-black text-carbon-50 px-3 py-1 rounded-lg transition ${
-                hovered === s.key ? 'bg-carbon-800' : ''
-              }`}
+              className={`flex items-center gap-1.5 font-black px-3 py-1 rounded-lg transition ${
+                s.tone === 'ultra'
+                  ? 'text-ultra-300'
+                  : s.dim && s.key === 'streak'
+                  ? 'text-carbon-400'
+                  : 'text-carbon-50'
+              } ${hovered === s.key ? 'bg-carbon-800' : ''}`}
             >
               <Icon
                 name={s.icon}
                 size={20}
                 className={
-                  s.dim ? 'text-carbon-600' : s.key === 'streak' ? 'text-lime-500 animate-flame-flicker' : 'text-lime-500'
+                  s.dim
+                    ? 'text-carbon-600'
+                    : s.tone === 'ultra'
+                    ? 'text-ultra-400'
+                    : s.key === 'streak'
+                    ? 'text-lime-500 animate-flame-flicker'
+                    : 'text-lime-500'
                 }
               />
               {s.value}
@@ -139,6 +205,7 @@ function StatRail({
 
 export default function Home() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
     name,
     isNodeUnlocked,
@@ -148,12 +215,29 @@ export default function Home() {
     getNodeMaxStage,
     isNodePlatinum,
   } = useUserStore();
+  /*
+   * A promotion is collected on the way back to the path.
+   *
+   * The server decides it on Monday, so there is no moment in the app where
+   * it "happens" — the first time this device sees the new rank is the only
+   * honest place to say so, and that's here, on the screen everyone opens
+   * first. Checked once per mount rather than on every render.
+   */
+  const [promotion, setPromotion] = useState<{
+    rank: number;
+    coins: number;
+    protectors: number;
+  } | null>(null);
+  useEffect(() => {
+    setPromotion(useUserStore.getState().claimLeaguePromotion());
+  }, []);
+
   // Depend on the raw state slices, not on the store's getter functions: those
   // keep a stable identity, so a memo keyed on them never recomputes and the
   // path would keep rendering a chest as unopened after you claimed it.
-  const { openedChestIds, nodeStageProgress, openChest, testMode } = useUserStore();
+  const { openedChestIds, nodeStageProgress, openChest, testMode, plan } = useUserStore();
   const [selected, setSelected] = useState<SkillNode | null>(null);
-  const [reward, setReward] = useState(false);
+  const [reward, setReward] = useState<{ protectorGifted: boolean } | null>(null);
   const { hearts, msUntilNextHeart } = useHeartRegen();
 
   const nodes = useMemo(
@@ -171,19 +255,205 @@ export default function Home() {
   );
 
   /** The furthest node you can actually play — what the banner and the
-   *  "empezar" marker point at. */
+   *  "empezar" marker point at. Taken from the whole tree, not the section on
+   *  screen, so reviewing an old section doesn't move where you are. */
   const current = nodes.find((n) => n.unlocked && !n.platinum && n.node.lessons.length > 0) ?? null;
+
+  /**
+   * The section the path is showing.
+   *
+   * One at a time, the way Duolingo does it: the path is a section, not the
+   * whole course. Scrolling can't wander into a section you finished or one
+   * you haven't earned — changing chapter is a deliberate trip through the
+   * sections page, which is what makes it feel like somewhere you go rather
+   * than a list you scrolled past.
+   *
+   * Defaults to the section being studied, so opening the app lands you where
+   * you left off rather than at the beginning of the course.
+   */
+  const requestedSection = Number(searchParams.get('seccion')) || null;
+  const currentSection = current?.node.section?.number ?? 1;
+
+  const viewSection = useMemo(() => {
+    if (!requestedSection) return currentSection;
+    // A section nobody has reached yet isn't reachable by typing a number into
+    // the address bar either.
+    const reachable = nodes.some((n) => n.node.section?.number === requestedSection && n.unlocked);
+    return reachable ? requestedSection : currentSection;
+  }, [requestedSection, currentSection, nodes]);
+
+  /** Only this section's topics are on the path. */
+  const sectionNodes = useMemo(
+    () => nodes.filter((n) => (n.node.section?.number ?? 1) === viewSection),
+    [nodes, viewSection]
+  );
+
+  /** True when you're looking at a chapter you already finished. */
+  const reviewing = viewSection !== currentSection;
+
+  /**
+   * What comes after this section, for the card at the end of the path.
+   *
+   * The path stops at the section boundary now, so without this the last
+   * node is simply where the page ends — nothing says there's more course
+   * behind it, or that finishing this one is what opens it.
+   */
+  const nextSection = useMemo(() => {
+    const after = nodes.filter((n) => n.node.section?.number === viewSection + 1);
+    if (after.length === 0) return null;
+    return {
+      number: viewSection + 1,
+      title: after[0].node.section?.title ?? '',
+      units: [...new Set(after.map((n) => n.node.unit?.title).filter(Boolean))] as string[],
+      unlocked: after.some((n) => n.unlocked),
+    };
+  }, [nodes, viewSection]);
+
+  // Changing section keeps the same route, so the browser has no reason to
+  // move the scroll — without this you'd arrive at the new section's path
+  // already scrolled to wherever the old one ended.
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [viewSection]);
+
+  /**
+   * The unit the banner is describing.
+   *
+   * Follows the scroll rather than progress, which is what Duolingo does and
+   * what makes the header useful: scrolling ahead to see what's coming should
+   * tell you what you're looking at, not keep repeating where you left off.
+   * Falls back to the unit being played, which is what you see on arrival.
+   */
+  const [scrolledUnit, setScrolledUnit] = useState<{ section: number; unit: number; title: string } | null>(null);
+  const banner = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let queued = false;
+    const update = () => {
+      queued = false;
+      // Measured, not assumed: where the banner ends depends on whether the
+      // stat bar is above it, how deep the notch is, and whether the title
+      // needed a second line.
+      const threshold = banner.current?.getBoundingClientRect().bottom ?? 72;
+      const markers = document.querySelectorAll<HTMLElement>('[data-unit]');
+      let latest: { section: number; unit: number; title: string } | null = null;
+      markers.forEach((el) => {
+        // Anything whose divider has passed under the banner is a unit we are
+        // now inside; the last such one wins.
+        if (el.getBoundingClientRect().top <= threshold) {
+          const [section, unit, title] = (el.dataset.unit ?? '').split('|');
+          latest = { section: Number(section), unit: Number(unit), title };
+        }
+      });
+      setScrolledUnit(latest);
+    };
+
+    // Coalesced into a frame: a scroll listener that measures on every event
+    // would read layout dozens of times per gesture.
+    const onScroll = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  // Keyed on nodes rather than the derived path: the dividers come from these,
+  // and pathItems is built further down.
+  }, [nodes]);
+
+  /**
+   * Before any divider has scrolled past, the banner falls back to something
+   * sensible — and it has to be something from the section on screen. Falling
+   * back to where you are studying would label a section you opened to review
+   * with the name of a unit that isn't even on the path.
+   */
+  const fallbackUnit = useMemo(() => {
+    const inView =
+      sectionNodes.find((n) => n.node.id === current?.node.id) ?? sectionNodes[0] ?? null;
+    const { section, unit } = inView?.node ?? {};
+    return section && unit ? { section: section.number, unit: unit.number, title: unit.title } : null;
+  }, [sectionNodes, current]);
+
+  const shownUnit = scrolledUnit ?? fallbackUnit;
+
+  /**
+   * Which units are finished outright.
+   *
+   * A unit counts only once every topic in it is platinum — chests and any
+   * node without lessons are scenery, not something you can master, so they
+   * neither hold a unit back nor let an empty one qualify.
+   */
+  const platinumUnits = useMemo(() => {
+    const byUnit = new Map<string, boolean>();
+    for (const n of nodes) {
+      const { section, unit } = n.node;
+      if (!section || !unit || n.node.lessons.length === 0) continue;
+      const key = `${section.number}|${unit.number}`;
+      byUnit.set(key, (byUnit.get(key) ?? true) && n.platinum);
+    }
+    return byUnit;
+  }, [nodes]);
+
+  const shownUnitPlatinum = !shownUnit || (platinumUnits.get(`${shownUnit.section}|${shownUnit.unit}`) ?? false);
+
+  const unitStyle = shownUnitPlatinum
+    ? PLATINUM_STYLE
+    : UNIT_STYLES[((shownUnit?.section ?? 1) - 1) % UNIT_STYLES.length];
+
+  /** The sweeping highlight is an overlay, so everything written on top of it
+   *  needs to be lifted out of its way. */
+  const overSweep = shownUnitPlatinum ? 'relative z-10' : '';
 
   /** Topics and chests woven into a single walkable list, so the sway offset
    *  applies to both and the chest genuinely sits on the path. */
   const pathItems = useMemo(() => {
     type Item =
       | { kind: 'node'; key: string; data: (typeof nodes)[number] }
-      | { kind: 'chest'; key: string; unlocked: boolean; opened: boolean };
+      | { kind: 'chest'; key: string; unlocked: boolean; opened: boolean }
+      /** Marks where a unit begins, and says so louder when a whole section
+       *  does. Duolingo puts the coloured banner at the top of the screen and
+       *  a quiet line in the path itself — the banner tells you where you are,
+       *  the line tells you where one chapter ended and the next began. */
+      | {
+          kind: 'divider';
+          key: string;
+          section: number;
+          sectionTitle: string;
+          startsSection: boolean;
+          sectionPlatinum: boolean;
+          unit: number;
+          title: string;
+          platinum: boolean;
+        };
     const items: Item[] = [];
-    nodes.forEach((n, i) => {
+    let lastSection: number | null = null;
+    let lastUnit: number | null = null;
+
+    sectionNodes.forEach((n, i) => {
+      const { section, unit } = n.node;
+      if (section && unit && (section.number !== lastSection || unit.number !== lastUnit)) {
+        const startsSection = section.number !== lastSection;
+        items.push({
+          kind: 'divider',
+          key: `divider-${section.number}-${unit.number}`,
+          section: section.number,
+          sectionTitle: section.title,
+          startsSection,
+          sectionPlatinum: sectionNodes.every(
+            (m) => m.node.lessons.length === 0 || m.platinum
+          ),
+          unit: unit.number,
+          title: unit.title,
+          platinum: platinumUnits.get(`${section.number}|${unit.number}`) ?? false,
+        });
+        lastSection = section.number;
+        lastUnit = unit.number;
+      }
+
       items.push({ kind: 'node', key: n.node.id, data: n });
-      const lastOne = i === nodes.length - 1;
+      const lastOne = i === sectionNodes.length - 1;
       if (!lastOne && (i + 1) % CHEST_EVERY === 0) {
         const key = `chest-${n.node.id}`;
         items.push({
@@ -195,35 +465,75 @@ export default function Home() {
       }
     });
     return items;
-  }, [nodes, openedChestIds, testMode]);
+  }, [sectionNodes, openedChestIds, testMode, platinumUnits]);
+
+  if (promotion) {
+    return (
+      <LeaguePromotionCelebration
+        rank={promotion.rank}
+        coins={promotion.coins}
+        protectors={promotion.protectors}
+        onContinue={() => setPromotion(null)}
+      />
+    );
+  }
 
   return (
     <div className="min-h-dvh bg-carbon-900 lg:flex">
       <NavRail />
 
-      <div className="lg:hidden">
         <TopBar />
-      </div>
 
       {/* pb-32 keeps the last node clear of the fixed BottomNav on phones. */}
       <main className="flex-1 min-w-0 px-4 pb-32 lg:pb-6 lg:py-6">
         <div className="max-w-[600px] mx-auto">
-          {/* Section banner */}
-          <div className="mt-4 lg:mt-0 bg-lime-500 rounded-2xl px-5 py-4 flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-[13px] font-black text-carbon-900/70 uppercase tracking-wide">
-                {current ? `Etapa ${current.stage + 1} de ${current.maxStage}` : 'Todo platinado'}
+          {/* The unit you are on, pinned to the top the way Duolingo does it,
+              so the answer to "where am I?" survives scrolling down the path.
+              Coloured per section, which is what makes one chapter feel
+              different from the next rather than the palette wandering. */}
+          <div
+            ref={banner}
+            // Parks below the phone's stat bar, which is pinned too: the
+            // bar's own height plus whatever the notch takes. On desktop that
+            // bar isn't there and the banner goes to the very top.
+            className={`sticky top-[calc(var(--topbar-h)_+_env(safe-area-inset-top))] lg:top-0 z-20 mt-4 lg:mt-0 ${unitStyle.bg} rounded-2xl px-4 py-3.5 flex items-center gap-3`}
+          >
+            <Link
+              to="/secciones"
+              aria-label="Ver todas las secciones"
+              className={`shrink-0 -ml-1 p-1 rounded-lg transition ${unitStyle.chip} ${overSweep}`}
+            >
+              <Icon name="chevron-left" size={22} strokeWidth={2.6} />
+            </Link>
+
+            <div className={`min-w-0 flex-1 ${overSweep}`}>
+              <p
+                className={`text-[11px] sm:text-[13px] font-black uppercase tracking-[0.6px] sm:tracking-[0.8px] ${unitStyle.sub}`}
+              >
+                {shownUnit ? `Sección ${shownUnit.section}, Unidad ${shownUnit.unit}` : 'Todo platinado'}
+                {/* Says so out loud: landing in an old chapter without this
+                    reads as having lost your place. */}
+                {reviewing && ' · Repaso'}
               </p>
-              <h1 className="text-xl font-black text-carbon-900 truncate">
-                {current ? current.node.title : `¡Bien hecho, ${name || 'trader'}!`}
+              {/* Two lines rather than one clipped one: on a phone the title
+                  has ~180px between the back arrow and the guide chip, and
+                  most of them are wider than that. Clamped at two so a long
+                  title can't push the path down the screen. */}
+              <h1 className={`text-lg sm:text-xl font-black leading-tight line-clamp-2 ${unitStyle.text}`}>
+                {shownUnit ? shownUnit.title : `¡Bien hecho, ${name || 'trader'}!`}
               </h1>
             </div>
+
             {current && (
               <Link
                 to={`/guia?tema=${current.node.id}`}
-                className="shrink-0 flex items-center gap-1.5 bg-carbon-900/15 hover:bg-carbon-900/25 text-carbon-900 font-black text-[13px] uppercase tracking-wide rounded-xl px-3 py-2.5 transition"
+                aria-label="Guía del tema"
+                className={`shrink-0 flex items-center gap-1.5 font-black text-[13px] uppercase tracking-wide rounded-xl px-2.5 sm:px-3 py-2.5 transition ${unitStyle.chip} ${overSweep}`}
               >
-                <Icon name="clipboard" size={16} /> Guía
+                {/* The word is dropped on phones, not the button: those
+                    ~45px are the difference between a title that fits on one
+                    line and one that doesn't. */}
+                <Icon name="clipboard" size={16} /> <span className="hidden sm:inline">Guía</span>
               </Link>
             )}
           </div>
@@ -240,8 +550,8 @@ export default function Home() {
                     <button
                       disabled={!item.unlocked || item.opened}
                       onClick={() => {
-                        openChest(item.key);
-                        setReward(true);
+                        const protectorGifted = openChest(item.key);
+                        setReward({ protectorGifted });
                       }}
                       aria-label={item.opened ? 'Cofre abierto' : 'Abrir cofre'}
                       style={{
@@ -281,47 +591,112 @@ export default function Home() {
                 );
               }
 
+              if (item.kind === 'divider') {
+                // Deliberately not swayed: the path weaves, the chapter marks
+                // stay straight, which is what makes them read as structure
+                // rather than as another thing on the trail.
+                return (
+                  <div
+                    key={item.key}
+                    data-unit={`${item.section}|${item.unit}|${item.title}`}
+                    className="w-full"
+                    style={{ marginBottom: NODE_PITCH - 70 }}
+                  >
+                    {item.startsSection && (
+                      <div className="text-center mb-6 mt-4 first:mt-0">
+                        <p
+                          className={`text-[25px] font-black leading-tight ${
+                            item.sectionPlatinum ? 'platinum-text' : 'text-carbon-200'
+                          }`}
+                        >
+                          Sección {item.section}
+                        </p>
+                        <p className="text-sm text-carbon-500 mt-0.5">{item.sectionTitle}</p>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-4">
+                      <span className="h-0.5 flex-1 bg-carbon-800" />
+                      <h2
+                        className={`text-[19px] font-black text-center ${
+                          item.platinum ? 'platinum-text' : 'text-carbon-500'
+                        }`}
+                      >
+                        {item.title}
+                      </h2>
+                      <span className="h-0.5 flex-1 bg-carbon-800" />
+                    </div>
+                  </div>
+                );
+              }
+
               const { node, unlocked, platinum, stage, maxStage } = item.data;
               const isCurrent = current?.node.id === node.id;
               return (
-                <div key={item.key} className="relative flex flex-col items-center" style={sway}>
+                <div
+                  key={item.key}
+                  className="relative flex flex-col items-center"
+                  // The "empezar" flag floats 48px above the node, over space
+                  // that belongs to whatever came before — the unit's title
+                  // when the node opens a unit, the previous node's caption
+                  // otherwise. It gets its own clearance rather than the two
+                  // sharing.
+                  style={isCurrent ? { ...sway, marginTop: MARKER_CLEARANCE } : sway}
+                >
                   {isCurrent && (
-                    <span className="absolute -top-9 whitespace-nowrap bg-carbon-850 border-2 border-carbon-700 text-lime-400 text-[11px] font-black uppercase tracking-[0.8px] px-3 py-1.5 rounded-xl animate-float">
+                    <span className="absolute -top-12 whitespace-nowrap bg-carbon-850 border-2 border-carbon-700 text-lime-400 text-[11px] font-black uppercase tracking-[0.8px] px-3 py-1.5 rounded-xl animate-float">
                       Empezar
                     </span>
                   )}
 
-                  <button
-                    disabled={!unlocked}
-                    onClick={() => setSelected(node)}
-                    aria-label={node.title}
-                    style={{
-                      ['--btn-lip' as string]: platinum
-                        ? 'var(--color-carbon-500)'
-                        : unlocked
-                        ? 'var(--color-lime-700)'
-                        : 'var(--color-carbon-950)',
-                    }}
-                    className={`btn-3d w-[70px] h-[70px] rounded-full flex items-center justify-center ${
-                      platinum
-                        ? 'bg-gradient-to-br from-carbon-100 to-carbon-300 text-carbon-900'
-                        : unlocked
-                        ? 'bg-lime-500 text-carbon-900'
-                        : 'bg-carbon-800 text-carbon-600 cursor-not-allowed'
-                    } ${isCurrent ? 'ring-4 ring-lime-500/25' : ''}`}
-                  >
-                    <Icon name={unlocked ? node.icon : 'lock'} size={30} strokeWidth={unlocked ? 1.9 : 2} />
-                  </button>
+                  {/* The ring wraps the button only, so it stays centred on the
+                      node instead of on the whole column with its caption. */}
+                  <div className="relative flex items-center justify-center">
+                    {unlocked && !platinum && maxStage > 0 && (
+                      <NodeRing progress={stage / maxStage} />
+                    )}
+                    <button
+                      disabled={!unlocked}
+                      onClick={() => setSelected(node)}
+                      aria-label={node.title}
+                      style={{
+                        ['--btn-lip' as string]: platinum
+                          ? 'var(--color-ultra-800)'
+                          : unlocked
+                          ? 'var(--color-lime-700)'
+                          : 'var(--color-carbon-950)',
+                      }}
+                      className={`btn-3d w-[70px] h-[70px] rounded-full flex items-center justify-center ${
+                        platinum
+                          ? 'relative platinum-node platinum-glow text-white'
+                          : unlocked
+                          ? 'bg-lime-500 text-carbon-900'
+                          : 'bg-carbon-800 text-carbon-600 cursor-not-allowed'
+                      }`}
+                    >
+                      {/* Above the sweeping highlight, which is an ::after and
+                          would otherwise wash over the icon itself. */}
+                      <Icon
+                        name={unlocked ? node.icon : 'lock'}
+                        size={30}
+                        strokeWidth={unlocked ? 1.9 : 2}
+                        className={platinum ? 'relative z-10' : undefined}
+                      />
+                    </button>
+                  </div>
 
                   <span
-                    className={`mt-2 text-[13px] font-black text-center w-32 leading-tight ${
+                    className={`mt-4 text-[13px] font-black text-center w-32 leading-tight ${
                       unlocked ? 'text-carbon-100' : 'text-carbon-600'
                     }`}
                   >
                     {node.title}
                   </span>
                   {unlocked && maxStage > 0 && (
-                    <span className="text-[11px] font-black text-carbon-500 mt-0.5">
+                    <span
+                      className={`text-[11px] font-black mt-0.5 ${
+                        platinum ? 'text-ultra-300' : 'text-carbon-500'
+                      }`}
+                    >
                       {platinum ? 'PLATINO' : `${stage}/${maxStage}`}
                     </span>
                   )}
@@ -329,6 +704,36 @@ export default function Home() {
               );
             })}
           </div>
+
+          {/* The path is where people spend their time, so it's where the
+              thing being sold has to be visible — once, at the end, rather
+              than floating over the lesson nodes. */}
+          <AdSlot className="mt-14" />
+
+          {/* Where the section ends. Duolingo's version of this is what makes
+              a section feel finished rather than truncated, so it says what's
+              next by name and — while it's still shut — what opens it. */}
+          {nextSection && (
+            <div className="mt-16 rounded-3xl border-2 border-carbon-800 bg-carbon-850 p-6 text-center">
+              <span className="inline-block rounded-lg bg-lime-500/15 px-2.5 py-1 text-[12px] font-black uppercase tracking-[0.8px] text-lime-400">
+                A continuación
+              </span>
+              <h2 className="mt-3 text-2xl font-black text-carbon-50">Sección {nextSection.number}</h2>
+              <p className="mt-1 text-sm text-carbon-400">{nextSection.title}</p>
+              {nextSection.units.length > 0 && (
+                <p className="mt-1 text-[13px] text-carbon-500">{nextSection.units.join(' · ')}</p>
+              )}
+              <div className="mt-5 max-w-[280px] mx-auto">
+                {nextSection.unlocked ? (
+                  <Button onClick={() => navigate(`/home?seccion=${nextSection.number}`)}>Continuar</Button>
+                ) : (
+                  <p className="flex items-center justify-center gap-2 text-sm font-bold text-carbon-500">
+                    <Icon name="lock" size={16} /> Termina esta sección para abrirla
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Chests live between topics, so they're rendered by splicing the
               path above rather than as a separate list. */}
@@ -346,7 +751,7 @@ export default function Home() {
       {reward && (
         <div
           className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-          onClick={() => setReward(false)}
+          onClick={() => setReward(null)}
         >
           <div className="text-center animate-pop-in" onClick={(e) => e.stopPropagation()}>
             <div className="w-24 h-24 rounded-3xl bg-[#FFC93C] text-carbon-900 flex items-center justify-center mx-auto animate-bounce-in">
@@ -361,8 +766,13 @@ export default function Home() {
                 <Icon name="coins" size={24} /> +{CHEST_REWARD.coins}
               </span>
             </div>
+            {reward.protectorGifted && (
+              <p className="mt-3 flex items-center justify-center gap-1.5 text-sky-400 font-black text-[15px]">
+                <Icon name="shield" size={18} /> +1 protector de racha
+              </p>
+            )}
             <div className="mt-6 w-[240px] mx-auto">
-              <Button onClick={() => setReward(false)}>Genial</Button>
+              <Button onClick={() => setReward(null)}>Genial</Button>
             </div>
           </div>
         </div>
@@ -386,8 +796,12 @@ export default function Home() {
             {selected.lessons.length > 0 && (
               <div className="mt-4 bg-carbon-800 rounded-2xl p-3">
                 {isNodePlatinum(selected.id) ? (
-                  <p className="flex items-center justify-center gap-1.5 text-sm font-black text-carbon-50">
-                    <Icon name="diamond" size={16} className="text-carbon-100" /> ¡PLATINO conseguido!
+                  // Same blue and the same sweep as the node on the path, so
+                  // opening a mastered topic confirms what the map promised
+                  // instead of dropping back to a plain grey line.
+                  <p className="relative platinum-node -m-3 rounded-2xl px-3 py-3 flex items-center justify-center gap-1.5 text-sm font-black text-white">
+                    <Icon name="diamond" size={16} className="relative z-10 text-white" />
+                    <span className="relative z-10">¡PLATINO conseguido!</span>
                   </p>
                 ) : (
                   <>
@@ -411,7 +825,18 @@ export default function Home() {
             )}
 
             {selected.lessons.length > 0 ? (
-              hearts <= 0 ? (
+              selected.ultra && !canPlayUltraLessons(plan) ? (
+                // Sold, not scolded: a locked topic explains what opens it and
+                // takes you there in one tap.
+                <div className="mt-4 space-y-3">
+                  <p className="flex items-center justify-center gap-1.5 text-sm font-black text-ultra-300">
+                    <Icon name="diamond" size={16} /> Tema exclusivo de Ultra
+                  </p>
+                  <Button variant="platinum" onClick={() => navigate('/planes')}>
+                    Desbloquear con Ultra
+                  </Button>
+                </div>
+              ) : hearts <= 0 ? (
                 <div className="mt-4 w-full bg-carbon-800 rounded-2xl py-3.5 flex flex-col items-center gap-1">
                   <p className="text-sm font-black text-carbon-300 flex items-center gap-1.5">
                     <Icon name="heart" size={16} className="text-carbon-600" /> Sin vidas
@@ -427,7 +852,8 @@ export default function Home() {
                   <Button
                     onClick={() => {
                       const lessonId = selected.lessons[0].id;
-                      const needsIntro = !!selected.intro && !hasSeenIntro(selected.id);
+                      const needsIntro =
+                        !!selected.intro && !hasSeenIntro(introKey(selected.id, getNodeStage(selected.id)));
                       navigate(needsIntro ? `/lesson/${lessonId}/intro` : `/lesson/${lessonId}`);
                     }}
                   >

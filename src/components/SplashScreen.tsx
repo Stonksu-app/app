@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Icon from './Icon';
 import Mascot from './Mascot';
 import { shuffle } from '../utils/shuffle';
+import { FADE_MS, LAST_BOOT_KEY, WARM_MS, splashDuration } from '../utils/splash';
 
 /** Shown while the app boots. Follows the shape of Duolingo's loading screen —
  * mascot front and centre with an idle animation, a pulsing status line and a
@@ -31,23 +32,54 @@ const TICKERS = [
   { dir: 'short', side: 'right', offset: 5, delay: 2.0, duration: 3.3 },
 ] as const;
 
-/** Total lifetime of the splash. The progress bar reads from this too, so the
- * two can't drift apart. FADE_MS is how long the cross-fade out takes. */
-const SPLASH_MS = 10000;
-const FADE_MS = 400;
+/*
+ * The timings live in utils/splash.ts, where they can be tested — the length of
+ * this screen is the whole point of it, and it's the one thing a screenshot
+ * can't show you.
+ */
+
+/**
+ * Read before the first render so the splash never starts long and then
+ * shortens under the player.
+ *
+ * Wrapped because storage throws in real situations — Safari's private mode,
+ * a webview with cookies blocked — and a splash screen that crashes the app is
+ * worse than one that's always long.
+ */
+function lastBoot(): number | null {
+  try {
+    const raw = localStorage.getItem(LAST_BOOT_KEY);
+    return raw === null ? null : Number(raw);
+  } catch {
+    return null;
+  }
+}
+
+function rememberBoot() {
+  try {
+    localStorage.setItem(LAST_BOOT_KEY, String(Date.now()));
+  } catch {
+    /* Not being able to remember isn't worth an error. */
+  }
+}
 
 export default function SplashScreen({ onDone }: { onDone: () => void }) {
   const [leaving, setLeaving] = useState(false);
   const tip = useMemo(() => shuffle([...TIPS])[0], []);
+  // Decided on the first render and never recomputed: a length that changed
+  // mid-splash would make the progress bar jump.
+  const [total] = useState(() => splashDuration(lastBoot(), Date.now()));
+  const warm = total === WARM_MS;
 
   useEffect(() => {
-    const fade = setTimeout(() => setLeaving(true), SPLASH_MS - FADE_MS);
-    const done = setTimeout(onDone, SPLASH_MS);
+    rememberBoot();
+    const fade = setTimeout(() => setLeaving(true), total - FADE_MS);
+    const done = setTimeout(onDone, total);
     return () => {
       clearTimeout(fade);
       clearTimeout(done);
     };
-  }, [onDone]);
+  }, [onDone, total]);
 
   return (
     <div
@@ -55,8 +87,10 @@ export default function SplashScreen({ onDone }: { onDone: () => void }) {
         leaving ? 'opacity-0' : 'opacity-100'
       }`}
     >
-      {/* Ambient tape: LONGs drift up, SHORTs drift down. */}
-      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+      {/* Ambient tape: LONGs drift up, SHORTs drift down. Skipped on a warm
+          boot — every chip's animation is longer than the whole screen lives,
+          so they'd only ever be caught mid-flight. */}
+      <div className={`absolute inset-0 pointer-events-none ${warm ? 'hidden' : ''}`} aria-hidden="true">
         {TICKERS.map((t, i) => (
           <span
             key={i}
@@ -89,12 +123,13 @@ export default function SplashScreen({ onDone }: { onDone: () => void }) {
         <div className="mt-6 h-1.5 w-44 rounded-full bg-carbon-800 overflow-hidden">
           <div
             className="h-full rounded-full bg-lime-500 animate-splash-progress"
-            style={{ animationDuration: `${SPLASH_MS - FADE_MS}ms` }}
+            style={{ animationDuration: `${total - FADE_MS}ms` }}
           />
         </div>
       </div>
 
-      <div className="shrink-0 pb-6 text-center relative z-10">
+      {/* A tip nobody has time to read is just clutter on the way in. */}
+      <div className={`shrink-0 pb-6 text-center relative z-10 ${warm ? 'invisible' : ''}`}>
         <p className="text-[10px] font-black text-carbon-500 uppercase tracking-widest">¿Sabías que…?</p>
         <p className="mt-1.5 text-sm text-carbon-300 font-medium max-w-xs mx-auto leading-snug">{tip}</p>
       </div>

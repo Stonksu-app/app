@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
  * es.duolingo.com: 50px tall, 12px radius, 15px/700 uppercase with 0.8px
  * tracking, sitting on a 4px lip it squashes into when pressed. */
 
-type Variant = 'primary' | 'secondary' | 'danger';
+type Variant = 'primary' | 'secondary' | 'danger' | 'platinum';
 type Size = 'md' | 'sm';
 
 const VARIANTS: Record<Variant, { classes: string; lip: string }> = {
@@ -20,11 +20,22 @@ const VARIANTS: Record<Variant, { classes: string; lip: string }> = {
     classes: 'bg-danger-500 hover:enabled:bg-danger-600 text-white',
     lip: '#8f1d1d',
   },
+  /* For anything about mastery or Ultra. Lime is the app's "go", so a green
+     button under a platinum bar reads as two subjects sharing a card.
+     ultra-400 rather than 500 for the fill: carbon text on 500 measures 4.23:1,
+     under the 4.5 this size of type needs, and on 400 it's 6.59. */
+  platinum: {
+    classes: 'bg-ultra-400 hover:enabled:bg-ultra-300 text-carbon-900',
+    lip: 'var(--color-ultra-800)',
+  },
 };
 
-const SIZES: Record<Size, string> = {
-  md: 'h-[50px] text-[15px]',
-  sm: 'h-[42px] text-[13px]',
+/* Padding belongs to the size, not to the layout: a small button padded like
+   a big one ends up wider than the sentence inside it, which is how "Guardar"
+   grew into a slab. Only applies when the button isn't stretching anyway. */
+const SIZES: Record<Size, { height: string; padding: string }> = {
+  md: { height: 'h-[50px] text-[15px]', padding: 'px-8' },
+  sm: { height: 'h-[42px] text-[13px]', padding: 'px-4' },
 };
 
 /** Disabled buttons lose the lip — a button you can't press shouldn't look
@@ -34,10 +45,10 @@ const DISABLED = 'disabled:bg-carbon-800 disabled:text-carbon-500 disabled:borde
 function classesFor(variant: Variant, size: Size, fullWidth: boolean, extra: string) {
   return [
     'btn-3d inline-flex items-center justify-center gap-2 rounded-xl font-bold uppercase tracking-[0.8px] text-center',
-    SIZES[size],
+    SIZES[size].height,
     VARIANTS[variant].classes,
     DISABLED,
-    fullWidth ? 'w-full' : 'px-8',
+    fullWidth ? 'w-full' : SIZES[size].padding,
     extra,
   ].join(' ');
 }
@@ -57,10 +68,14 @@ export function Button({
   className = '',
   onClick,
   disabled,
+  // Defaults to "button" so a Button sitting inside a form doesn't submit it by
+  // accident; pass "submit" when that is the point.
+  type = 'button',
   children,
-}: CommonProps & { onClick?: () => void; disabled?: boolean }) {
+}: CommonProps & { onClick?: () => void; disabled?: boolean; type?: 'button' | 'submit' }) {
   return (
     <button
+      type={type}
       onClick={onClick}
       disabled={disabled}
       style={{ ['--btn-lip' as string]: VARIANTS[variant].lip }}

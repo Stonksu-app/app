@@ -1,13 +1,26 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar';
 import NavRail from '../components/NavRail';
 import BottomNav from '../components/BottomNav';
 import Mascot from '../components/Mascot';
 import Icon from '../components/Icon';
+import PlanBadge from '../components/PlanBadge';
+import LeagueMark from '../components/LeagueMark';
+import { MAX_LEAGUE_RANK, leagueRankInfo } from '../data/leagues';
 import AchievementRow from '../components/AchievementRow';
+import ReminderSetting from '../components/ReminderSetting';
+import HeartsReminderSetting from '../components/HeartsReminderSetting';
+import PasswordSetting from '../components/PasswordSetting';
+import ConfirmModal from '../components/ConfirmModal';
+import FriendsPanel from '../components/FriendsPanel';
 import { byRelevance, computeAchievements } from '../data/achievements';
 import { getLessonById } from '../data/lessons';
 import { useUserStore, xpToLevel } from '../store/useUserStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { appEnv, isCloudEnabled, isTestingBackend } from '../lib/supabase';
+import { signOut } from '../lib/cloud';
+import { useSyncStore } from '../store/useSyncStore';
 import type { IconName } from '../types';
 
 /* Section headings are 24px/700 and stat tiles sit in a 2x2 grid, matching the
@@ -52,9 +65,30 @@ export default function Profile() {
     nodeStageProgress,
     openedChestIds,
     avatar,
+    plan,
+    leagueRank,
+    weeklyXp,
     resetProgress,
   } = useUserStore();
   const { level } = xpToLevel(xp);
+  const league = leagueRankInfo(leagueRank);
+  const authStatus = useAuthStore((s) => s.status);
+  const syncUserId = useSyncStore((s) => s.userId);
+  const navigate = useNavigate();
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const doSignOut = async () => {
+    setLoggingOut(true);
+    // Reset the local view first: if it's left holding this account's data,
+    // the "empty account" branch of the sync would push it straight back up
+    // under the fresh anonymous session that replaces it.
+    resetProgress();
+    await signOut();
+    setLoggingOut(false);
+    setConfirmLogout(false);
+    navigate('/');
+  };
 
   const achievements = computeAchievements({ streak, xp, attempts, nodeStageProgress, openedChestIds });
   const preview = [...achievements].sort(byRelevance).slice(0, 3);
@@ -75,9 +109,7 @@ export default function Profile() {
       <BottomNav />
 
       <div className="flex-1 min-w-0">
-        <div className="lg:hidden">
           <TopBar />
-        </div>
 
         <div className="max-w-2xl mx-auto px-4 py-6 pb-32 lg:pb-6">
           {/* Identity */}
@@ -90,7 +122,12 @@ export default function Profile() {
               <Icon name="pencil" size={18} />
             </Link>
             <Mascot size={110} mood="happy" look={avatar} />
-            <h1 className="mt-3 text-[25px] sm:text-[28px] font-black text-carbon-50">{name || 'Trader'}</h1>
+            {/* The badge sits with the name, here and on a friend's card, so
+                the thing being paid for is the same thing wherever it shows. */}
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <h1 className="text-[25px] sm:text-[28px] font-black text-carbon-50">{name || 'Trader'}</h1>
+              <PlanBadge plan={plan} />
+            </div>
             <p className="text-carbon-400 text-sm font-medium">
               {EXPERIENCE_LABELS[onboardingAnswers.experience ?? ''] ?? 'Explorando el mercado'}
             </p>
@@ -100,6 +137,16 @@ export default function Profile() {
               </p>
             )}
           </div>
+
+          <Link
+            to="/tienda"
+            className="mt-4 flex items-center gap-3 rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-4 text-carbon-200 hover:border-lime-500/50 transition"
+          >
+            <Icon name="coins" size={24} className="text-lime-400" />
+            <span className="flex-1 font-bold">Tienda</span>
+            <span className="text-xs text-carbon-400">Vidas y protectores</span>
+            <Icon name="chevron-left" size={18} className="rotate-180" />
+          </Link>
 
           {/* Statistics */}
           <h2 className="mt-8 text-2xl font-black text-carbon-50">Estadísticas</h2>
@@ -114,6 +161,49 @@ export default function Profile() {
             <StatTile icon="medal" value={level} label="Nivel actual" />
             <StatTile icon="target" value={flawless} label="Lecciones perfectas" />
           </div>
+
+          {/* League — the one number on this page that is about other
+              people, so it sits between your own stats and your friends. */}
+          <div className="mt-8 flex items-center justify-between gap-3">
+            <h2 className="text-2xl font-black text-carbon-50">Liga</h2>
+            {authStatus === 'registered' && (
+              <Link
+                to="/liga"
+                className="text-[15px] font-black uppercase tracking-[0.8px] text-lime-400 hover:text-lime-300"
+              >
+                Ver tabla
+              </Link>
+            )}
+          </div>
+
+          {authStatus === 'registered' ? (
+            <Link
+              to="/liga"
+              className="mt-3 flex items-center gap-4 rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-4 hover:border-carbon-700 transition"
+            >
+              <LeagueMark rank={leagueRank} size={52} />
+              <div className="min-w-0 flex-1">
+                <p className="text-[12px] font-black uppercase tracking-[0.8px] text-carbon-500">
+                  Liga {leagueRank + 1} de {MAX_LEAGUE_RANK + 1}
+                </p>
+                <p className="text-[19px] font-black text-carbon-50 truncate">{league.name}</p>
+                {/* Weekly XP rather than total: it's what the table ranks on,
+                    and a number here that didn't decide anything would just be
+                    XP said twice. */}
+                <p className="text-sm text-carbon-400 tabular-nums">{weeklyXp} XP esta semana</p>
+              </div>
+              <Icon name="chevron-left" size={20} className="shrink-0 text-carbon-600 rotate-180" />
+            </Link>
+          ) : (
+            /* Anonymous accounts aren't seated at a table — saying so here is
+               better than a card that looks broken. */
+            <p className="mt-3 rounded-2xl border-2 border-carbon-800 bg-carbon-850 p-5 text-sm text-carbon-400 text-center">
+              Guarda tu cuenta para competir en la liga: las anónimas no entran en las mesas.
+            </p>
+          )}
+
+          {/* Friends */}
+          <FriendsPanel />
 
           {/* Achievements */}
           <div className="mt-8 flex items-center justify-between gap-3">
@@ -161,18 +251,52 @@ export default function Profile() {
             </div>
           )}
 
+          <ReminderSetting />
+          <HeartsReminderSetting />
+          <PasswordSetting />
+
           <button
-            onClick={() => {
-              if (confirm('¿Reiniciar todo tu progreso? Esta acción no se puede deshacer.')) {
-                resetProgress();
-              }
-            }}
+            onClick={() => setConfirmLogout(true)}
             className="mt-8 text-xs text-carbon-500 hover:text-danger-400 font-bold"
           >
-            Reiniciar progreso
+            Cerrar sesión
           </button>
+
+          {/* Settles "is the new build actually on my phone?" without guesswork,
+              which a sideloaded .ipa otherwise gives you no way to answer. */}
+          <p className="mt-6 text-[11px] text-carbon-600 font-bold tabular-nums">
+            Versión {__BUILD_ID__} ·{' '}
+            {authStatus === 'off'
+              ? 'solo en este dispositivo'
+              : authStatus === 'registered'
+              ? 'progreso guardado en la nube'
+              : 'sin cuenta — progreso solo local'}
+            {isTestingBackend && isCloudEnabled && (
+              <span className="text-[#FFC93C]">
+                {' '}
+                · base de datos de {appEnv === 'test' ? 'test' : 'pruebas'}
+              </span>
+            )}
+            {/* The first characters of the account id. "Why am I not my old
+                self?" is almost always "you are signed into a different
+                account than you think", and nothing else on screen says
+                which. Enough to match against a row in the database, far too
+                little to identify anyone. */}
+            {syncUserId && <span className="text-carbon-700"> · {syncUserId.slice(0, 8)}</span>}
+          </p>
         </div>
       </div>
+
+      {confirmLogout && (
+        <ConfirmModal
+          title={`¿Seguro, ${name || 'trader'}, que quieres salir?`}
+          message="Se cerrará tu sesión en este dispositivo. Si tienes una cuenta vinculada, tu progreso sigue guardado en la nube y podrás volver a entrar con ella."
+          confirmLabel="Cerrar sesión"
+          busy={loggingOut}
+          onConfirm={() => void doSignOut()}
+          onCancel={() => setConfirmLogout(false)}
+        />
+      )}
     </div>
   );
 }

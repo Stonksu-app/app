@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { SortClassifyGame as SortClassifyGameType } from '../types';
+import { shuffle } from '../utils/shuffle';
 import { Button } from './Button';
 import Icon from './Icon';
 
@@ -21,13 +22,55 @@ export default function SortClassifyGame({
   const [placed, setPlaced] = useState<Record<string, 'a' | 'b'>>({});
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [wrongItem, setWrongItem] = useState<string | null>(null);
+  // Shuffled once at mount, not on every render: the authored order is a
+  // fixed pattern (usually alternating buckets), so replaying the same round
+  // meant the answer was the position, not the item. Fixed here rather than
+  // re-shuffling `items` on every placement, which would send the remaining
+  // chips jumping around mid-game.
+  const [order] = useState(() => shuffle(items));
 
-  const remaining = items.filter((i) => !placed[i.id]);
+  /*
+   * Dragging, alongside the tap-then-tap that was already here.
+   *
+   * Both, not one: dragging is the obvious gesture for putting a thing in a
+   * box, and tapping is the one that still works with a thumb on a moving bus,
+   * or with a keyboard. The drag is pointer-based rather than HTML5
+   * drag-and-drop, which does not fire on touch at all.
+   */
+  const [dragging, setDragging] = useState<{
+    id: string;
+    x: number;
+    y: number;
+    /** True once the pointer has travelled far enough to mean a drag rather
+     *  than a tap that wobbled. Below the threshold the gesture stays a tap,
+     *  which is the flow that was already here and still works. */
+    moved: boolean;
+  } | null>(null);
+  const bucketRefs = useRef<Record<'a' | 'b', HTMLElement | null>>({ a: null, b: null });
+  const [hoverBucket, setHoverBucket] = useState<'a' | 'b' | null>(null);
+  /** Where the finger went down, so the chip follows it rather than jumping
+   *  its own top-left corner to the cursor. */
+  const startRef = useRef({ x: 0, y: 0 });
+  /** Pixels of travel before a press becomes a drag. A finger never holds
+   *  perfectly still, and treating two pixels of wobble as a drag stole the
+   *  tap-then-tap flow from anyone who taps firmly. */
+  const DRAG_THRESHOLD = 6;
+
+  /** Which bucket a point is over, or null between them. */
+  const bucketAt = (x: number, y: number): 'a' | 'b' | null => {
+    for (const key of ['a', 'b'] as const) {
+      const box = bucketRefs.current[key]?.getBoundingClientRect();
+      if (box && x >= box.left && x <= box.right && y >= box.top && y <= box.bottom) return key;
+    }
+    return null;
+  };
+
+  const remaining = order.filter((i) => !placed[i.id]);
   const allDone = remaining.length === 0;
 
-  const handlePlace = (bucket: 'a' | 'b') => {
-    if (!selectedItem) return;
-    const item = items.find((i) => i.id === selectedItem);
+  const handlePlace = (bucket: 'a' | 'b', itemId = selectedItem) => {
+    if (!itemId) return;
+    const item = items.find((i) => i.id === itemId);
     if (!item) return;
     if (item.bucket === bucket) {
       setPlaced((p) => ({ ...p, [item.id]: bucket }));
@@ -43,14 +86,74 @@ export default function SortClassifyGame({
 
   return (
     <div className="w-full">
-      <p className="text-sm text-carbon-400 font-medium text-center mb-5">{instructions}</p>
+      <p className="text-sm text-carbon-400 font-medium text-center mb-1">{instructions}</p>
+      <p className="text-xs text-carbon-500 text-center mb-4">
+        Arrastra cada palabra a su caja, o tócala y luego la caja
+      </p>
 
       <div className="flex flex-wrap gap-2 justify-center min-h-12 mb-5">
         {remaining.map((item) => (
           <button
             key={item.id}
-            onClick={() => setSelectedItem(item.id)}
-            className={`px-3 py-2 rounded-full border-2 text-sm font-bold transition ${
+            // Pointer input already selected this on press. Kept for the
+            // keyboard, where there is no pointer at all — and guarded so it
+            // can't re-select a chip that was just dragged into a bucket.
+            onClick={() => {
+              if (!placed[item.id]) setSelectedItem(item.id);
+            }}
+            onPointerDown={(e) => {
+              (e.currentTarget as Element).setPointerCapture(e.pointerId);
+              setSelectedItem(item.id);
+              startRef.current = { x: e.clientX, y: e.clientY };
+              setDragging({ id: item.id, x: e.clientX, y: e.clientY, moved: false });
+            }}
+            onPointerMove={(e) => {
+              if (dragging?.id !== item.id) return;
+              const dx = e.clientX - startRef.current.x;
+              const dy = e.clientY - startRef.current.y;
+              const moved = dragging.moved || Math.hypot(dx, dy) > DRAG_THRESHOLD;
+              setDragging({ id: item.id, x: e.clientX, y: e.clientY, moved });
+              setHoverBucket(moved ? bucketAt(e.clientX, e.clientY) : null);
+            }}
+            onPointerUp={(e) => {
+              if (dragging?.id !== item.id) return;
+              // Only a real drag drops. A tap leaves the chip selected, which
+              // is where the tap-then-tap flow picks up — and stops a firm tap
+              // that happens to land over a bucket from answering for you.
+              const bucket = dragging.moved ? bucketAt(e.clientX, e.clientY) : null;
+              setDragging(null);
+              setHoverBucket(null);
+              if (bucket) handlePlace(bucket, item.id);
+            }}
+            // Fires when the browser takes the pointer away — a scroll gesture
+            // winning, the element unmounting mid-drag — and without it the
+            // chip stays stuck to the finger with nothing to release it.
+            onLostPointerCapture={() => {
+              setDragging(null);
+              setHoverBucket(null);
+            }}
+            onPointerCancel={() => {
+              setDragging(null);
+              setHoverBucket(null);
+            }}
+            style={
+              dragging?.id === item.id
+                ? {
+                    transform: `translate(${dragging.x - startRef.current.x}px, ${
+                      dragging.y - startRef.current.y
+                    }px)`,
+                  }
+                : undefined
+            }
+            /* `transition` animates transform too, so while dragging the chip
+               trailed the finger by 150ms and every drop landed where the
+               finger had been rather than where it was. Off during the drag,
+               on for everything else. */
+            className={`px-3 py-2 rounded-full border-2 text-sm font-bold touch-none select-none ${
+              dragging?.id === item.id
+                ? 'z-20 relative shadow-lg cursor-grabbing transition-none'
+                : 'cursor-grab transition'
+            } ${
               wrongItem === item.id
                 ? 'border-danger-500 bg-danger-950 text-danger-400 animate-shake'
                 : selectedItem === item.id
@@ -66,9 +169,16 @@ export default function SortClassifyGame({
 
       <div className="grid grid-cols-2 gap-3">
         <button
+          ref={(el) => {
+            bucketRefs.current.a = el;
+          }}
           onClick={() => handlePlace('a')}
           disabled={!selectedItem}
-          className="rounded-2xl border-2 border-dashed border-lime-500/40 hover:enabled:border-lime-500 disabled:opacity-40 disabled:cursor-not-allowed p-4 min-h-28 flex flex-col gap-1.5 transition"
+          className={`rounded-2xl border-2 border-dashed p-4 min-h-28 flex flex-col gap-1.5 transition disabled:opacity-40 disabled:cursor-not-allowed ${
+            hoverBucket === 'a'
+              ? 'border-lime-500 bg-lime-500/10 scale-[1.02]'
+              : 'border-lime-500/40 hover:enabled:border-lime-500'
+          }`}
         >
           <span className="text-xs font-black text-lime-400 uppercase">{bucketALabel}</span>
           <div className="flex flex-wrap gap-1.5 justify-center">
@@ -82,9 +192,16 @@ export default function SortClassifyGame({
           </div>
         </button>
         <button
+          ref={(el) => {
+            bucketRefs.current.b = el;
+          }}
           onClick={() => handlePlace('b')}
           disabled={!selectedItem}
-          className="rounded-2xl border-2 border-dashed border-danger-500/40 hover:enabled:border-danger-500 disabled:opacity-40 disabled:cursor-not-allowed p-4 min-h-28 flex flex-col gap-1.5 transition"
+          className={`rounded-2xl border-2 border-dashed p-4 min-h-28 flex flex-col gap-1.5 transition disabled:opacity-40 disabled:cursor-not-allowed ${
+            hoverBucket === 'b'
+              ? 'border-danger-500 bg-danger-500/10 scale-[1.02]'
+              : 'border-danger-500/40 hover:enabled:border-danger-500'
+          }`}
         >
           <span className="text-xs font-black text-danger-400 uppercase">{bucketBLabel}</span>
           <div className="flex flex-wrap gap-1.5 justify-center">
