@@ -6,14 +6,14 @@ name: Build iOS IPA (unsigned)
 # Which Supabase project the build points at is decided by the tag:
 #
 #   v0.8.0-dev   ->  dev
-#   v0.8.0-test  ->  test (rigby-branch, *_TEST)
+#   v0.8.0-test  ->  test (*_TEST)
 #   v0.8.0       ->  production
 #
 # Repository variables and secrets are per-repo, not per-branch, so the two
 # environments are told apart by a _DEV / _TEST / _PROD suffix on the name.
-# Anything ending in -dev, -beta or -rc counts as dev, and -test or -rigby
-# counts as test, so a release candidate can never be the thing that
-# accidentally points a shipped app at a non-production database.
+# Anything ending in -dev, -beta or -rc counts as dev, and -test counts as
+# test, so a release candidate can never be the thing that accidentally
+# points a shipped app at a non-production database.
 on:
   workflow_dispatch:
     inputs:
@@ -41,7 +41,7 @@ jobs:
             NAME="${{ inputs.environment }}"
           else
             case "${{ github.ref_name }}" in
-              *-test|*-rigby) NAME=test ;;
+              *-test) NAME=test ;;
               *-dev|*-beta|*-rc|*-rc.*) NAME=dev ;;
               *) NAME=production ;;
             esac

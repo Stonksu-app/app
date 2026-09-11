@@ -39,10 +39,9 @@ export const isCloudEnabled = Boolean(url && anonKey);
  * dev build from a production one, and "why is my progress missing?" is almost
  * always the answer being "you're on the other database".
  *
- * `test` is the environment of the `rigby-branch` branch: its own Supabase
- * project, loaded from a copy of dev, so that a destructive test cannot take
- * dev's data with it. Anything unrecognised reads as dev, which is the safe
- * default: it never mistakes an unconfigured build for production.
+ * The road is dev -> test -> production, one branch and one Supabase project
+ * each. Anything unrecognised reads as dev, which is the safe default: it
+ * never mistakes an unconfigured build for production.
  */
 export type AppEnv = 'dev' | 'test' | 'production';
 
