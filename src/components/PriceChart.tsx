@@ -85,6 +85,20 @@ const MENU_H = 430;
  */
 const VISIBLE_BARS = 120;
 
+/**
+ * How long a touch has to sit still before it counts as the long-press that
+ * opens the order menu — a phone's stand-in for the right-click above.
+ *
+ * Short enough that it doesn't feel like waiting, long enough that it
+ * survives the couple of frames a tap wobbles by before lifting — the same
+ * budget a platform long-press (text selection, a native context menu)
+ * usually gives itself.
+ */
+const LONG_PRESS_MS = 450;
+/** How far a touch may drift and still count as "held still". Past this it
+ *  reads as the start of a pan, which AUTO-off already hands to the chart. */
+const LONG_PRESS_SLOP_PX = 10;
+
 export default function PriceChart({
   candles,
   entry,
@@ -164,6 +178,10 @@ export default function PriceChart({
   const [menu, setMenu] = useState<{ x: number; y: number; price: number | null } | null>(null);
   /** The target currently under the finger, and where it is right now. */
   const [dragging, setDragging] = useState<{ kind: 'takeProfit' | 'stopLoss'; price: number } | null>(null);
+  /** The pending long-press timer and where it started, so a move past the
+   *  slop or an early lift can cancel it before it fires. A ref, not state:
+   *  nothing here is drawn, and a timer id has no business re-rendering. */
+  const longPress = useRef<{ id: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
   /*
    * Bumped whenever the chart moves, so the handles are re-placed against it.
    *
@@ -287,6 +305,15 @@ export default function PriceChart({
     });
   }, []);
 
+  const cancelLongPress = useCallback(() => {
+    if (longPress.current) clearTimeout(longPress.current.id);
+    longPress.current = null;
+  }, []);
+
+  // A timer left running past the component isn't dangerous — it only calls
+  // setMenu — but it would fire after the chart it was meant for is gone.
+  useEffect(() => cancelLongPress, [cancelLongPress]);
+
   // Closing on any click elsewhere, on Escape, or on a scroll — the three ways
   // anybody expects a menu like this to go away.
   useEffect(() => {
@@ -405,7 +432,7 @@ export default function PriceChart({
     <div ref={wrap} className="relative w-full">
       <div
         ref={box}
-        className="w-full"
+        className="w-full select-none"
         aria-label="Gráfico de precio"
         role="img"
         /* A click on the candles puts the menu away. The listener below only
@@ -413,7 +440,33 @@ export default function PriceChart({
            a menu sitting open over the very thing you were trying to look at.
            Safe on the press that opens it too: pointerdown runs first and
            contextmenu re-opens it a moment later, at the new place. */
-        onPointerDown={() => setMenu(null)}
+        onPointerDown={(e) => {
+          setMenu(null);
+          // The mouse already has a right-click for this; arming a timer under
+          // a left-click too would fire the order menu on an ordinary drag.
+          if (e.pointerType === 'mouse') return;
+          const { clientX, clientY } = e;
+          longPress.current = {
+            x: clientX,
+            y: clientY,
+            id: setTimeout(() => {
+              longPress.current = null;
+              openMenu(clientX, clientY, true);
+            }, LONG_PRESS_MS),
+          };
+        }}
+        onPointerMove={(e) => {
+          // Past the slop this is a pan starting (or AUTO is on and it's
+          // nothing), not a press held still — the same distinction a long
+          // press for text selection or a native context menu makes.
+          if (!longPress.current) return;
+          const dx = e.clientX - longPress.current.x;
+          const dy = e.clientY - longPress.current.y;
+          if (Math.hypot(dx, dy) > LONG_PRESS_SLOP_PX) cancelLongPress();
+        }}
+        onPointerUp={cancelLongPress}
+        onPointerLeave={cancelLongPress}
+        onPointerCancel={cancelLongPress}
         onContextMenu={(e) => {
           e.preventDefault();
           openMenu(e.clientX, e.clientY, true);
