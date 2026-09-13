@@ -264,14 +264,50 @@ export function liquidationDistance(p: Position): number {
  * all, so that case is named and rejected rather than quietly accepted.
  */
 
-/** Where a trigger has to sit for the direction to make any sense. */
-export function triggerIsValid(p: Position, kind: 'takeProfit' | 'stopLoss', price: number): boolean {
+/**
+ * Where a trigger has to sit for the direction to make any sense.
+ *
+ * Two conditions, and the second one only applies to a position that is
+ * already running.
+ *
+ * Against the **entry**: a target is what you'll settle for and a stop what
+ * you'll accept losing, so each belongs on its own side of the price you got
+ * in at. A stop past the liquidation is not a stop at all — the engine closes
+ * you first — so it's named and rejected rather than quietly accepted.
+ *
+ * Against the **market**, when it's known: a trigger is an order waiting for a
+ * price that hasn't happened yet. Dropped on the side the price already left
+ * behind, it fires the instant it lands and settles at a level the market has
+ * moved past — a long bought at 100 with the price at 95 could take a stop at
+ * 97 and be paid as if it had sold there. Coins out of nowhere, and the only
+ * skill involved is knowing where to click.
+ *
+ * `market` is left out when the position doesn't exist yet: a limit order
+ * prices its targets off a fill that hasn't happened, so there is no market
+ * side to be on the wrong side of.
+ */
+export function triggerIsValid(
+  p: Position,
+  kind: 'takeProfit' | 'stopLoss',
+  price: number,
+  market?: number
+): boolean {
   if (!Number.isFinite(price) || price <= 0) return false;
   const liq = liquidationPrice(p);
-  if (p.direction === 'long') {
-    return kind === 'takeProfit' ? price > p.entry : price < p.entry && price > liq;
-  }
-  return kind === 'takeProfit' ? price < p.entry : price > p.entry && price < liq;
+  const sideOfEntry =
+    p.direction === 'long'
+      ? kind === 'takeProfit'
+        ? price > p.entry
+        : price < p.entry && price > liq
+      : kind === 'takeProfit'
+        ? price < p.entry
+        : price > p.entry && price < liq;
+  if (!sideOfEntry) return false;
+  if (market === undefined || !Number.isFinite(market) || market <= 0) return true;
+  // The same side `reaches` watches, so what can be placed and what can fire
+  // are two readings of one rule rather than two rules that might drift.
+  const above = (p.direction === 'long') === (kind === 'takeProfit');
+  return above ? price > market : price < market;
 }
 
 /** Whether a price range reaches a level, from the side the position cares

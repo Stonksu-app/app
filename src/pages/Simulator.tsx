@@ -410,7 +410,7 @@ export default function Simulator() {
    */
   const setTarget = async (kind: 'takeProfit' | 'stopLoss', at: number | null) => {
     if (!position || !sync.ready) return;
-    if (at !== null && !triggerIsValid(position, kind, at)) return;
+    if (at !== null && !triggerIsValid(position, kind, at, price)) return;
     await sync.commit((st) => {
       if (!st.openTrade || st.openTrade.openedAt !== openedAt) return null;
       return { state: { ...st, openTrade: { ...st.openTrade, [kind]: at } } };
@@ -437,8 +437,8 @@ export default function Simulator() {
     if (position) {
       const acciones: ChartAction[] = [];
       const busy = !sync.ready ? 'Comprobando tus operaciones' : null;
-      const tpOk = triggerIsValid(position, 'takeProfit', at);
-      const slOk = triggerIsValid(position, 'stopLoss', at);
+      const tpOk = triggerIsValid(position, 'takeProfit', at, price);
+      const slOk = triggerIsValid(position, 'stopLoss', at, price);
 
       if (tpOk) {
         acciones.push({
@@ -464,10 +464,16 @@ export default function Simulator() {
       if (!tpOk && !slOk) {
         acciones.push({
           label: 'Aquí no cabe ningún objetivo',
+          // Entre tu entrada y el precio de ahora no cabe nada: por ese tramo
+          // el mercado ya ha pasado, así que un objetivo ahí se ejecutaría
+          // solo. Da igual la dirección y da igual cuál de los dos quede más
+          // arriba, y por eso se pregunta por el signo en vez de por el lado.
           hint:
             (position.direction === 'long' ? at <= liqPrice : at >= liqPrice)
               ? 'Pasado el precio de liquidación ya te habrían cerrado'
-              : 'Un objetivo tiene que quedar a un lado u otro de tu entrada',
+              : (at - price) * (at - position.entry) < 0
+                ? 'Por ahí ya ha pasado el precio: se ejecutaría al instante'
+                : 'Un objetivo tiene que quedar a un lado u otro de tu entrada',
           disabled: true,
           onSelect: () => {},
         });
@@ -831,7 +837,7 @@ export default function Simulator() {
                     ? {
                         takeProfit: position.takeProfit ?? null,
                         stopLoss: position.stopLoss ?? null,
-                        validAt: (kind, at) => triggerIsValid(position, kind, at),
+                        validAt: (kind, at) => triggerIsValid(position, kind, at, price),
                         onDrop: (kind, at) => void setTarget(kind, at),
                       }
                     : undefined
