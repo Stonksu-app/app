@@ -257,6 +257,11 @@ interface UserState {
    *  permission that makes them work is granted per device, so a preference
    *  synced from a phone would read as "on" in a browser that can't deliver
    *  anything. */
+  /** Whether the interface makes a sound. Device-local, like the reminders:
+   *  a phone on the bus and a laptop at a desk want different answers, and
+   *  syncing this would have one of them override the other. */
+  soundEnabled: boolean;
+  setSoundEnabled: (on: boolean) => void;
   reminderEnabled: boolean;
   /** Hour of the day, 0-23, in local time. */
   reminderHour: number;
@@ -543,6 +548,7 @@ export const useUserStore = create<UserState>()(
       claimedMissionIds: [],
       unlockedAccessories: ['ninguno'],
       testMode: false,
+      soundEnabled: true,
       reminderEnabled: false,
       reminderHour: DEFAULT_REMINDER_HOUR,
       heartsReminderEnabled: false,
@@ -1069,6 +1075,8 @@ export const useUserStore = create<UserState>()(
 
       isAccessoryUnlocked: (style) => style === 'ninguno' || get().unlockedAccessories.includes(style),
 
+      setSoundEnabled: (on) => set({ soundEnabled: on }),
+
       setReminder: (patch) =>
         set((s) => ({
           reminderEnabled: patch.enabled ?? s.reminderEnabled,
@@ -1131,6 +1139,7 @@ export const useUserStore = create<UserState>()(
           claimedMissionIds: [],
           unlockedAccessories: ['ninguno'],
           testMode: false,
+          soundEnabled: true,
           reminderEnabled: false,
           reminderHour: DEFAULT_REMINDER_HOUR,
           heartsReminderEnabled: false,

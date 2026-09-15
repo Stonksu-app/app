@@ -12,6 +12,7 @@ import { isCloudEnabled } from '../lib/supabase';
 import { todayLocal } from '../utils/streak';
 import { FREE_TRADES_PER_DAY, hasUnlimitedTrades } from '../data/plans';
 import PriceChart, { type ChartAction } from '../components/PriceChart';
+import { play } from '../lib/sound';
 import TradeHistory from '../components/TradeHistory';
 import {
   INTERVALS,
@@ -384,7 +385,25 @@ export default function Simulator() {
     const accepted = await sync.commit(s => s.openTrade?.openedAt !== since ? null : ({
       state: { ...s, openTrade: null, tradeHistory: [record, ...s.tradeHistory].slice(0, 50) }, coinDelta: change,
     }));
-    if (accepted) setSettled({ coins: change, reason });
+    if (accepted) {
+      setSettled({ coins: change, reason });
+      /* Cada final tiene la suya. Un cierre a mano no sabe cómo fue hasta
+         mirar el saldo, y cero merece voz propia: pasa más de lo que parece
+         cuando el movimiento no cubre la comisión, y no es una pérdida. */
+      play(
+        reason === 'takeProfit'
+          ? 'takeProfitHit'
+          : reason === 'stopLoss'
+          ? 'stopLossHit'
+          : reason === 'liquidation'
+          ? 'liquidated'
+          : change > 0
+          ? 'closeProfit'
+          : change < 0
+          ? 'closeLoss'
+          : 'closeFlat',
+      );
+    }
   };
 
   /**
@@ -410,11 +429,22 @@ export default function Simulator() {
    */
   const setTarget = async (kind: 'takeProfit' | 'stopLoss', at: number | null) => {
     if (!position || !sync.ready) return;
-    if (at !== null && !triggerIsValid(position, kind, at, price)) return;
-    await sync.commit((st) => {
+    if (at !== null && !triggerIsValid(position, kind, at, price)) {
+      play('denied');
+      return;
+    }
+    const tenia = position[kind] != null;
+    const hecho = await sync.commit((st) => {
       if (!st.openTrade || st.openTrade.openedAt !== openedAt) return null;
       return { state: { ...st, openTrade: { ...st.openTrade, [kind]: at } } };
     });
+    if (!hecho) return;
+    /* Mover uno que ya existe es un tic y no un anuncio: arrastrándolo lo vas
+       a oír veinte veces seguidas, y cualquier cosa más larga se hace
+       insoportable a la tercera. */
+    if (at === null) play(kind === 'takeProfit' ? 'targetCleared' : 'stopCleared');
+    else if (tenia) play(kind === 'takeProfit' ? 'targetMoved' : 'stopMoved');
+    else play(kind === 'takeProfit' ? 'targetSet' : 'stopSet');
   };
 
   /**
@@ -553,8 +583,17 @@ export default function Simulator() {
     const kind = at?.type ?? orderType;
     const restingAt = at?.type === 'limit' ? at.price : limitPrice;
     const rests = kind === 'limit' && restingAt !== null && limitCanRest(direction, restingAt, price);
-    if (!sync.ready || !marketReady || openTrade || pendingOrder || margin <= 0 || margin > coins || !slReachable) return;
-    if (kind === 'limit' && !rests) return;
+    /* Un "no" audible. El botón ya está deshabilitado en la mayoría de estos
+       casos, pero el menú del gráfico y el arrastre llegan hasta aquí, y una
+       acción que no hace nada ni suena se lee como que la app se ha colgado. */
+    if (!sync.ready || !marketReady || openTrade || pendingOrder || margin <= 0 || margin > coins || !slReachable) {
+      play('denied');
+      return;
+    }
+    if (kind === 'limit' && !rests) {
+      play('denied');
+      return;
+    }
     const now = Date.now();
     const today = todayLocal();
     const submit = (trade: SimulatorState['openTrade'], order: SimulatorState['pendingOrder']) => sync.commit(s => {
@@ -566,7 +605,7 @@ export default function Simulator() {
     if (kind === 'limit' && restingAt !== null) {
       // Nothing is bought yet and nothing is at risk: the order waits, and the
       // targets wait with it as percentages, to be priced off the fill.
-      await submit(null, {
+      if (await submit(null, {
         direction,
         leverage,
         margin,
@@ -576,7 +615,7 @@ export default function Simulator() {
         wallet: coins,
         tpRoi,
         slRoi,
-      });
+      })) play('orderPlaced');
       return;
     }
 
@@ -595,18 +634,24 @@ export default function Simulator() {
     opened.stopLoss = slRoi !== null ? priceForRoi(opened, slRoi) : null;
     // Remembered before anything else can go wrong: a position that exists on
     // screen but not in storage is one that vanishes when the app is closed.
-    await submit({
-      direction,
-      leverage,
-      margin,
-      entry: entryPrice,
-      openedAt: now,
-      mode,
-      wallet: coins,
-      takeProfit: opened.takeProfit,
-      stopLoss: opened.stopLoss,
-      orderType: 'market',
-    }, null);
+    if (
+      await submit({
+        direction,
+        leverage,
+        margin,
+        entry: entryPrice,
+        openedAt: now,
+        mode,
+        wallet: coins,
+        takeProfit: opened.takeProfit,
+        stopLoss: opened.stopLoss,
+        orderType: 'market',
+      }, null)
+    ) {
+      // Las mismas dos notas leídas al revés, para no tener que mirar la
+      // pantalla para saber hacia dónde acabas de comprometerte.
+      play(direction === 'long' ? 'openLong' : 'openShort');
+    }
   };
 
   /** Turns a waiting order into a position at its own price. */
@@ -638,13 +683,15 @@ export default function Simulator() {
     const accepted = await sync.commit(s => s.pendingOrder?.placedAt !== pendingOrder.placedAt ? null : ({
       state: { ...s, pendingOrder: null, openTrade: trade },
     }));
+    // Más seca que abrir a mercado: esta orden esperó a su precio.
+    if (accepted) play('orderFilled');
     return accepted ? opened : undefined;
   };
 
   const cancelOrder = () => {
     void sync.commit(s => !pendingOrder || s.pendingOrder?.placedAt !== pendingOrder.placedAt ? null : ({
       state: { ...s, pendingOrder: null, tradesToday: Math.max(0, s.tradesToday - 1) },
-    }));
+    })).then((hecho) => { if (hecho) play('orderCancelled'); });
   };
 
   const closeAt = (at: number, reason: ExitReason) => {

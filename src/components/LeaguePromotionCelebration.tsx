@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import Confetti from './Confetti';
+import { play } from '../lib/sound';
 import Icon from './Icon';
 import LeagueMark from './LeagueMark';
 import { Button } from './Button';
@@ -24,6 +26,11 @@ export default function LeaguePromotionCelebration({
   protectors: number;
   onContinue: () => void;
 }) {
+  // Suena al aparecer: la celebración es el sonido tanto como el confeti.
+  useEffect(() => {
+    play('promotion');
+  }, []);
+
   const info = leagueRankInfo(rank);
 
   return (

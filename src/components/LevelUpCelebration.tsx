@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import Icon from './Icon';
 import Confetti from './Confetti';
+import { play } from '../lib/sound';
 import { Button } from './Button';
 import type { LevelUpInfo } from '../store/useUserStore';
 
@@ -16,6 +18,11 @@ export default function LevelUpCelebration({
   info: LevelUpInfo;
   onContinue: () => void;
 }) {
+  // Suena al aparecer: la celebración es el sonido tanto como el confeti.
+  useEffect(() => {
+    play('levelUp');
+  }, []);
+
   const milestone = info.protectors > 0;
   return (
     <div className="fixed inset-0 z-50 bg-carbon-900 flex flex-col items-center justify-center px-6 text-center">

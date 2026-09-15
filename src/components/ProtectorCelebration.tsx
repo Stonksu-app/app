@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import Icon from './Icon';
 import Confetti from './Confetti';
+import { play } from '../lib/sound';
 import { Button } from './Button';
 
 /**
@@ -13,6 +15,11 @@ import { Button } from './Button';
  * hands you, not a separate system.
  */
 export default function ProtectorCelebration({ onContinue }: { onContinue: () => void }) {
+  // Suena al aparecer: la celebración es el sonido tanto como el confeti.
+  useEffect(() => {
+    play('reward');
+  }, []);
+
   return (
     <div className="fixed inset-0 z-50 bg-carbon-900 flex flex-col items-center justify-center px-6 text-center">
       <Confetti count={50} />
