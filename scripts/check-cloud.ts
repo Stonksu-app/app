@@ -112,6 +112,7 @@ const cloudKeys = new Set(Object.keys(sample));
  * difference that can be enforced is whether someone wrote it down.
  *
  * - testMode: a debugging switch, not progress.
+ * - soundEnabled: a preference for this device's surroundings.
  * - reminder*: the notification permission behind them is granted per device.
  * - lastStreakLoss: an explanation of what happened on this device, not
  *   progress. Syncing it would mean explaining a phone's lost streak on a
@@ -137,6 +138,7 @@ const cloudKeys = new Set(Object.keys(sample));
  */
 const LOCAL_ONLY = new Set([
   'testMode',
+  'soundEnabled',
   'practiceDay',
   'practiceRoundsToday',
   'simulatorOwnerId', // Device cache ownership; the simulator RPC syncs the following five fields.

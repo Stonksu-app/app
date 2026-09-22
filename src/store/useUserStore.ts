@@ -253,6 +253,11 @@ interface UserState {
    *  every topic one stage short of platinum, so each can be finished in a
    *  single lesson to check the mastery and chest flows end to end. */
   testMode: boolean;
+  /** Whether the interface makes a sound. Device-local, like the reminders:
+   *  a phone on the bus and a laptop at a desk want different answers, and
+   *  syncing this would have one of them override the other. */
+  soundEnabled: boolean;
+  setSoundEnabled: (on: boolean) => void;
   /** Streak reminders. Kept off the cloud on purpose: the notification
    *  permission that makes them work is granted per device, so a preference
    *  synced from a phone would read as "on" in a browser that can't deliver
@@ -543,6 +548,7 @@ export const useUserStore = create<UserState>()(
       claimedMissionIds: [],
       unlockedAccessories: ['ninguno'],
       testMode: false,
+      soundEnabled: true,
       reminderEnabled: false,
       reminderHour: DEFAULT_REMINDER_HOUR,
       heartsReminderEnabled: false,
@@ -1069,6 +1075,8 @@ export const useUserStore = create<UserState>()(
 
       isAccessoryUnlocked: (style) => style === 'ninguno' || get().unlockedAccessories.includes(style),
 
+      setSoundEnabled: (on) => set({ soundEnabled: on }),
+
       setReminder: (patch) =>
         set((s) => ({
           reminderEnabled: patch.enabled ?? s.reminderEnabled,
@@ -1131,6 +1139,7 @@ export const useUserStore = create<UserState>()(
           claimedMissionIds: [],
           unlockedAccessories: ['ninguno'],
           testMode: false,
+          soundEnabled: true,
           reminderEnabled: false,
           reminderHour: DEFAULT_REMINDER_HOUR,
           heartsReminderEnabled: false,

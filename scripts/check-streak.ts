@@ -430,7 +430,7 @@ check6(
 
 reset({ streak: 1, lastActiveDate: todayLocal(-7), streakProtectors: 0 });
 store.settleStreak();
-check6('una racha ya en 1 no tiene nada que sentenciar', useUserStore.getState().streak === 1);
+check6('una racha de 1 perdida también vuelve a 0', useUserStore.getState().streak === 0);
 
 // Settled once, a real lesson today still starts a clean day-one streak
 // instead of double-recording the same loss.

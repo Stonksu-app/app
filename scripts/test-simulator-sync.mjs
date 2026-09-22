@@ -21,9 +21,19 @@ await pool.query(`
   create table public.profiles (id uuid primary key, coins integer not null default 1000);
   insert into public.profiles (id) values ('${uid}'), ('${other}');
 `);
-const migration = await readFile('supabase/migrations/0016_simulator_sync.sql', 'utf8');
-await pool.query(migration);
-await pool.query(migration); // Rerunnable from SQL Editor.
+// El esquema vive en Stonksu-app/database, no aquí: la copia de supabase/
+// migrations es el histórico de antes de la mudanza. Apunta SIMULATOR_MIGRATIONS
+// al repositorio de verdad para probar el RPC que se despliega, o deja el
+// valor por omisión para que esto siga corriendo solo.
+const rutas = (process.env.SIMULATOR_MIGRATIONS ?? 'supabase/migrations/0016_simulator_sync.sql')
+  .split(',')
+  .map((r) => r.trim())
+  .filter(Boolean);
+for (const ruta of rutas) {
+  const migration = await readFile(ruta, 'utf8');
+  await pool.query(migration);
+  await pool.query(migration); // Rerunnable from SQL Editor.
+}
 async function rpc(name, args = {}, user = uid) {
   const c = await pool.connect();
   try {

@@ -81,6 +81,10 @@ Despliegue: ejecutar `0016_simulator_sync.sql` en el proyecto Supabase correspon
 
 Gratis y Premium tienen una práctica y una operación por día. Premium (2,99 €/mes en la oferta del código) elimina anuncios propios. Ultra (6,99 €/mes) añade vidas, prácticas y trades ilimitados, y accesorios. Las comprobaciones para temas exclusivos existen, pero ningún tema está marcado Ultra. **No hay cobro integrado**: planes no disponibles para compra real y cambio de plan de prueba en `testMode`.
 
+Primera prueba de monetización: en `dev`/`test`, cualquier cuenta puede usar `/planes` para elegir tarjeta o cartera del dispositivo y simular el pago sin datos bancarios ni cargo. Los `AdSlot` de Home y Guía muestran un espacio de prueba sin red publicitaria; en producción la promoción interna se identifica como tal. `/ultra` envía al selector de planes. `docs/MONETIZATION.md` explica el recorrido y los requisitos para cobros y anuncios reales. La simulación usa el plan sincronizado existente y **no verifica una compra**; antes de activar cobros, el servidor debe ser la autoridad del plan y el cliente debe dejar de escribirlo.
+
+Validación de esta prueba (2026-09-22): `npm ci`, `npm run check`, `npm run lint` y `npm run build` completados. El check de nube se actualizó para reconocer `soundEnabled` como ajuste local y el de rachas para reflejar la regla vigente de rachas de un día. En Chromium, a 390×844 y 1440×900, se eligió Ultra, se seleccionó la cartera y se completó la simulación; el anuncio de prueba apareció en Home con plan Gratis. No se ejecutó un cobro, una petición a AdMob ni una prueba en binarios nativos.
+
 ## Aspecto e intención visual
 
 La referencia está expresada en componentes/comentarios; no hay un archivo de diseño externo versionado. Conservar una app educativa amable y de aspecto consistente, con controles grandes y respuesta inmediata.

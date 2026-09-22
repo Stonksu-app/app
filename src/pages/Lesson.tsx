@@ -18,6 +18,7 @@ import { getLessonById, getNodeById, getReviewPool } from '../data/lessons';
 import { canPlayUltraLessons } from '../data/plans';
 import { useComboFeedback } from '../hooks/useComboFeedback';
 import { useUserStore } from '../store/useUserStore';
+import { play } from '../lib/sound';
 import { buildStage, mistakeKey } from '../utils/buildActivityStream';
 import { shuffle } from '../utils/shuffle';
 import type { Activity, IconName } from '../types';
@@ -181,6 +182,7 @@ export default function Lesson() {
     const wasFirstEverLesson = attempts.length === 0;
     const alreadyCompleted = isLessonCompleted(lesson.id);
 
+    play('lesson');
     const { protectorGifted, levelUp } = completeLesson({
       lessonId: lesson.id,
       nodeId: node.id,
@@ -250,6 +252,7 @@ export default function Lesson() {
     setSelectedId(optionId);
     setChecked(true);
     setMascotLine(randomLine(correct ? 'correct' : 'incorrect'));
+    play(correct ? 'correct' : 'wrong');
     trackResult(correct);
   };
 

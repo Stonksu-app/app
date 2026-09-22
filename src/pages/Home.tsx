@@ -10,6 +10,7 @@ import UltraPromo from '../components/UltraPromo';
 import LeaguePromotionCelebration from '../components/LeaguePromotionCelebration';
 import { Button } from '../components/Button';
 import { formatCountdown, useHeartRegen } from '../hooks/useHeartRegen';
+import { play } from '../lib/sound';
 import { SKILL_TREE } from '../data/lessons';
 import StatPanel, { type StatKey } from '../components/StatPanels';
 import { CHEST_REWARD, useUserStore, xpToLevel } from '../store/useUserStore';
@@ -550,6 +551,7 @@ export default function Home() {
                     <button
                       disabled={!item.unlocked || item.opened}
                       onClick={() => {
+                        play('reward');
                         const protectorGifted = openChest(item.key);
                         setReward({ protectorGifted });
                       }}

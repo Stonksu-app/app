@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigationType } from 'react-router-dom';
 import SplashScreen from './components/SplashScreen';
+import { useSound } from './hooks/useSound';
 import Landing from './pages/Landing';
 import Guide from './pages/Guide';
 import GuidePractice from './pages/GuidePractice';
@@ -88,6 +89,7 @@ function App() {
   // already 10 seconds, which comfortably covers the first pull.
   useCloudSync();
   useStreakReminders();
+  useSound();
   useHeartsReminder();
 
   // Watches the session so the nag knows whether this account is anonymous.

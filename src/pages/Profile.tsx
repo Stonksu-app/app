@@ -9,6 +9,7 @@ import PlanBadge from '../components/PlanBadge';
 import LeagueMark from '../components/LeagueMark';
 import { MAX_LEAGUE_RANK, leagueRankInfo } from '../data/leagues';
 import AchievementRow from '../components/AchievementRow';
+import SoundSetting from '../components/SoundSetting';
 import ReminderSetting from '../components/ReminderSetting';
 import HeartsReminderSetting from '../components/HeartsReminderSetting';
 import PasswordSetting from '../components/PasswordSetting';
@@ -251,6 +252,7 @@ export default function Profile() {
             </div>
           )}
 
+          <SoundSetting />
           <ReminderSetting />
           <HeartsReminderSetting />
           <PasswordSetting />
