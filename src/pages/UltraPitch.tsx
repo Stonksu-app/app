@@ -1,10 +1,8 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import Mascot from '../components/Mascot';
 import { Button } from '../components/Button';
 import { formatPrice, offerFor } from '../data/plans';
-import { useUserStore } from '../store/useUserStore';
 
 /*
  * The between-lessons pitch, in the shape Duolingo uses for Super: the perks
@@ -22,16 +20,7 @@ const STAGGER_MS = 320;
 export default function UltraPitch() {
   const navigate = useNavigate();
   const ultra = offerFor('ultra')!;
-  const testMode = useUserStore((s) => s.testMode);
-  const setPlan = useUserStore((s) => s.setPlan);
-  const [notice, setNotice] = useState<string | null>(null);
-
   const choose = () => {
-    if (testMode) {
-      setPlan('ultra');
-      setNotice('Modo test: Ultra activado sin pagar nada.');
-      return;
-    }
     navigate('/planes');
   };
 
@@ -81,12 +70,6 @@ export default function UltraPitch() {
           Todo esto por{' '}
           <span className="font-black text-carbon-100">{formatPrice(ultra.price)}</span> al mes.
         </p>
-
-        {notice && (
-          <p className="mt-4 rounded-2xl border-2 border-ultra-500/30 bg-ultra-500/10 px-4 py-3 text-center text-sm font-bold text-ultra-300 animate-pop-in">
-            {notice}
-          </p>
-        )}
 
         <div className="mt-5 space-y-3">
           <Button variant="platinum" onClick={choose}>

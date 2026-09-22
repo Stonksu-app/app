@@ -7,17 +7,17 @@ import Icon from '../components/Icon';
 import Mascot from '../components/Mascot';
 import { Button } from '../components/Button';
 import ConfirmModal from '../components/ConfirmModal';
+import { Capacitor } from '@capacitor/core';
 import { PLAN_OFFERS, formatPrice, planName, type PlanOffer } from '../data/plans';
+import { isTestingBackend } from '../lib/supabase';
 import { useUserStore } from '../store/useUserStore';
 
 /*
  * The two plans, side by side.
  *
- * Nothing here takes money: there is no payment provider wired up, and a
- * screen that collected card details into nowhere would be a lie told to
- * somebody's wallet. So the button says what's actually true — the plans
- * aren't on sale yet — and in test mode it switches the plan locally so every
- * perk behind it can be exercised before a single euro is involved.
+ * Payment method selection is a preview in dev/test. It never requests card
+ * details or opens a wallet. Billing must be verified on the server before
+ * this screen can sell subscriptions.
  */
 
 function PlanCard({
@@ -90,6 +90,11 @@ function PlanCard({
 export default function Premium() {
   const navigate = useNavigate();
   const { plan, testMode, setPlan } = useUserStore();
+  const [selectedOffer, setSelectedOffer] = useState<PlanOffer | null>(null);
+  const paymentRef = useRef<HTMLElement>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'wallet'>('card');
+  const platform = Capacitor.getPlatform();
+  const walletName = platform === 'ios' ? 'Apple Pay' : platform === 'android' ? 'Google Pay' : 'Apple Pay o Google Pay';
   /** Carries the plan it came from: an answer to "elegir Premium" printed in
    *  Ultra's violet reads as being about the other card. */
   const [notice, setNotice] = useState<{ text: string; accent: PlanOffer['accent'] } | null>(null);
@@ -110,16 +115,32 @@ export default function Premium() {
     noticeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [notice]);
 
+  useEffect(() => {
+    if (selectedOffer) paymentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [selectedOffer]);
+
   const choose = (offer: PlanOffer) => {
-    if (testMode) {
-      setPlan(offer.id);
-      setNotice({ text: `Modo test: ${offer.name} activado sin pagar nada.`, accent: offer.accent });
+    if (isTestingBackend && testMode) {
+      setSelectedOffer(offer);
+      setPaymentMethod('card');
       return;
     }
     setNotice({
-      text: 'Los pagos todavía no están conectados. En cuanto lo estén, este botón abrirá la pasarela.',
+      text: isTestingBackend
+        ? 'Las compras todavía no están disponibles. Para probar el recorrido sin pagar, crea una cuenta de prueba con el apodo test.'
+        : 'Las compras todavía no están disponibles.',
       accent: offer.accent,
     });
+  };
+
+  const simulatePayment = () => {
+    if (!selectedOffer || !isTestingBackend || !testMode) return;
+    setPlan(selectedOffer.id);
+    setNotice({
+      text: `Prueba completada con ${paymentMethod === 'card' ? 'tarjeta' : walletName}: ${selectedOffer.name} activado sin cargo real.`,
+      accent: selectedOffer.accent,
+    });
+    setSelectedOffer(null);
   };
 
   return (
@@ -150,7 +171,7 @@ export default function Premium() {
               </p>
               <p className="text-xl font-black text-carbon-50">{planName(plan)}</p>
             </div>
-            {plan !== 'free' && (
+            {plan !== 'free' && isTestingBackend && testMode && (
               <button
                 onClick={() => setConfirmCancel(true)}
                 className="ml-auto shrink-0 text-[13px] font-black uppercase tracking-wide text-carbon-500 hover:text-carbon-300 transition"
@@ -186,9 +207,32 @@ export default function Premium() {
             ))}
           </div>
 
+          {selectedOffer && (
+            <section ref={paymentRef} aria-label="Pago de prueba" className="mt-5 rounded-3xl border-2 border-ultra-500/40 bg-carbon-850 p-5">
+              <p className="text-xs font-black uppercase tracking-wide text-ultra-300">Simulación · sin cargos</p>
+              <h2 className="mt-2 text-xl font-black text-carbon-50">Stonksu {selectedOffer.name}</h2>
+              <p className="mt-1 text-sm text-carbon-300">{formatPrice(selectedOffer.price)} al mes. Elige cómo querrías pagar cuando esté disponible.</p>
+              <div role="radiogroup" aria-label="Método de pago" className="mt-4 space-y-2">
+                {([
+                  { id: 'card' as const, label: 'Tarjeta de crédito o débito' },
+                  { id: 'wallet' as const, label: walletName },
+                ]).map((method) => (
+                  <label key={method.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-carbon-700 bg-carbon-900 p-3 text-sm font-bold text-carbon-100">
+                    <input type="radio" name="payment-method" value={method.id} checked={paymentMethod === method.id} onChange={() => setPaymentMethod(method.id)} className="accent-lime-500" />
+                    {method.label}
+                  </label>
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-carbon-400">No se pedirán datos de tarjeta ni se abrirá una cartera. Esta prueba no crea una suscripción.</p>
+              <div className="mt-4 space-y-2">
+                <Button variant="platinum" onClick={simulatePayment}>Simular pago sin cargo</Button>
+                <Button variant="secondary" onClick={() => setSelectedOffer(null)}>Volver a los planes</Button>
+              </div>
+            </section>
+          )}
+
           <p className="mt-6 text-[13px] text-carbon-500 leading-snug">
-            Los precios son mensuales e incluyen impuestos. Puedes cancelar cuando quieras y
-            mantienes el plan hasta que termine el mes pagado.
+            Precios previstos para la suscripción mensual. Las compras todavía no están disponibles.
           </p>
         </div>
       </div>
@@ -196,7 +240,7 @@ export default function Premium() {
       {confirmCancel && (
         <ConfirmModal
           title={`¿Cancelar ${planName(plan)}?`}
-          message="Volverás al plan gratuito ahora mismo y perderás sus ventajas. Los pagos todavía no están conectados, así que no hay nada que reembolsar: puedes reactivarlo cuando quieras."
+          message="Volverás al plan gratuito ahora mismo y perderás sus ventajas de prueba. No se ha realizado ningún cobro."
           confirmLabel="Sí, cancelar"
           cancelLabel="Seguir con el plan"
           onConfirm={() => {
