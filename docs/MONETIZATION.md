@@ -2,7 +2,7 @@
 
 ## Estado actual
 
-En `dev` y `test`, una cuenta creada con el apodo `test` puede entrar en Planes, elegir Premium o Ultra, escoger **tarjeta** o **Apple Pay / Google Pay** según dispositivo y pulsar **Simular pago sin cargo**. No se solicitan datos bancarios ni se abre una cartera. La simulación cambia el plan mediante el mecanismo de prueba existente; no crea una suscripción ni un recibo. El botón de cancelar vuelve al plan gratuito solo para esa cuenta de prueba.
+En `dev` y `test`, cualquier cuenta puede entrar en Planes, elegir Premium o Ultra, escoger **tarjeta** o **Apple Pay / Google Pay** según dispositivo y pulsar **Simular pago sin cargo**. No se solicitan datos bancarios ni se abre una cartera. La simulación cambia el plan mediante el mecanismo de prueba existente; no crea una suscripción ni un recibo. El botón de cancelar vuelve al plan gratuito en esos entornos.
 
 Los espacios de Home y Guía muestran un anuncio de prueba en `dev` y `test`, solo para el plan Gratis. No se llama a una red publicitaria y no se generan impresiones. En producción se mantiene la promoción interna, identificada como tal.
 

@@ -89,7 +89,7 @@ function PlanCard({
 
 export default function Premium() {
   const navigate = useNavigate();
-  const { plan, testMode, setPlan } = useUserStore();
+  const { plan, setPlan } = useUserStore();
   const [selectedOffer, setSelectedOffer] = useState<PlanOffer | null>(null);
   const paymentRef = useRef<HTMLElement>(null);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'wallet'>('card');
@@ -120,21 +120,16 @@ export default function Premium() {
   }, [selectedOffer]);
 
   const choose = (offer: PlanOffer) => {
-    if (isTestingBackend && testMode) {
+    if (isTestingBackend) {
       setSelectedOffer(offer);
       setPaymentMethod('card');
       return;
     }
-    setNotice({
-      text: isTestingBackend
-        ? 'Las compras todavía no están disponibles. Para probar el recorrido sin pagar, crea una cuenta de prueba con el apodo test.'
-        : 'Las compras todavía no están disponibles.',
-      accent: offer.accent,
-    });
+    setNotice({ text: 'Las compras todavía no están disponibles.', accent: offer.accent });
   };
 
   const simulatePayment = () => {
-    if (!selectedOffer || !isTestingBackend || !testMode) return;
+    if (!selectedOffer || !isTestingBackend) return;
     setPlan(selectedOffer.id);
     setNotice({
       text: `Prueba completada con ${paymentMethod === 'card' ? 'tarjeta' : walletName}: ${selectedOffer.name} activado sin cargo real.`,
@@ -171,7 +166,7 @@ export default function Premium() {
               </p>
               <p className="text-xl font-black text-carbon-50">{planName(plan)}</p>
             </div>
-            {plan !== 'free' && isTestingBackend && testMode && (
+            {plan !== 'free' && isTestingBackend && (
               <button
                 onClick={() => setConfirmCancel(true)}
                 className="ml-auto shrink-0 text-[13px] font-black uppercase tracking-wide text-carbon-500 hover:text-carbon-300 transition"
