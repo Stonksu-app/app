@@ -9,15 +9,16 @@ import { Button } from '../components/Button';
 import ConfirmModal from '../components/ConfirmModal';
 import { Capacitor } from '@capacitor/core';
 import { PLAN_OFFERS, formatPrice, planName, type PlanOffer } from '../data/plans';
-import { isTestingBackend } from '../lib/supabase';
+import { isTestingBackend, supabase } from '../lib/supabase';
+import { checkoutUrl, portalUrl, webBillingEnabled } from '../lib/billing';
+import { useAuthStore } from '../store/useAuthStore';
 import { useUserStore } from '../store/useUserStore';
 
 /*
  * The two plans, side by side.
  *
- * Payment method selection is a preview in dev/test. It never requests card
- * details or opens a wallet. Billing must be verified on the server before
- * this screen can sell subscriptions.
+ * Stripe Checkout handles real payment methods when web billing is configured.
+ * Without it, dev/test keeps the no-charge preview.
  */
 
 function PlanCard({
@@ -90,14 +91,16 @@ function PlanCard({
 export default function Premium() {
   const navigate = useNavigate();
   const { plan, setPlan } = useUserStore();
+  const authStatus = useAuthStore((s) => s.status);
   const [selectedOffer, setSelectedOffer] = useState<PlanOffer | null>(null);
+  const [billingBusy, setBillingBusy] = useState(false);
   const paymentRef = useRef<HTMLElement>(null);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'wallet'>('card');
   const platform = Capacitor.getPlatform();
   const walletName = platform === 'ios' ? 'Apple Pay' : platform === 'android' ? 'Google Pay' : 'Apple Pay o Google Pay';
   /** Carries the plan it came from: an answer to "elegir Premium" printed in
    *  Ultra's violet reads as being about the other card. */
-  const [notice, setNotice] = useState<{ text: string; accent: PlanOffer['accent'] } | null>(null);
+  const [notice, setNotice] = useState<{ text: string; accent: PlanOffer['accent']; accountLink?: boolean } | null>(null);
   const noticeRef = useRef<HTMLParagraphElement>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
@@ -119,7 +122,54 @@ export default function Premium() {
     if (selectedOffer) paymentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [selectedOffer]);
 
-  const choose = (offer: PlanOffer) => {
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('checkout') !== 'cancel') return;
+    setNotice({ text: 'Has cerrado el pago. No se ha hecho ningún cargo.', accent: 'lime' });
+    window.history.replaceState({}, '', '/planes');
+  }, []);
+
+  useEffect(() => {
+    if (!webBillingEnabled || new URLSearchParams(window.location.search).get('checkout') !== 'success' || !supabase) return;
+    const client = supabase;
+    let cancelled = false;
+    setNotice({ text: 'Estamos confirmando tu suscripción…', accent: 'ultra' });
+    const confirm = async () => {
+      const { data: session } = await client.auth.getSession();
+      if (!session.session) return;
+      for (let attempt = 0; attempt < 15 && !cancelled; attempt++) {
+        const { data } = await client.from('profiles').select('plan, plan_started_at')
+          .eq('id', session.session.user.id).maybeSingle();
+        if (data?.plan === 'premium' || data?.plan === 'ultra') {
+          setPlan(data.plan);
+          useUserStore.setState({ planStartedAt: data.plan_started_at });
+          setNotice({ text: `${data.plan === 'ultra' ? 'Ultra' : 'Premium'} activado. Gracias por suscribirte.`, accent: data.plan === 'ultra' ? 'ultra' : 'lime' });
+          window.history.replaceState({}, '', '/planes');
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+      if (!cancelled) setNotice({ text: 'El pago está pendiente de confirmación. Actualiza esta página en unos segundos.', accent: 'ultra' });
+    };
+    void confirm();
+    return () => { cancelled = true; };
+  }, [setPlan]);
+
+  const choose = async (offer: PlanOffer) => {
+    if (webBillingEnabled) {
+      if (authStatus !== 'registered') {
+        setNotice({ text: 'Guarda tu cuenta antes de suscribirte para conservar el plan en todos tus dispositivos.', accent: offer.accent, accountLink: true });
+        return;
+      }
+      if (billingBusy) return;
+      setBillingBusy(true);
+      try {
+        window.location.assign(await checkoutUrl(offer.id));
+      } catch (error) {
+        setNotice({ text: error instanceof Error ? error.message : 'No pudimos abrir la pasarela.', accent: offer.accent });
+        setBillingBusy(false);
+      }
+      return;
+    }
     if (isTestingBackend) {
       setSelectedOffer(offer);
       setPaymentMethod('card');
@@ -136,6 +186,17 @@ export default function Premium() {
       accent: selectedOffer.accent,
     });
     setSelectedOffer(null);
+  };
+
+  const manageBilling = async () => {
+    if (billingBusy) return;
+    setBillingBusy(true);
+    try {
+      window.location.assign(await portalUrl());
+    } catch (error) {
+      setNotice({ text: error instanceof Error ? error.message : 'No pudimos abrir la gestión de pagos.', accent: 'ultra' });
+      setBillingBusy(false);
+    }
   };
 
   return (
@@ -166,7 +227,16 @@ export default function Premium() {
               </p>
               <p className="text-xl font-black text-carbon-50">{planName(plan)}</p>
             </div>
-            {plan !== 'free' && isTestingBackend && (
+            {plan !== 'free' && webBillingEnabled && (
+              <button
+                onClick={() => void manageBilling()}
+                disabled={billingBusy}
+                className="ml-auto shrink-0 text-[13px] font-black uppercase tracking-wide text-carbon-500 hover:text-carbon-300 transition disabled:opacity-50"
+              >
+                Gestionar
+              </button>
+            )}
+            {plan !== 'free' && !webBillingEnabled && isTestingBackend && (
               <button
                 onClick={() => setConfirmCancel(true)}
                 className="ml-auto shrink-0 text-[13px] font-black uppercase tracking-wide text-carbon-500 hover:text-carbon-300 transition"
@@ -188,6 +258,9 @@ export default function Premium() {
               }`}
             >
               {notice.text}
+              {notice.accountLink && (
+                <button onClick={() => navigate('/profile')} className="ml-2 underline underline-offset-2">Ir a Perfil</button>
+              )}
             </p>
           )}
 
@@ -197,7 +270,7 @@ export default function Premium() {
                 key={offer.id}
                 offer={offer}
                 current={plan === offer.id}
-                onChoose={() => choose(offer)}
+                onChoose={() => void choose(offer)}
               />
             ))}
           </div>
@@ -227,7 +300,11 @@ export default function Premium() {
           )}
 
           <p className="mt-6 text-[13px] text-carbon-500 leading-snug">
-            Precios previstos para la suscripción mensual. Las compras todavía no están disponibles.
+            {webBillingEnabled
+              ? isTestingBackend
+                ? 'Checkout de prueba: puedes usar tarjetas de prueba de Stripe. No se mueve dinero real.'
+                : 'Suscripción mensual gestionada por Stripe. Puedes cancelarla desde Gestionar.'
+              : 'Precios previstos para la suscripción mensual. Las compras todavía no están disponibles.'}
           </p>
         </div>
       </div>

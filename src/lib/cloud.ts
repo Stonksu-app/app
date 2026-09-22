@@ -123,8 +123,6 @@ export function toRow(s: CloudState, id: string) {
     pending_mistakes: s.pendingMistakes,
     node_stage_progress: s.nodeStageProgress,
     term_mastery: s.termMastery,
-    plan: s.plan,
-    plan_started_at: s.planStartedAt,
     avatar: s.avatar,
     virtual_balance: s.virtualBalance,
     frozen_dates: s.frozenDates,

@@ -78,7 +78,9 @@ const sample: CloudState = {
 
 // ------------------------------------------------- the mapping is lossless
 const row = toRow(sample, 'user-uuid');
-const back = fromRow(row as unknown as ProfileRow, sample.attempts);
+const back = fromRow({ ...row, plan: sample.plan, plan_started_at: sample.planStartedAt } as unknown as ProfileRow, sample.attempts);
+
+check('client never writes the billing-owned plan', !('plan' in row) && !('plan_started_at' in row));
 
 for (const key of Object.keys(sample) as (keyof CloudState)[]) {
   check(
@@ -90,7 +92,7 @@ for (const key of Object.keys(sample) as (keyof CloudState)[]) {
 
 // Postgres returns numeric as a string; the mapping has to convert it back or
 // the virtual balance turns into "12345.67" and arithmetic on it concatenates.
-const asPostgresReturnsIt = { ...row, virtual_balance: '12345.67' } as unknown as ProfileRow;
+const asPostgresReturnsIt = { ...row, plan: sample.plan, plan_started_at: sample.planStartedAt, virtual_balance: '12345.67' } as unknown as ProfileRow;
 const converted = fromRow(asPostgresReturnsIt, []);
 check(
   'a numeric column comes back as a number, not a string',
@@ -216,7 +218,7 @@ for (const column of Object.keys(row)) {
 
 // Server-owned columns don't come from toRow's output, so the loop above
 // never looks for them — checked by hand instead, same regex.
-for (const column of ['league_rank', 'league_table_id', 'league_week_start']) {
+for (const column of ['league_rank', 'league_table_id', 'league_week_start', 'plan', 'plan_started_at']) {
   const declared =
     new RegExp(String.raw`\n\s+${column}\s`).test(sql) ||
     new RegExp(String.raw`add column (if not exists )?${column}\s`).test(sql);
@@ -239,7 +241,8 @@ check('a profile row is created automatically for new accounts', createsProfileT
 check('the superseded trigger from 0001 is dropped, not left duplicating work', legacyTriggerDropped);
 
 check('the account summary view cannot leak other players', /security_invoker = true/.test(sql));
-check('the migrations never mention the service_role key', !/service_role/.test(sql));
+check('the migrations never contain a service role credential', !/service_role[_ ]key|SUPABASE_SERVICE_ROLE_KEY/i.test(sql));
+check('the billing migration protects paid plans from client updates', /create trigger profiles_protect_billing_plan/.test(sql) && /new\.plan := old\.plan/.test(sql));
 
 // ------------------------------- what a friend is allowed to see about you
 // The numbers on a friend's card come from tables the caller cannot read, so
