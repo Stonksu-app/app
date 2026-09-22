@@ -1,3 +1,5 @@
+-- Mirror of database/supabase/migrations/20260922125730_billing.sql.
+-- toca datos: retira planes de simulación sin una suscripción verificada.
 -- Stripe is the authority for paid plans. The client may still sync learning
 -- progress, but cannot change plan or plan_started_at through its profile row.
 create or replace function public.protect_billing_plan()
@@ -60,4 +62,6 @@ grant all on public.billing_subscriptions to service_role;
 -- Service role alone may update billing rows. An authenticated player can
 -- neither fake a subscription nor write another player's entitlement.
 -- Existing paid plans came from the old preview and have no verified receipt.
-update public.profiles set plan = 'free', plan_started_at = null where plan <> 'free';
+update public.profiles p set plan = 'free', plan_started_at = null
+where p.plan <> 'free'
+  and not exists (select 1 from public.billing_subscriptions b where b.user_id = p.id);
